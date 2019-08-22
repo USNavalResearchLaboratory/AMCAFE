@@ -33,12 +33,12 @@ int main()
   MPI_Comm_rank(MPI_COMM_WORLD,&myid);
   
   int NtM,cc1,nDim;
-  std::vector<int> nXM,nX,nTTemp(3,0);
+  std::vector<int> nXM,nX;
   std::vector<double> dX,dXM,LX;
   double tL,mL,c0,Gamma,dP,dL,dtM,muN,layerThickness,T0;
   std::string filbaseTemp,filbaseOut,filout,neighOrder;
-  double mu; //2e11;//5e9 // rate for baseplate voronoi;
-  double heightBase;
+  double mu = 2e11; //2e11;//5e9 // rate for baseplate voronoi;
+  double heightBase = .1e-3;
   // schwalbach parameters
   int patternID;
   double beamVel,beamSpacing,beamPower,wEst,cP,rho,kappa,beamEta,rcut;
@@ -46,10 +46,9 @@ int main()
   // schwalbach parameters
 
   nXM = {20,20,20};
-  nX = {128,32,16};
+  nX = {20,20,20};
   nDim = nX.size();
-  //  LX = {.002,.002,.001};
-  LX = {.001,.00025,12.5e-5};  
+  LX = {.002,.002,.002};
   dX.assign(nDim,0.0);
   dXM.assign(nDim,0.0);
   for (int j=0;j<nDim;++j){
@@ -62,9 +61,7 @@ int main()
   mL = -10.9; // (K / wt%)
   dL = 3e-9; // (m^2/s)
   Gamma = 1e-7;  // (K m)
-  muN = 9; // 9e-2; // rate for nucleation
-  mu = 2e14; // 2e11
-  heightBase = 2e-5;
+  muN = 9e-2; // rate for nucleation
   dP = .48;
   c0 = 4.85; // (wt %)
   filbaseTemp = "/Users/kteferra/Documents/research/projects/AMICME/codes/CA/tempData/tempField0.";
@@ -72,11 +69,7 @@ int main()
   rho = 8000.0; // kg /m^3
   cP = 502.0; // J/kg-K)
   kappa = 18.0; // W/(m-K)
-  beamVel = 70e-3; //70e-3 // m/s
-  beamSTD = {5e-5,10e-5,12.5e-5}; //  {20e-6,20e-6,20e-6}; // m
-  beamPower = 70; //300; // W
-  beamEta = 1.0;
-  layerThickness = floor(beamSTD[2]/dX[2])*dX[2]; //30e-6; // m (layer thickness to be multiple of dX[2])
+  layerThickness = 50e-5; //30e-6; // m
   Grid g(dX,nX,tL,mL,c0,Gamma,dP,dL,muN,rho,cP,kappa,layerThickness,neighOrder,nDim);
   Partition part(g,myid,nprocs);
   part.PartitionGraph();
@@ -84,18 +77,18 @@ int main()
   TempField TempF(g,part,bp);
   // initialize appropriate temperature model
   //TempF.InitializeMoose(filbaseTemp,NtM,dtM,nXM,dXM);
+  beamVel = 70e-3; // m/s
+  beamSTD = {20e-5,20e-5,50e-5}; //  {20e-6,20e-6,20e-6}; // m
+  beamPower = 400; //300; // W
+  beamEta = 1.0;
   wEst  = pow(8*beamPower/(exp(1.0)*M_PI*rho*cP*(tL-298.0)*beamVel),.5); // see EQ (1) in schwalbach
   beamSpacing = 4.0/3.0*beamSTD[1]; //wEst*.8;
   patternID = 0;
-  //LxAll = {LX[0]+beamSpacing,LX[1]+beamSpacing,LX[2]}; //{.01,.01,.01}; // domain of entire piece, used for laser pattern (m)
-  LxAll = {LX[0]+1000*beamSpacing,LX[1],LX[2]};
-  //LxAll = {.002+beamSpacing,.002+beamSpacing,.002+beamSpacing}; //{.01,.01,.01}; // domain of entire piece, used for laser pattern (m)
-  nTTemp = {int(floor(LxAll[0]/(4/3.0*beamSTD[0])))+1,int(floor(LxAll[1]/beamSpacing))+1,
-	    int(floor(LxAll[2]/layerThickness))};
+  LxAll = {.002,.002,.002}; //{.01,.01,.01}; // domain of entire piece, used for laser pattern (m)
   T0 = 300.0; // initial temperature in (K)
   TempF.InitializeSchwalbach(patternID,beamSTD,beamSpacing,beamVel,beamPower,beamEta,LxAll,T0);
   TempF.SchwalbachTempCurr();
-  //TempF.SchwalbachDDtTemp();
+  TempF.SchwalbachDDtTemp();
   //TempF.ReadCSVMoose2();
   //TempF.Test2();
   //TempF.ComputeDDtTemp();
@@ -103,7 +96,6 @@ int main()
   
   VoxelsCA vox(g,TempF, part);
   vox.InitializeVoxels(bp);
-  vox.ExtentsInitialize();
   //vox.InitializeTest1();
   /*
   if (part.myid==0){
@@ -115,31 +107,18 @@ int main()
   /*-----------------------------------------------
     execute simulation */
   cc1=0;
-  int outskip=20,indOut;
-  std::vector<int> filinds,out2(3,0),j123(3,0);
+  int outskip=20;
+  std::vector<int> filinds;
   std::vector<double> filtime;
-  std::string filTest="asdf"; // MUST DELETE AFTER TEST
-  int icheck = 1,ichecktmp,cc2=0, irep=0;
+  int icheck = 1,ichecktmp,cc2=0;
   filbaseOut = "CA3D";
-  out2 = {1,1,1}; // the increment to skip output per direction
   while (icheck!=0){
     cc2+=1;
-    j123[2] = floor(TempF.tInd /(nTTemp[0]*nTTemp[1]));
-    j123[1] = floor((TempF.tInd - (nTTemp[0]*nTTemp[1])*j123[2])/ nTTemp[0]);
-    j123[0] = TempF.tInd - (nTTemp[0]*nTTemp[1])*j123[2] - nTTemp[0]*j123[1];
-    indOut = j123[2] % out2[2] + j123[1] % out2[1] + j123[0] % out2[0];
-    //if (cc2>1000){icheck=0;}
+    if (cc2>1000){icheck=0;}
     icheck=!std::all_of(vox.vState.begin(),vox.vState.end(),[](int n){return n==3;});
     ichecktmp = icheck;
     MPI_Allreduce(&ichecktmp,&icheck,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
-
-    // update next step for voxels (time is updated in vox.ComputeExtents() )
-    vox.UpdateVoxels();
-    vox.CheckTimeSkip();
-    //vox.ComputeNucleation1();
-    //if (TempF.tInd==1){vox.WriteCSVDataTest(filTest); throw std::exception();}
-    /*
-    if (TempF.tInd==2){ 
+    if (g.tInd % outskip ==0 || icheck ==0){ 
       filinds.push_back(g.tInd);
       filtime.push_back(g.time);
       filout = filbaseOut+std::to_string(g.tInd);
@@ -153,35 +132,15 @@ int main()
       } // if (cc1
       MPI_Barrier(MPI_COMM_WORLD);
     }
-    */
-    
-    if (irep==0){
-      irep=1;
-      //      if (TempF.tInd % outskip ==0 || icheck ==0){ 
-      if (indOut==0 || icheck ==0){ 
-	filinds.push_back(TempF.tInd);
-	filtime.push_back(g.time);
-	filout = filbaseOut+std::to_string(TempF.tInd);
-	vox.WriteToVTU1(filout);
-	filout = filbaseOut+".csv";
-	vox.WriteCSVData(filout);
-	cc1+=1;
-	if (cc1 % 20 || icheck==0){
-	  filout=filbaseOut;
-	  vox.WriteToPVD(filout,filinds,filtime);
-	} // if (cc1
-	MPI_Barrier(MPI_COMM_WORLD);
-      }
-    }
-    
+
+    // update next step for voxels (time is updated in vox.ComputeExtents() )
+    vox.UpdateVoxels();
+
+    //vox.ComputeNucleation1();
+
     // update temperature field
-    if (TempF.tInd != int(floor(g.time/TempF.DelT))){
-      vox.ExtentsInitialize();
-      TempF.tInd = int(floor(g.time/TempF.DelT));
-      TempF.SchwalbachTempCurr();
-      //TempF.SchwalbachDDtTemp();
-      irep=0;
-    } // if (TempF.tInd !=
+    TempF.SchwalbachTempCurr();
+    TempF.SchwalbachDDtTemp();
     /* This is for reading CSV file
     if (int(floor(g.time/TempF.dtM))!=TempF.indexM){
       TempF.ReadCSVMoose2();

@@ -1,0 +1,267 @@
+#include "Grid.h"
+#include "Partition.h"
+#include "iostream"
+#include "metis.h"
+#include <numeric>
+#include <vector>
+#include <math.h>
+#include "mpi.h"
+
+//constructor
+Partition::Partition(Grid &g,int & myidIn,int & nprocsIn)
+{
+  _xyz = &g;
+  myid = myidIn;
+  nprocs=nprocsIn;
+} // end constructor
+
+void Partition::PartitionGraph()
+{
+
+  if (myid==0){
+    std::vector<int> cellNeigh,ghostId,cellGhost;
+    
+    idx_t myoptions[METIS_NOPTIONS];
+    myoptions[METIS_OPTION_NUMBERING] = 0; // 0 for 0 based, 1 for 1 based #ing system
+    std::vector<int> n={_xyz->Nx,_xyz->Ny};
+    int nelem=n[0]*n[1],j,cc,cc1,cc2,nneigh,nelemLoc,jn,j1,j2;
+    int nedge = 4*2+3*(n[0]-2)*2+3*(n[1]-2)*2 +4*(n[0]-2)*(n[1]-2);
+    std::vector<int> :: iterator tmp;
+    idx_t myeptr[nelem+1], myeind[nedge];
+    std::vector<int> neigh(4,0),ncheck(4,0),y1;
+    cc=0;
+    for (int j2=0;j2<n[1];++j2){
+      for (int j1=0;j1<n[0];++j1){
+	j = n[0]*j2 + j1;
+	neigh = {j-1,j+1,j-n[0],j+n[0]};
+	cc1=0;
+	ncheck= {0,1,2,3};
+	myeptr[j] = cc;
+	if ((j1-1) < 0 ){ncheck[0]=-1;}
+	if ((j1+1) >= n[0] ){ncheck[1]=-1;}
+	if ((j2-1) < 0){ncheck[2]=-1;}
+	if ((j2+1) >= n[1]){ncheck[3]=-1;}
+	for (int jn=0;jn<4;++jn){
+	  if (ncheck[jn]!=-1){
+	    myeind[cc] = neigh[jn];
+	    cc+=1;
+	  }
+	}
+      }
+    }
+    myeptr[nelem]=cc;
+    idx_t ne=nelem,ncon=1,nn = (n[0]+1)*(n[1]+1),objval,epart[nelem];
+    if (nprocs < 8){
+      METIS_PartGraphRecursive(&ne,&ncon,&myeptr[0],&myeind[0],NULL,NULL,NULL,&nprocs,NULL,NULL,NULL,&objval,&epart[0]);
+    } else{
+      METIS_PartGraphKway(&ne,&ncon,&myeptr[0],&myeind[0],NULL,NULL,NULL,&nprocs,NULL,NULL,NULL,&objval,&epart[0]);
+    }
+    for (int jid=nprocs-1;jid > -1;--jid){
+      cc=0;
+      cc1=0;
+      icellidLoc.assign(nelem,0);
+      cellNeigh.assign(nedge,0);
+      for (int j=0;j<nelem;++j){
+        if (epart[j]==jid){
+          icellidLoc[cc] = j;
+          cc+=1;
+          for (int j1=myeptr[j];j1<myeptr[j+1];++j1){
+            cellNeigh[cc1] = myeind[j1];
+            cc1+=1;
+          }
+        }
+      }
+      ncellLoc = cc;
+      cellNeigh.resize(cc1);
+      // make cellNeigh unique and check which proc owns it
+      std::sort(cellNeigh.begin(),cellNeigh.end());
+      tmp = std::unique(cellNeigh.begin(),cellNeigh.end());
+      cellNeigh.resize(std::distance(cellNeigh.begin(),tmp));
+      nneigh = cellNeigh.size();
+      cellGhost.assign(nneigh,0);
+      ghostId.assign(nneigh,0);
+      cc=0;
+      for (int j=0;j<nneigh;++j){
+        if (epart[cellNeigh[j]] !=jid){
+          cellGhost[cc] = cellNeigh[j];
+          ghostId[cc] = epart[cellNeigh[j]];
+          cc+=1;
+        }
+      }
+      ghostId.resize(cc);
+      cellGhost.resize(cc);
+      nGhost = cc;
+      nelemLoc = nGhost + ncellLoc;
+      icellidLoc.resize(nelemLoc);
+      for (int j=0;j<nGhost;++j){
+        icellidLoc[j+ncellLoc]=cellGhost[j];
+      };
+      ineighProcId = ghostId;
+      std::sort(ineighProcId.begin(),ineighProcId.end());
+      tmp = std::unique(ineighProcId.begin(),ineighProcId.end());
+      ineighProcId.resize(std::distance(ineighProcId.begin(),tmp));
+      nneighProc = ineighProcId.size();
+      ineigh2Locptr.assign(nneighProc+1,0);
+      ineigh2LocVals.assign(nGhost,0);
+      y1.assign(nGhost,0);
+      std::iota(y1.begin(),y1.end(),0);
+      std::sort(y1.begin(),y1.end(),[&ghostId](int i1,int i2){return ghostId[i1]<ghostId[i2];});
+      cc= -1;
+      cc1=0;
+      ineigh2Locptr[0]=0;
+      for (int j=0;j<nGhost;++j){
+        ineigh2LocVals[j] =  std::distance(icellidLoc.begin(),std::find(icellidLoc.begin(),icellidLoc.end(),cellGhost[y1[j]]));
+        if (ghostId[y1[j]] != cc){
+          ineigh2Locptr[cc1] = j;
+          cc1+=1;
+        }
+        cc = ghostId[y1[j]];
+      }
+      ineigh2Locptr[nneighProc] = nGhost;
+      iloc2Neighptr.assign(nneighProc+1,0);
+      iloc2NeighVals.assign(nedge,0);
+      cc2=0;
+      for (int jn=0;jn<nneighProc;++jn){
+        cellNeigh.assign(nedge,0);
+        cc1=0;
+        for (int j=0;j<nelem;++j){
+          if (epart[j]==ineighProcId[jn]){
+            for (int j1=myeptr[j];j1<myeptr[j+1];++j1){
+              cellNeigh[cc1] = myeind[j1];
+              cc1+=1;
+            }
+          }
+        }
+        cellNeigh.resize(cc1);
+	std::sort(cellNeigh.begin(),cellNeigh.end());
+        tmp = std::unique(cellNeigh.begin(),cellNeigh.end());
+        cellNeigh.resize(std::distance(cellNeigh.begin(),tmp));
+        nneigh = cellNeigh.size();
+        iloc2Neighptr[jn]=cc2;
+        for (int j=0;j<nneigh;++j){
+          if (epart[cellNeigh[j]] ==jid){
+            iloc2NeighVals[cc2] =std::distance(icellidLoc.begin(),std::find(icellidLoc.begin(),icellidLoc.end(),cellNeigh[j]));
+            cc2+=1;
+          }
+        }
+      } // for jn
+      iloc2Neighptr[nneighProc]=cc2;
+      iloc2NeighVals.resize(cc2);
+      // compute pointIDs for cells
+      ipointidLoc.assign(4*ncellLoc,0);
+      for (int j =0;j<ncellLoc;++j){
+	j2 = static_cast<int>(floor(icellidLoc[j]/(_xyz->Nx))); 
+	j1 = icellidLoc[j] - _xyz->Nx*j2;
+	jn = (_xyz->Nx+1)*j2 + j1;
+	ipointidLoc[4*j] = jn;
+	ipointidLoc[4*j+1] = jn+1;
+	ipointidLoc[4*j+2] = jn+(_xyz->Nx+1)+1;
+	ipointidLoc[4*j+3] = jn+(_xyz->Nx+1);
+      } // for (int j
+      std::sort(ipointidLoc.begin(),ipointidLoc.end());
+      tmp =std::unique(ipointidLoc.begin(),ipointidLoc.end());
+      ipointidLoc.resize(std::distance(ipointidLoc.begin(),tmp));
+      npointLoc = ipointidLoc.size();
+      iconnectivityLoc.assign(4*ncellLoc,0);
+      for (int j=0;j<ncellLoc;++j){
+	j2 = static_cast<int>(floor(icellidLoc[j]/(_xyz->Nx))); 
+	j1 = icellidLoc[j] - (_xyz->Nx)*j2;
+	jn = (_xyz->Nx+1)*j2 + j1;
+	iconnectivityLoc[4*j]=std::distance(ipointidLoc.begin(),std::find(ipointidLoc.begin(),ipointidLoc.end(),jn));
+	iconnectivityLoc[4*j+1]=std::distance(ipointidLoc.begin(),std::find(ipointidLoc.begin(),ipointidLoc.end(),jn+1));
+	iconnectivityLoc[4*j+2]=std::distance(ipointidLoc.begin(),std::find(ipointidLoc.begin(),ipointidLoc.end(),jn+1+_xyz->Nx+1));
+	iconnectivityLoc[4*j+3]=std::distance(ipointidLoc.begin(),std::find(ipointidLoc.begin(),ipointidLoc.end(),jn+_xyz->Nx+1));
+      } // for (int j...
+      // send ineigh2Locptr,ineigh2LocVals, iloc2Neighptr, iloc2NeighVals, icellidLoc,ineighProcId,nneighProc,nGhost,ncellLoc
+      if (jid >0){
+        // SEND Data
+	MPI_Send(&nGhost,1,MPI_INT,jid,0,MPI_COMM_WORLD);
+        MPI_Send(&ncellLoc,1,MPI_INT,jid,0,MPI_COMM_WORLD);
+        MPI_Send(&nneighProc,1,MPI_INT,jid,0,MPI_COMM_WORLD);
+        MPI_Send(&npointLoc,1,MPI_INT,jid,0,MPI_COMM_WORLD);
+        MPI_Send(&icellidLoc[0],(nGhost+ncellLoc),MPI_INT,jid,0,MPI_COMM_WORLD);
+        MPI_Send(&ipointidLoc[0],npointLoc,MPI_INT,jid,0,MPI_COMM_WORLD);
+        MPI_Send(&ineighProcId[0],nneighProc,MPI_INT,jid,0,MPI_COMM_WORLD);
+        MPI_Send(&iloc2Neighptr[0],(nneighProc+1),MPI_INT,jid,0,MPI_COMM_WORLD);
+        MPI_Send(&ineigh2Locptr[0],(nneighProc+1),MPI_INT,jid,0,MPI_COMM_WORLD);
+        MPI_Send(&iloc2NeighVals[0],iloc2Neighptr[nneighProc],MPI_INT,jid,0,MPI_COMM_WORLD);
+        MPI_Send(&ineigh2LocVals[0],ineigh2Locptr[nneighProc],MPI_INT,jid,0,MPI_COMM_WORLD);
+        MPI_Send(&iconnectivityLoc[0],4*ncellLoc,MPI_INT,jid,0,MPI_COMM_WORLD);
+      } // if (jid >0)
+    } // for jid
+  } // if (myid==0)
+  if (myid > 0){
+    // receive data
+    MPI_Recv(&nGhost,1,MPI_INT,0,MPI_ANY_TAG,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+    MPI_Recv(&ncellLoc,1,MPI_INT,0,MPI_ANY_TAG,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+    MPI_Recv(&nneighProc,1,MPI_INT,0,MPI_ANY_TAG,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+    MPI_Recv(&npointLoc,1,MPI_INT,0,MPI_ANY_TAG,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+    icellidLoc.assign((nGhost+ncellLoc),0);
+    ineighProcId.assign(nneighProc,0);
+    iloc2Neighptr.assign(nneighProc+1,0);
+    ineigh2Locptr.assign(nneighProc+1,0);
+    ipointidLoc.assign(npointLoc,0);
+    MPI_Recv(&icellidLoc[0],(nGhost+ncellLoc),MPI_INT,0,MPI_ANY_TAG,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+    MPI_Recv(&ipointidLoc[0],npointLoc,MPI_INT,0,MPI_ANY_TAG,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+    MPI_Recv(&ineighProcId[0],nneighProc,MPI_INT,0,MPI_ANY_TAG,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+    MPI_Recv(&iloc2Neighptr[0],(nneighProc+1),MPI_INT,0,MPI_ANY_TAG,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+    MPI_Recv(&ineigh2Locptr[0],(nneighProc+1),MPI_INT,0,MPI_ANY_TAG,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+    iloc2NeighVals.assign(iloc2Neighptr[nneighProc],0);
+    ineigh2LocVals.assign(ineigh2Locptr[nneighProc],0);
+    iconnectivityLoc.assign(4*ncellLoc,0);
+    MPI_Recv(&iloc2NeighVals[0],iloc2Neighptr[nneighProc],MPI_INT,0,MPI_ANY_TAG,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+    MPI_Recv(&ineigh2LocVals[0],ineigh2Locptr[nneighProc],MPI_INT,0,MPI_ANY_TAG,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+    MPI_Recv(&iconnectivityLoc[0],4*ncellLoc,MPI_INT,0,MPI_ANY_TAG,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+  } // if (myid > 0)
+} // end PartitionGraph()
+
+void Partition::PassInformation(std::vector<int> &ivec)
+{
+  // passes and receives ghost values of ivec among all processors
+  std::vector<int> ivecsend,ivecrecv;
+  int nsend,nrecv;
+  MPI_Request reqs[2*nneighProc];
+  MPI_Status stats[2*nneighProc];
+  // option 1
+  /*
+    for (int j2=0;j2<nneighProc;++j2){
+      nsend = iloc2Neighptr[j2+1]-iloc2Neighptr[j2];
+    ivecsend.resize(nsend,0);
+    for (int j=0;j<nsend;++j){ivecsend[j]=ivec[iloc2NeighVals[iloc2Neighptr[j2]]+j];}
+    MPI_Isend(&ivecsend[0],nsend,MPI_INT,ineighProcId[j2],j1,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[j2]);
+    nrecv = ineigh2Locptr[j2+1]-ineigh2Locptr[j2];
+    ivecrecv.resize(nrecv,0);
+    MPI_Irecv(&ivecrecv[0],nprecv,MPI_INT,ineighProcId[j2],MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[j2+nneighPrc]);
+    for (int j=0;j<nrecv;++j){ivec[ineigh2LocVals[ineigh2Locptr[j2]]+j]=ivecrecv[j];}
+  MPI_Waitall(int 2*nneighProc,&reqs,&stats);
+  */
+    // option 2
+  for (int j2=0;j2<nneighProc;++j2){
+    nsend = iloc2Neighptr[j2+1]-iloc2Neighptr[j2];
+    ivecsend.assign(nsend,0);
+    for (int j=0;j<nsend;++j){ivecsend[j]=ivec[iloc2NeighVals[iloc2Neighptr[j2]+j]];}
+    nrecv = ineigh2Locptr[j2+1]-ineigh2Locptr[j2];
+    ivecrecv.assign(nrecv,0);
+    MPI_Sendrecv(&ivecsend[0],nsend,MPI_INT,ineighProcId[j2],0,
+		 &ivecrecv[0],nrecv,MPI_INT,ineighProcId[j2],MPI_ANY_TAG,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+    for (int j=0;j<nrecv;++j){ivec[ineigh2LocVals[ineigh2Locptr[j2]+j]]=ivecrecv[j];}
+  } // for j2
+} // end PassInformation(std::vector<int> &ivec)
+void Partition::PassInformation(std::vector<double> &vec)
+{
+  // passes and receives ghost values of ivec among all processors
+  std::vector<double> vecsend,vecrecv;
+  int nsend,nrecv;
+  MPI_Request reqs[2*nneighProc];
+  MPI_Status stats[2*nneighProc];
+  for (int j2=0;j2<nneighProc;++j2){
+    nsend = iloc2Neighptr[j2+1]-iloc2Neighptr[j2];
+    vecsend.assign(nsend,0);
+    for (int j=0;j<nsend;++j){vecsend[j]=vec[iloc2NeighVals[iloc2Neighptr[j2]+j]];}
+    nrecv = ineigh2Locptr[j2+1]-ineigh2Locptr[j2];
+    vecrecv.assign(nrecv,0);
+    MPI_Sendrecv(&vecsend[0],nsend,MPI_DOUBLE,ineighProcId[j2],0,
+		 &vecrecv[0],nrecv,MPI_DOUBLE,ineighProcId[j2],MPI_ANY_TAG,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+    for (int j=0;j<nrecv;++j){vec[ineigh2LocVals[ineigh2Locptr[j2]+j]]=vecrecv[j];}
+  } // for j2
+} // end PassInformation(std::vector<double> &vec)

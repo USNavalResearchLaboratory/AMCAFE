@@ -1,0 +1,39 @@
+#ifndef VOXELSCA_H
+#define VOXELSCA_H
+
+#include "Grid.h"
+#include "TempField.h"
+#include "BasePlate.h"
+#include "vector"
+#include "string"
+// #include <math.h>
+
+
+class VoxelsCA
+{
+ public:
+  VoxelsCA(Grid &g, TempField &tf);
+  void ConvertSolid(const int &iswitch);
+  void InitializeVoxels(BasePlate &bp);
+  void SetLiquid();
+  void ZeroVoxels();
+  void ComputeVoxelCapture();
+  void ComputeExtents();
+  void UpdateVoxels();
+  void WriteToVTK(const std::string &filname);
+  void InitializeTest1();
+  void ComputeNeighborhood(int &j, std::string & nO,std::vector<int> & nn);
+  void ComputeNeighborhoodFirst(int &j, std::vector<int> &nn);
+  std::vector<int> gID;
+  std::vector<int> vState; // 0=uninitialized; 1=liquid; 2=mushy; 3=solid
+  std::vector<double> cTheta;
+  std::vector<double> extents;
+  double vmax;
+ private:
+  double extentsInitialValue;
+  Grid *_xyz;
+  BasePlate *bp;
+  TempField *_temp;
+  std::vector<int> nn;
+}; // end class VoxelCA
+#endif

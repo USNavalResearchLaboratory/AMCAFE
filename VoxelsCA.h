@@ -28,10 +28,12 @@ class VoxelsCA
   void CheckTimeSkip();
   void WriteToVTU1(const std::string &filname);
   void WriteCSVData(const std::string &filname);
+  void WriteCSVDataTest(const std::string &filname); // MUST DELETE AFTER TESTING
   void WriteToPVD(const std::string &filname, const std::vector<int> &, const std::vector<double> &);
   std::vector<int> gID,gNucleus;
   std::vector<int> vState; // 0=uninitialized; 1=liquid; 2=mushy; 3=solid
   std::vector<double> cTheta,extents;
+  std::vector<double> velocityStore; // MUST DELETE AFTER TESTING
   double vmax;
   int nGrain,seed0,seed1,NzhBP;
  private:

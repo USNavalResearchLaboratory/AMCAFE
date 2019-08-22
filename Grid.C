@@ -53,7 +53,7 @@ void Grid::UpdateTime(const double &vmax)
 void Grid::UpdateTimeTest1(const double &vmax)
 {
   //dt = .25*std::min(deltaTcheck,deltaXmin/vmax);
-  dt = .50*std::min(deltaTcheck,deltaXmin/vmax);
+  dt = 1.50*std::min(deltaTcheck,deltaXmin/vmax);
   time +=dt;
   tInd +=1;
 } // end UpdateTime

@@ -27,7 +27,6 @@ VoxelsCA::VoxelsCA(Grid &g,TempField &tf, Partition &part)
   extents.assign(Ntot,extentsInitialValue);
   seed0= 2132512;
   seed1=2912351;
-  velocityStore.resize(_part->ncellLoc,0.0); // MUST DELETE AFTER TEST
 } // end constructor
 
 void VoxelsCA::InitializeVoxels(BasePlate &bp){
@@ -74,7 +73,6 @@ void VoxelsCA::InitializeTest1()
 
 void VoxelsCA::UpdateVoxels()
 {
-
   // set liquid if temperature > TL
   SetLiquid();
   // zero voxels above laser (no material there)
@@ -85,7 +83,6 @@ void VoxelsCA::UpdateVoxels()
   _part->PassInformation(vState);
   // update extents of growing grains 
   ComputeExtents();
-  _part->PassInformation(extents);
   // (ComputeExtents: no information pass: only local evaluation)
   // determine if liquid voxel is captured by neighbor
   ComputeVoxelCapture();
@@ -96,7 +93,6 @@ void VoxelsCA::UpdateVoxels()
   ConvertSolid(0);
   _part->PassInformation(vState);
   _part->PassInformation(extents);
-  
 };
 
 void VoxelsCA::ConvertSolid(const int &iswitch)
@@ -104,7 +100,7 @@ void VoxelsCA::ConvertSolid(const int &iswitch)
   // if iswitch =0 then converts mushy to solid
   // else converts solid to mushy
   int Ntot = (_part->ncellLoc),cc,j2,iplay=_xyz->nX[0]*_xyz->nX[1]*_temp->ilaserLoc,
-    iplay2=_xyz->nX[0]*_xyz->nX[1]*(NzhBP-1);
+    iplay2=_xyz->nX[0]*_xyz->nX[1]*NzhBP;
   std::vector<int> vneigh,neigh,i1(_part->ncellLoc,0);
   if (iswitch==0){
     // this checks if all neighbors are >=2 and converts to 3 if currently 2
@@ -166,6 +162,7 @@ void VoxelsCA::ComputeVoxelCapture(){
   std::vector<std::vector<double>> nA(8,std::vector<double>(3)),
     pA(8,std::vector<double>(3)),rRot(3,std::vector<double>(3));
 
+
   nA[0] = {1.0/pow(3.0,.5),1.0/pow(3.0,.5),1.0/pow(3.0,.5)};
   nA[1] = {-1.0/pow(3.0,.5),1.0/pow(3.0,.5),1.0/pow(3.0,.5)};
   nA[2] = {1.0/pow(3.0,.5),-1.0/pow(3.0,.5),1.0/pow(3.0,.5)};
@@ -188,8 +185,8 @@ void VoxelsCA::ComputeVoxelCapture(){
   ichk.assign(Ntot2,0);
   iplay =_xyz->nX[0]*_xyz->nX[1]*_temp->ilaserLoc;
   for (int j=0;j<Ntot;++j){
-    if (_part->icellidLoc[j] >= iplay){continue;}
-    if (vState[j]==1 && _temp->TempCurr[j]<_xyz->tL){
+    //if (_part->icellidLoc[j] >= iplay){continue;}
+    if (vState[j]==1){
       _xyz->ComputeNeighborhood(_part->icellidLoc[j],_xyz->neighOrder,neigh);
       j3 = floor(_part->icellidLoc[j]/(_xyz->nX[0]*_xyz->nX[1]));
       j2 = floor( (_part->icellidLoc[j]- _xyz->nX[0]*_xyz->nX[1]*j3)/_xyz->nX[0]);
@@ -261,41 +258,15 @@ void VoxelsCA::SetLiquid(){
     if (_temp->TempCurr[j] >= _xyz->tL ) { 
       vState[j] = 1;
       gID[j] = 0; // flag that it loses its grain
-      extents[j] = extentsInitialValue;
     } 
   } // end for j
 };
 
-void VoxelsCA::ExtentsInitialize(){
-  int Ntot = _part->ncellLoc + _part->nGhost;
-  int j,j1,j2,j3,j1n,j2n,j3n;
-  double xj,yj,zj,xn,yn,zn;
-  for (int j=0;j<Ntot;++j){
-    if (vState[j]==2){
-      j3n = floor(gNucleus[gID[j]-1]/(_xyz->nX[0]*_xyz->nX[1]));
-      j2n = floor( (gNucleus[gID[j]-1]-_xyz->nX[0]*_xyz->nX[1]*j3n)  /_xyz->nX[0]);
-      j1n = gNucleus[gID[j]-1] - _xyz->nX[0]*_xyz->nX[1]*j3n - _xyz->nX[0]*j2n;
-      xn = (double(j1n)+.5)*(_xyz->dX[0]);
-      yn = (double(j2n)+.5)*(_xyz->dX[1]);
-      zn = (double(j3n)+.5)*(_xyz->dX[2]);
-
-      j3 = floor(_part->icellidLoc[j]/(_xyz->nX[0]*_xyz->nX[1]));
-      j2 = floor( (_part->icellidLoc[j]- _xyz->nX[0]*_xyz->nX[1]*j3)/_xyz->nX[0]);
-      j1 = _part->icellidLoc[j] - _xyz->nX[0]*_xyz->nX[1]*j3 - _xyz->nX[0]*j2;
-      xj = (double(j1)+.5)*(_xyz->dX[0]);
-      yj = (double(j2)+.5)*(_xyz->dX[1]);
-      zj = (double(j3)+.5)*(_xyz->dX[2]);
-      extents[j] = pow( pow(xj-xn,2.0)+pow(yj-yn,2.0)+pow(zj-zn,2.0),.5);
-    } else {
-	extents[j] = extentsInitialValue;
-    } // if/else (vState[j]==2...
-  } // for (int j=0...
-}; // end ExtentsInitialize
-
 void VoxelsCA::ZeroVoxels(){
   // sets voxels to zero where laser hasn't reached yet
   int j,j1,j2,j3;
-  int Ntot = _part->ncellLoc + _part->nGhost,n1; 
+  int n1 = _temp->ilaserLoc*_xyz->nX[0]*_xyz->nX[1];
+  int Ntot = _part->ncellLoc + _part->nGhost; 
   double x,y;
   if (_temp->patternID==0){
     x = _temp->bmV*fmod(_xyz->time,_temp->bmPeriod[0]);;
@@ -312,69 +283,37 @@ void VoxelsCA::ZeroVoxels(){
   } // if (_temp->patternID==0
 };
 
-void VoxelsCA::CheckTimeSkip(){
-  // checks if any voxel with vState=1 has temperature < melting; if none, then 
-  // skip ahead to next time increment for temperature
-  int Ntot = _part->ncellLoc + _part->nGhost,icheck=0,icheckT;
-  for (int j=0;j<Ntot;++j){
-    if (vState[j]==1 && _temp->TempCurr[j]<_xyz->tL){icheck=1;}
-  }
-  MPI_Allreduce(&icheck,&icheckT,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
-  if (icheckT==0){_xyz->SkipTime(_temp->DelT); if (_part->myid==0){std::cout << _temp->tInd<<","<<_xyz->tInd<<std::endl;}}
-
-}; // end CheckTimeSkip
-
 void VoxelsCA::ComputeExtents(){
   // compute velocity and update extent of [1,0] direction if vState=2
-  int j,Ntot,jneigh;
+  int j,Ntot;
   double etaScale;
-  Ntot = _part->ncellLoc;
+  Ntot = _part->ncellLoc + _part->nGhost;
   std::vector<double> velocity(Ntot,0);
-  std::vector<int> neigh,vneigh;
-  std::string strNeigh;
   vmax = 0.0;
-  strNeigh ="first";
   for (int j=0;j<Ntot;++j){
     if (vState[j] == 2){
-      _xyz->ComputeNeighborhood(_part->icellidLoc[j],strNeigh,neigh);
-      vneigh.assign(neigh.size(),0);
-      for (int jj=0;jj<neigh.size();++jj){
-	jneigh = std::distance(_part->icellidLoc.begin(),
-			     std::find(_part->icellidLoc.begin(),_part->icellidLoc.end(),neigh[jj]));
-	vneigh[jj]=vState[jneigh];
-      } // for (int jj ...
       if (_temp->TempCurr[j]>=_xyz->tL){
 	velocity[j] = 0.0;
-	//extents[j] = extentsInitialValue;
-      } else if (!std::any_of(vneigh.begin(),vneigh.end(),[](int n){return n==1;})) {
-	velocity[j] = 0.0;
+	extents[j] = extentsInitialValue;
       } else{
 	velocity[j] = (_xyz->dL)/
 	  (5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
 	   (_xyz->Gamma))*( pow((_xyz->tL - _temp->TempCurr[j]),2.5)/
 			  pow(_xyz->c0,1.5));
-       }	
+      }	
       vmax = std::max(vmax,velocity[j]);
     } // if (vState[j]==2)
   } // for j  
   double vmax2 = vmax;
   MPI_Allreduce(&vmax2,&vmax,1,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
-  _xyz->UpdateTimeTest1(vmax);
-
-  /*
-  etaScale = .5*_xyz->deltaXmin/_temp->DelT/vmax*20;
+  etaScale = .25*_xyz->deltaXmin/_temp->DelT/vmax;
   for (int j=0;j<Ntot;++j){
     if (vState[j] == 2){velocity[j]*=etaScale;}
   }
-  _xyz->UpdateTime2(_temp->DelT/20.0);
-  */
-  
+  _xyz->UpdateTime2(_temp->DelT);
   for (int j=0;j<Ntot;++j){
     if (vState[j] == 2){
       extents[j] +=velocity[j]*(_xyz->dt);
-      // MUST DELETE AFTER DONE CHECKING
-      velocityStore[j] = velocity[j];
-      
     }
   }
 };
@@ -602,17 +541,9 @@ void VoxelsCA::WriteToVTU1(const std::string &filename)
 void VoxelsCA::WriteCSVData(const std::string &filename)
 {
   // write out csv file with grain id, axis-angle, vstate
-  int j3,j2,j1,Ntot;
-  double x,y,z,vvol;
-  std::vector<double> gVol(nGrain,0.0),gVolT(nGrain,0);
+  int j3,j2,j1;
+  double x,y,z;
   std::ofstream fp;
-  Ntot = _part->ncellLoc;
-  vvol = _xyz->dX[0]*_xyz->dX[1]*_xyz->dX[2];
-  for (int j=0;j<Ntot;++j){
-    if (gID[j]>0){gVol[gID[j]-1]+=vvol;}
-  }
-  MPI_Allreduce(&gVol[0],&gVolT[0],nGrain,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-
   fp.open(filename.c_str());
   fp << "grain nucleation (x,y,z), axis-angle (omega,n), grain Volume" << std::endl;
   for (int j=0;j<nGrain;++j){
@@ -624,33 +555,11 @@ void VoxelsCA::WriteCSVData(const std::string &filename)
     z = (double(j3)+.5)*(_xyz->dX[2]);
     
     fp << x <<"," << y << "," << z << "," << cTheta[4*j] << "," <<
-      cTheta[4*j+1] << "," << cTheta[4*j+2] << "," << cTheta[4*j+3]<<","<<gVolT[j] << std::endl;
+      cTheta[4*j+1] << "," << cTheta[4*j+2] << "," << cTheta[4*j+3] << std::endl;
 
   } // end for (int j...
 
   fp.close();
-
-} // WriteCSVData
-
-void VoxelsCA::WriteCSVDataTest(const std::string &filename)
-{
-  // write out csv file with grain id, axis-angle, vstate
-  int j3,j2,j1,Ntot;
-  double x,y,z,vvol;
-  std::vector<double> gVol(nGrain,0.0),gVolT(nGrain,0);
-  std::ofstream fp;
-  Ntot = _part->ncellLoc;
-  if (_part->myid==0){fp.open(filename.c_str());}
-  for (int rank = 0; rank < _part->nprocs; rank++) {
-    MPI_Barrier(MPI_COMM_WORLD);
-    if (_part->myid != rank) continue;
-    fp.open(filename.c_str(), std::fstream::app);
-    for (int j=0;j<Ntot;++j){
-      fp << _part->icellidLoc[j] << "," << velocityStore[j] <<std::endl;
-    }
-    fp.close();
-  } // end for (int rank...
-
 
 } // WriteCSVData
 

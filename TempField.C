@@ -54,8 +54,6 @@ void TempField::InitializeSchwalbach(int & patternIDIn, std::vector<double> & be
   patternID = patternIDIn;
   bmLx = LxAllIn;
   T0 = T0In;
-  bmX0 = {(bmLx[0] - (_xyz->nX[0]*_xyz->dX[0]))/2.0,(bmLx[1] - (_xyz->nX[1]*_xyz->dX[1]))/2.0,
-	  (bmLx[2] - (_xyz->nX[2]*_xyz->dX[2]))/2.0};
   double tb,minTemp;
   if (patternID==0){
     DelT = 4.0/3.0*bmSTD[0]/bmV;
@@ -78,7 +76,7 @@ void TempField::SchwalbachTempCurr()
   //tmin = std::max(0.0,_xyz->time-tcut);
   tmin = _xyz->time-tcut;
   nSource = ceil( (_xyz->time - tmin) / DelT);
-  ilaserLoc = _bp->Nzh + floor(floor(_xyz->time/(bmPeriod[1]*bmPeriod[0]))*_xyz->layerT/_xyz->dX[2]) + 1;
+  ilaserLoc = _bp->Nzh + floor( (floor(_xyz->time/(bmPeriod[1]*bmPeriod[0]))+1)*_xyz->layerT/_xyz->dX[2]);
   iplay=_xyz->nX[0]*_xyz->nX[1]*ilaserLoc;
   TempCurr.assign(Ntot,T0);
   if (patternID==0){
@@ -94,8 +92,8 @@ void TempField::SchwalbachTempCurr()
 	// tc,x,y,z space-time location of source
 	tc = _xyz->time - jt*DelT;
 	x = bmV*fmod(tc,bmPeriod[0]);
-	y = fmod(floor(tc/bmPeriod[0]),bmPeriod[1])*bmS;
-	z = floor(tc/(bmPeriod[1]*bmPeriod[0]))*_xyz->layerT + (_bp->Nzh+1)*_xyz->dX[2];
+	y = fmod(floor(tc/bmPeriod[0]),bmPeriod[1])*bmS + (_xyz->nX[1]*_xyz->dX[1])/2.0;
+	z = (floor(tc/(bmPeriod[1]*bmPeriod[0]))+1.0)*_xyz->layerT + _bp->height;
 	lam = {pow(bmSTD[0],2.0)+2*alpha*(_xyz->time - tc), 
 	       pow(bmSTD[1],2.0)+2*alpha*(_xyz->time - tc),
 	       pow(bmSTD[2],2.0)+2*alpha*(_xyz->time - tc)};
@@ -238,10 +236,17 @@ void TempField::ReadCSVMoose2()
 
 void TempField::Test2(){
   // sets the temperature field to 1584
+  int NxyM = std::accumulate(nXM.begin(),nXM.end(),1,std::multiplies<int>());
   int Ntot = _part->nGhost+_part->ncellLoc;
-  ilaserLoc = _xyz->nX.back(); // make z (3rd) direction the build direction   
+  std::vector<double> tempM(NxyM,0),tempLoc(Ntot,0);
+  for (int jM=0;jM<NxyM;++jM){
+    tempM[jM] = 1584;
+  } // end for jM
+  InterpolateToGrid2(tempM,_part->icellidLoc,tempLoc);
   for (int j1=0;j1<(Ntot);++j1){
-    TempCurr[j1] = 1584;
+    Temp[0][j1] = tempLoc[j1];
+    Temp[1][j1] = tempLoc[j1];
+    TempCurr[j1] = tempLoc[j1];
   }
 } // end test2
 
