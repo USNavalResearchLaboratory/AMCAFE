@@ -41,6 +41,10 @@ Grid::Grid(const std::vector<double> & dxIn, const std::vector<int> & NxIn,
   dt=0;
   neighOrder = neighOrderIn;
   nnodePerCell = pow(2,nDim);
+
+  // this should change into a user parameter
+  ethresh = .01; 
+  deltaThresh=.95;  
 } // end constructor
 
 void Grid::UpdateTime(const double &vmax)

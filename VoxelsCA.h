@@ -20,8 +20,10 @@ class VoxelsCA
   void SetLiquid();
   void ZeroVoxels();
   void ComputeVoxelCapture();
+  void ComputeVoxelCapture2();
   void ComputeExtents();
   void UpdateVoxels();
+  void UpdateVoxels2();
   void NucleateGrain();
   void ComputeNucleation1();
   void ExtentsInitialize();

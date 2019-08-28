@@ -37,6 +37,8 @@ class Grid
   double kappa; // material thermal conductivity (W/(m-K))
   double cP; // specific heat capacity (J/(kg-K))
   double layerT; // thickness of each layer
+  double ethresh; // 1- cut off probability for Delta t max (see latex notes)
+  double deltaThresh; // threshold value of pmf for allowing if voxel can be captured
   std::string neighOrder; // order of neighborhood
 }; // end class Grid
 

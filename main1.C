@@ -2,10 +2,7 @@
 This runs the cellular automata model using a given temperature
 input (obtained from Moose runs) to simulate microstructure
 evolution of AM builds (20190123)
-
 */
-
-
 // include files here
 #include "Grid.h"
 #include "VoxelsCA.h"
@@ -20,7 +17,6 @@ evolution of AM builds (20190123)
 #include <thread>
 #include <algorithm>
 #include "mpi.h"
-
 #include "fstream"
 
 int main()
@@ -28,10 +24,9 @@ int main()
   /*-----------------------------------------------
     initialization step */
   MPI_Init(NULL,NULL);
-  int nprocs,myid;
+  int nprocs,myid,ictrl;
   MPI_Comm_size(MPI_COMM_WORLD,&nprocs);
   MPI_Comm_rank(MPI_COMM_WORLD,&myid);
-  
   int NtM,cc1,nDim;
   std::vector<int> nXM,nX,nTTemp(3,0);
   std::vector<double> dX,dXM,LX;
@@ -44,7 +39,7 @@ int main()
   double beamVel,beamSpacing,beamPower,wEst,cP,rho,kappa,beamEta,rcut;
   std::vector<double> beamSTD,LxAll;
   // schwalbach parameters
-
+  ictrl=1;
   nXM = {20,20,20};
   nX = {128,32,16};
   nDim = nX.size();
@@ -99,26 +94,16 @@ int main()
   //TempF.ReadCSVMoose2();
   //TempF.Test2();
   //TempF.ComputeDDtTemp();
-    
-  
   VoxelsCA vox(g,TempF, part);
   vox.InitializeVoxels(bp);
   vox.ExtentsInitialize();
   //vox.InitializeTest1();
-  /*
-  if (part.myid==0){
-    std::cout << bp.Ngrain << std::endl;
-    for (int j=0;j<bp.Ngrain;++j){std::cout <<bp.gNucleus[j] << ",";}
-  }
-  MPI_Barrier(MPI_COMM_WORLD);
-  */
   /*-----------------------------------------------
     execute simulation */
   cc1=0;
   int outskip=20,indOut;
   std::vector<int> filinds,out2(3,0),j123(3,0);
   std::vector<double> filtime;
-  std::string filTest="asdf"; // MUST DELETE AFTER TEST
   int icheck = 1,ichecktmp,cc2=0, irep=0;
   filbaseOut = "CA3D";
   out2 = {1,1,1}; // the increment to skip output per direction
@@ -132,32 +117,18 @@ int main()
     icheck=!std::all_of(vox.vState.begin(),vox.vState.end(),[](int n){return n==3;});
     ichecktmp = icheck;
     MPI_Allreduce(&ichecktmp,&icheck,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
-
     // update next step for voxels (time is updated in vox.ComputeExtents() )
-    vox.UpdateVoxels();
-    vox.CheckTimeSkip();
-    //vox.ComputeNucleation1();
-    //if (TempF.tInd==1){vox.WriteCSVDataTest(filTest); throw std::exception();}
-    /*
-    if (TempF.tInd==2){ 
-      filinds.push_back(g.tInd);
-      filtime.push_back(g.time);
-      filout = filbaseOut+std::to_string(g.tInd);
-      vox.WriteToVTU1(filout);
-      filout = filbaseOut+".csv";
-      vox.WriteCSVData(filout);
-      cc1+=1;
-      if (cc1 % 20 || icheck==0){
-	filout=filbaseOut;
-	vox.WriteToPVD(filout,filinds,filtime);
-      } // if (cc1
-      MPI_Barrier(MPI_COMM_WORLD);
+    if (ictrl==0){
+      vox.UpdateVoxels();
+      vox.CheckTimeSkip();
     }
-    */
-    
+    if (ictrl==1){
+      vox.UpdateVoxels2();
+      g.SkipTime(TempF.DelT);
+    }
+    //vox.ComputeNucleation1();
     if (irep==0){
       irep=1;
-      //      if (TempF.tInd % outskip ==0 || icheck ==0){ 
       if (indOut==0 || icheck ==0){ 
 	filinds.push_back(TempF.tInd);
 	filtime.push_back(g.time);
@@ -173,10 +144,9 @@ int main()
 	MPI_Barrier(MPI_COMM_WORLD);
       }
     }
-    
     // update temperature field
     if (TempF.tInd != int(floor(g.time/TempF.DelT))){
-      vox.ExtentsInitialize();
+      if (ictrl==0){vox.ExtentsInitialize();}
       TempF.tInd = int(floor(g.time/TempF.DelT));
       TempF.SchwalbachTempCurr();
       //TempF.SchwalbachDDtTemp();

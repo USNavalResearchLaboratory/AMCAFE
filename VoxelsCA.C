@@ -74,7 +74,6 @@ void VoxelsCA::InitializeTest1()
 
 void VoxelsCA::UpdateVoxels()
 {
-
   // set liquid if temperature > TL
   SetLiquid();
   // zero voxels above laser (no material there)
@@ -96,7 +95,34 @@ void VoxelsCA::UpdateVoxels()
   ConvertSolid(0);
   _part->PassInformation(vState);
   _part->PassInformation(extents);
-  
+};
+void VoxelsCA::UpdateVoxels2()
+{
+  /*
+    This is the modified updating scheme that is described in notes
+   */
+  // set liquid if temperature > TL
+  SetLiquid();
+  // zero voxels above laser (no material there)
+  ZeroVoxels();
+  // SetLiquids, ZeroVoxels: no need to pass information for  b/c only local evaluation)
+  // solid (vState=3) to mushy (vState=2) if one neighbor liquid (vState=1)
+  ConvertSolid(1);
+  _part->PassInformation(vState);
+  // capture all undercooled liquid voxels by growing grains
+  int i0=0,iT=10;
+  while (iT>0){
+    ComputeVoxelCapture2();
+    _part->PassInformation(vState);
+    _part->PassInformation(gID);
+    // mushy (vState=2) to solid (vState=3) if all neighbors 2 
+    ConvertSolid(0);
+    _part->PassInformation(vState);
+    for (int j=0;j<_part->ncellLoc;++j){
+      if (vState[j]==1 && _temp->TempCurr[j]< _xyz->tL){i0+=1;}
+    }
+    MPI_Allreduce(&i0,&iT,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
+  } // while (iT>0...
 };
 
 void VoxelsCA::ConvertSolid(const int &iswitch)
@@ -250,6 +276,112 @@ void VoxelsCA::ComputeVoxelCapture(){
     } // if vState[j]==1
   } // for j
 }; // end ComputeVoxelCapture
+
+void VoxelsCA::ComputeVoxelCapture2(){
+  int Ntot = _part->ncellLoc, j,j1,jx1,jx2,jx3,jy1,jy2,jy3,ncomp,cc,ncompT;
+  double dmax,dmin,omega,vhat,dlocnorm, rRot[3][3],dloc[3],ax[3],delxy[3],velCurr;
+  // assemble voxel index for all vState=2 over all processes and give to all
+  ncomp=0;
+  for (int j1=0;j1<Ntot;++j1){if (vState[j1]==2){ncomp+=1; } }
+  int ncompv[_part->nprocs];
+  MPI_Allgather(&ncomp,1,MPI_INT,&ncompv[0],1,MPI_INT,MPI_COMM_WORLD);
+  ncompT=0;
+  for (int j1=0;j1<_part->nprocs;++j1){ncompT+=ncompv[j1];}
+  int icid0[ncomp],*is=icid0, icidT[ncompT],gid0[ncomp],*gs=gid0,gidT[ncompT];
+  double vel0[ncomp],*vs=vel0,velT[ncompT];
+  for (int j1=0;j1<Ntot;++j1){
+    if (vState[j1]==2){
+      *(is++) = _part->icellidLoc[j1];
+      *(gs++) = gID[j1];
+      *(vs++)=(5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
+       (_xyz->Gamma))*( pow((_xyz->tL - _temp->TempCurr[j1]),2.5)/
+			pow(_xyz->c0,1.5));
+    }
+  }
+  cc=0;
+  for (int j1=0;j1<_part->nprocs;++j1){
+    if (ncompv[j1]>0){
+      if (_part->myid==j1){
+	for (int j2=0;j2<ncompv[j1];++j2){
+	  icidT[cc+j2] = icid0[j2];
+	  gidT[cc+j2] = gid0[j2];
+	  velT[cc+j2] = vel0[j2];
+	}
+      }
+      MPI_Bcast(&icidT[cc],ncompv[j1],MPI_INT,j1,MPI_COMM_WORLD);
+      MPI_Bcast(&gidT[cc],ncompv[j1],MPI_INT,j1,MPI_COMM_WORLD);
+      MPI_Bcast(&velT[cc],ncompv[j1],MPI_DOUBLE,j1,MPI_COMM_WORLD);
+      cc+=ncompv[j1];
+    }
+  }
+  // end assemble voxel index for all vState=2 over all processes and give to all
+  for (int j=0;j<Ntot;++j){
+    if (vState[j]==1 && _temp->TempCurr[j]< _xyz->tL){
+      jx3 = floor(_part->icellidLoc[j]/(_xyz->nX[0]*_xyz->nX[1]));
+      jx2 = floor( (_part->icellidLoc[j]- _xyz->nX[0]*_xyz->nX[1]*jx3)/_xyz->nX[0]);
+      jx1 = _part->icellidLoc[j] - _xyz->nX[0]*_xyz->nX[1]*jx3 - _xyz->nX[0]*jx2;
+      velCurr=(5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
+       (_xyz->Gamma))*( pow((_xyz->tL - _temp->TempCurr[j]),2.5)/
+			pow(_xyz->c0,1.5));
+      double A[4][ncompT],p[ncompT],pg[nGrain],*ps=pg,dminT=_xyz->dX[0]*1000; // container for distribution of  Delta t (Dt_min,Dt_max, A,B)
+      std::fill(p,p+ncompT,1); // initialize all to value 1
+      std::fill(pg,pg+nGrain,0.0); // initialize all to value 0
+      for (int j1=0;j1<ncompT;++j1){
+	jy3 = floor(icidT[j1]/(_xyz->nX[0]*_xyz->nX[1]));
+	jy2 = floor( (icidT[j1]- _xyz->nX[0]*_xyz->nX[1]*jy3)/_xyz->nX[0]);
+	jy1 = icidT[j1] - _xyz->nX[0]*_xyz->nX[1]*jy3 - _xyz->nX[0]*jy2;
+	delxy[0]=(jy1-jx1)*_xyz->dX[0]; delxy[1]=(jy2-jx2)*_xyz->dX[1]; delxy[2]=(jy3-jx3)*_xyz->dX[2];
+	dmin = pow(pow(delxy[0],2.0)+ pow(delxy[1],2.0)+pow(delxy[2],2.0),.5);
+	dminT = std::min(dmin,dminT);
+	dmax = dmin*M_PI;
+	omega = cTheta[4*(gidT[j1]-1)];
+	ax[0]=cTheta[4*(gidT[j1]-1)+1];ax[1]=cTheta[4*(gidT[j1]-1)+2];ax[2]=cTheta[4*(gidT[j1]-1)+3];
+	// matrix is local->global; need to multiply by transpose for global->local
+	rRot[0][0] = cos(omega) + pow(ax[0],2.0)*(1-cos(omega));
+	rRot[0][1] = ax[0]*ax[1]*(1-cos(omega)) - ax[2]*sin(omega);
+	rRot[0][2] = ax[0]*ax[2]*(1-cos(omega)) + ax[1]*sin(omega);
+	rRot[1][0] = ax[0]*ax[1]*(1-cos(omega)) + ax[2]*sin(omega);
+	rRot[1][1] = cos(omega) + pow(ax[1],2.0)*(1-cos(omega));
+	rRot[1][2] = ax[1]*ax[2]*(1-cos(omega)) - ax[0]*sin(omega);
+	rRot[2][0] = ax[2]*ax[0]*(1-cos(omega)) - ax[1]*sin(omega);
+	rRot[2][1] = ax[2]*ax[1]*(1-cos(omega)) + ax[0]*sin(omega);
+	rRot[2][2] = cos(omega) + pow(ax[2],2.0)*(1-cos(omega));
+	// put into 1st quadrant b/c of symmetry
+	dloc[0] = abs(rRot[0][0]*delxy[0]+rRot[1][0]*delxy[1]+rRot[2][0]*delxy[2]);
+	dloc[1] = abs(rRot[0][1]*delxy[0]+rRot[1][1]*delxy[1]+rRot[2][1]*delxy[2]);
+	dloc[2] = abs(rRot[0][2]*delxy[0]+rRot[1][2]*delxy[1]+rRot[2][2]*delxy[2]);
+	dlocnorm = pow(pow(dloc[0],2.0)+pow(dloc[1],2.0)+pow(dloc[2],2.0),.5);
+	vhat = .5*(velT[j1]+velCurr)*dlocnorm/(dloc[0]+dloc[1]+dloc[2]);
+	A[0][j1] = dmin/vhat;
+	A[1][j1] = dmax/vhat;
+	A[2][j1] = log(_xyz->ethresh)/pow(_xyz->ethresh,A[j1][1]-A[j1][0])/(A[0][j1]-A[1][j1]);
+	A[3][j1] = log(_xyz->ethresh)/(A[0][j1]-A[1][j1]);
+      }
+      for (int j1=0;j1<ncompT;++j1){
+	for (int j2=0;j2<ncompT;++j2){
+	  if (j1!=j2){
+	    p[j1]*=A[2][j1]*A[2][j2]/A[3][j1]/A[3][j2]*
+	      (exp(-A[3][j1]*A[0][j1]-A[3][j2]*std::max(A[0][j1],A[0][j2]))-exp(-A[3][j1]*A[0][j1]))+
+	      A[2][j1]*A[2][j2]/A[3][j1]/(A[3][j1]+A[3][j2])*
+	      (1-exp(-(A[3][j1]+A[3][j2])*std::max(A[0][j1],A[0][j2])));
+	  } // if (j1!=j2
+	} // for (int j2...
+      } // for (int j1
+      for (int j1=0;j1<ncompT;++j1){pg[gidT[j1]]+= p[j1];}
+      std::default_random_engine gen1(seed0+10*_part->icellidLoc[j]+15*_xyz->tInd);
+      std::discrete_distribution<int> pind(ps,ps+nGrain);
+      std::vector<double> pmf=pind.probabilities();
+      double maxP = *std::max_element(pmf.begin(),pmf.end());
+      if (dminT <= 2*_xyz->dX[0]){
+	gID[j] = pg[pind(gen1)];
+	vState[j] = 2;
+      } else if (dminT > 2*_xyz->dX[0] && maxP > _xyz->deltaThresh){
+	gID[j] = pg[pind(gen1)];
+	vState[j] = 2;
+      }
+    } // if (vState[j]==1...
+  } // for (int j ...
+}; // end ComputeVoxelCapture2
 
 void VoxelsCA::SetLiquid(){
   // makes cell liquid if temperature exceeds liquidus
@@ -612,24 +744,22 @@ void VoxelsCA::WriteCSVData(const std::string &filename)
     if (gID[j]>0){gVol[gID[j]-1]+=vvol;}
   }
   MPI_Allreduce(&gVol[0],&gVolT[0],nGrain,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-
-  fp.open(filename.c_str());
-  fp << "grain nucleation (x,y,z), axis-angle (omega,n), grain Volume" << std::endl;
-  for (int j=0;j<nGrain;++j){
-    j3 = floor(gNucleus[j]/(_xyz->nX[0]*_xyz->nX[1]));
-    j2 = floor( (gNucleus[j]-_xyz->nX[0]*_xyz->nX[1]*j3)  /_xyz->nX[0]);
-    j1 = gNucleus[j] - _xyz->nX[0]*_xyz->nX[1]*j3 - _xyz->nX[0]*j2;
-    x = (double(j1)+.5)*(_xyz->dX[0]);
-    y = (double(j2)+.5)*(_xyz->dX[1]);
-    z = (double(j3)+.5)*(_xyz->dX[2]);
-    
-    fp << x <<"," << y << "," << z << "," << cTheta[4*j] << "," <<
-      cTheta[4*j+1] << "," << cTheta[4*j+2] << "," << cTheta[4*j+3]<<","<<gVolT[j] << std::endl;
-
-  } // end for (int j...
-
-  fp.close();
-
+  if (_part->myid==0){
+    fp.open(filename.c_str());
+    fp << "grain nucleation (x,y,z), axis-angle (omega,n), grain Volume" << std::endl;
+    for (int j=0;j<nGrain;++j){
+      j3 = floor(gNucleus[j]/(_xyz->nX[0]*_xyz->nX[1]));
+      j2 = floor( (gNucleus[j]-_xyz->nX[0]*_xyz->nX[1]*j3)  /_xyz->nX[0]);
+      j1 = gNucleus[j] - _xyz->nX[0]*_xyz->nX[1]*j3 - _xyz->nX[0]*j2;
+      x = (double(j1)+.5)*(_xyz->dX[0]);
+      y = (double(j2)+.5)*(_xyz->dX[1]);
+      z = (double(j3)+.5)*(_xyz->dX[2]);
+      fp << x <<"," << y << "," << z << "," << cTheta[4*j] << "," <<
+	cTheta[4*j+1] << "," << cTheta[4*j+2] << "," << cTheta[4*j+3]<<","<<gVolT[j] << std::endl;
+    } // end for (int j...
+    fp.close();
+  } // if (_part->myid ..)
+  MPI_Barrier(MPI_COMM_WORLD);
 } // WriteCSVData
 
 void VoxelsCA::WriteCSVDataTest(const std::string &filename)
