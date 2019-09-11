@@ -18,12 +18,14 @@ class VoxelsCA
   void InitializeVoxels(BasePlate &bp);
   void InitializeTest1();
   void SetLiquid();
+  void SetLiquid2();
   void ZeroVoxels();
   void ComputeVoxelCapture();
   void ComputeVoxelCapture2();
   void ComputeExtents();
   void UpdateVoxels();
   void UpdateVoxels2();
+  void UpdateVoxels3();
   void NucleateGrain();
   void ComputeNucleation1();
   void ExtentsInitialize();

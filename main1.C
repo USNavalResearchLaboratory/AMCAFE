@@ -39,9 +39,10 @@ int main()
   double beamVel,beamSpacing,beamPower,wEst,cP,rho,kappa,beamEta,rcut;
   std::vector<double> beamSTD,LxAll;
   // schwalbach parameters
-  ictrl=1;
+  ictrl=2;
   nXM = {20,20,20};
   nX = {128,32,16};
+  //nX = {64,16,8};
   nDim = nX.size();
   //  LX = {.002,.002,.001};
   LX = {.001,.00025,12.5e-5};  
@@ -77,6 +78,7 @@ int main()
   part.PartitionGraph();
   BasePlate bp(g,heightBase,mu, part);
   TempField TempF(g,part,bp);
+
   // initialize appropriate temperature model
   //TempF.InitializeMoose(filbaseTemp,NtM,dtM,nXM,dXM);
   wEst  = pow(8*beamPower/(exp(1.0)*M_PI*rho*cP*(tL-298.0)*beamVel),.5); // see EQ (1) in schwalbach
@@ -123,8 +125,16 @@ int main()
       vox.CheckTimeSkip();
     }
     if (ictrl==1){
+      /*
+      if (part.myid==0){std::cout << g.time << std::endl;}
+      MPI_Barrier(MPI_COMM_WORLD);
+      */
       vox.UpdateVoxels2();
-      g.SkipTime(TempF.DelT);
+      g.UpdateTime2(TempF.DelT);
+    }
+    if (ictrl==2){
+      vox.UpdateVoxels3();
+      g.UpdateTime2(TempF.DelT);
     }
     //vox.ComputeNucleation1();
     if (irep==0){
