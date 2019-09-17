@@ -152,6 +152,8 @@ void VoxelsCA::UpdateVoxels3()
   // for file writing purposes
   // 8888888888888888888888888888888888888888888888
 
+  double nA[3] = {1.0/pow(3.0,.5),1.0/pow(3.0,.5),1.0/pow(3.0,.5)},
+    pA[3] = {1.0,0.0,0.0};
 
 
 
@@ -283,13 +285,11 @@ void VoxelsCA::UpdateVoxels3()
 	  dlocXnorm = pow(pow(dlocX[0],2.0)+pow(dlocX[1],2.0)+pow(dlocX[2],2.0),.5);
 	  dlocYnorm = pow(pow(dlocY[0],2.0)+pow(dlocY[1],2.0)+pow(dlocY[2],2.0),.5);
 	  dlocXYnorm = pow(pow(delxy[0],2.0)+pow(delxy[1],2.0)+pow(delxy[2],2.0),.5);
-
-	  dr = std::fabs(dlocXnorm*(1.0 - (dlocY[0]+dlocY[1]+dlocY[2])/
-	  (dlocX[0]+dlocX[1]+dlocX[2])));
-	  //dr = dlocXYnorm;
+          dr = - (nA[0]*pA[0]+nA[1]*pA[1]+nA[2]*pA[2])*dlocYnorm;
+	  dr = std::fabs(nA[0]*dlocX[0]+nA[1]*dlocX[1]+nA[2]*dlocX[2] + dr);	  
 	  velY=(5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
 		 (_xyz->Gamma))*( pow((_xyz->tL - T[V[j][j1]]),2.5)/pow(_xyz->c0,1.5));
-	  vhat = .5*(velY+velX)*dlocXnorm/(dlocX[0]+dlocX[1]+dlocX[2]);
+	  vhat = .5*(velY+velX)/pow(3.0,.5);
 	  time = (dr-vhat*tmn1[V[j][j1]])/vhat;
 	  if (time < DtMin){
 	    DtMin = time;
