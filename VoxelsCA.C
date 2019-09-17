@@ -140,8 +140,21 @@ void VoxelsCA::UpdateVoxels3()
   ConvertSolid(1);
   _part->PassInformation(vState);
   // assemble arrays to be used to compute grain growth
-  int NlocA=0,Na=0,NvecA[_part->nprocs],Ntot,cc,cc1;
+  int NlocA=0,Na=0,NvecA[_part->nprocs],Ntot,cc,cc1,jn[3],itmp[3]={-1,0,1};
   Ntot = _part->ncellLoc;
+
+  // 8888888888888888888888888888888888888888888888
+  // for file writing purposes
+  std::vector<int> filinds,vState0(Ntot,0);
+  std::vector<double> filtime;
+  std::string filout;
+  for (int j=0;j<Ntot;++j){vState0[j]=vState[j];}
+  // for file writing purposes
+  // 8888888888888888888888888888888888888888888888
+
+
+
+
   for (int j=0;j<Ntot;++j){
     if (vState[j]==2 || (vState[j]==1 && _temp->TempCurr[j]< _xyz->tL)){NlocA+=1;}
   }
@@ -170,17 +183,24 @@ void VoxelsCA::UpdateVoxels3()
     MPI_Bcast(&G[j0[j]],NvecA[j],MPI_INT,j,MPI_COMM_WORLD);
     MPI_Bcast(&T[j0[j]],NvecA[j],MPI_DOUBLE,j,MPI_COMM_WORLD);
   } // for (int j ..
-  int i1=_xyz->nX[0],i2=_xyz->nX[0]*_xyz->nX[1];
+  int i1=_xyz->nX[0],i2=_xyz->nX[0]*_xyz->nX[1],jst;
   for (int j=0;j<Na;++j){
-    vneigh[0]=vI[j] - i2 - i1-1; vneigh[1]=vI[j] - i2 - i1;vneigh[2]=vI[j] - i2 - i1+1;
-    vneigh[3]=vI[j] - i2 -1; vneigh[4]=vI[j] - i2;vneigh[5]=vI[j] - i2 +1;
-    vneigh[6]=vI[j] - i2 + i1-1; vneigh[7]=vI[j] - i2 + i1;vneigh[8]=vI[j] - i2 + i1+1;
-    vneigh[9]=vI[j] - i1-1; vneigh[10]=vI[j] - i1;vneigh[11]=vI[j] - i1+1;
-    vneigh[12]=vI[j] -1; vneigh[13]=vI[j] + 1;
-    vneigh[14]=vI[j]+ i1-1; vneigh[15]=vI[j] + i1;vneigh[16]=vI[j] + i1+1;
-    vneigh[17]=vI[j] + i2 - i1-1; vneigh[18]=vI[j] + i2 - i1;vneigh[19]=vI[j] + i2 - i1+1;
-    vneigh[20]=vI[j] + i2 -1; vneigh[21]=vI[j] + i2;vneigh[22]=vI[j] + i2 +1;
-    vneigh[23]=vI[j] + i2 + i1-1; vneigh[24]=vI[j] + i2 + i1;vneigh[25]=vI[j] + i2 + i1+1;
+    std::fill(vneigh,vneigh+26,-1);
+    jn[2] = floor(vI[j]/i2);
+    jn[1] = floor((vI[j]- i2*jn[2])/i1);
+    jn[0] = vI[j] - i2*jn[2] - i1*jn[1];
+    cc=0;
+    for (int j3=0;j3<3;++j3){
+      if ( (jn[2]+itmp[j3]<0) || (jn[2]+itmp[j3]>=_xyz->nX[2])){continue;}      
+      for (int j2=0;j2<3;++j2){
+	if ( (jn[1]+itmp[j2]<0) || (jn[1]+itmp[j2]>=_xyz->nX[1])){continue;}      
+	for (int j1=0;j1<3;++j1){
+	  if ( (jn[0]+itmp[j1]<0) || (jn[0]+itmp[j1]>=_xyz->nX[0])){continue;}      
+          jst = i2*(jn[2]+itmp[j3])+i1*(jn[1]+itmp[j2])+jn[0]+itmp[j1];
+	  if (jst !=vI[j]){vneigh[cc]=jst; cc+=1;}
+	} // for (int j1...
+      } // for (int j2...
+    } // for (int j3...    
     for (int j1=0;j1<26;++j1){
       cc=std::distance(vI,std::find(vI,vI+Na,vneigh[j1]));
       if (cc <Na){
@@ -199,9 +219,10 @@ void VoxelsCA::UpdateVoxels3()
   } // for (int j...
   // end assemble arrays to be used to compute grain growth
   // capture all undercooled liquid voxels by growing grains
-  int js,j1s,jx[3],jy[3],jTs[_part->nprocs], j1Ts[_part->nprocs],i3,jn[3];
+  int js,j1s,jx[3],jy[3],jTs[_part->nprocs], j1Ts[_part->nprocs],i3;
   double DtT[_part->nprocs],velX,velY,delxy[3],omega,ax[3],
-    rRot[3][3],dloc[3],dlocnorm,vhat,tmn1[Na],time,dnx[3],dny[3],tmp1;
+    rRot[3][3],dlocX[3],dlocYnorm,dlocXnorm,dlocXYnorm,dlocY[3],dr,vhat,tmn1[Na],
+    time,dnx[3],dny[3],tmp1;
   std::fill(tmn1,tmn1+Na,0.0);
   i2 = _xyz->nX[0]; i3 = _xyz->nX[0]*_xyz->nX[1];
   cc=0;
@@ -230,9 +251,9 @@ void VoxelsCA::UpdateVoxels3()
 	  dny[2] = (jy[2]-jn[2])*_xyz->dX[2];
 	  tmp1 = (dnx[0]*dny[0]+dnx[1]*dny[1]+dnx[2]*dny[2])/
 	    (dnx[0]*dnx[0]+dnx[1]*dnx[1]+dnx[2]*dnx[2]);
-	  delxy[0] = dnx[0]*(1-tmp1);
-	  delxy[1] = dnx[1]*(1-tmp1);
-	  delxy[2] = dnx[2]*(1-tmp1);
+	  delxy[0] = dnx[0];//*(1-tmp1);
+	  delxy[1] = dnx[1];//*(1-tmp1);
+	  delxy[2] = dnx[2];//*(1-tmp1);
 	  /*
 	  delxy[0]=(jy[0]-jx[0])*_xyz->dX[0]; 
 	  delxy[1]=(jy[1]-jx[1])*_xyz->dX[1]; 
@@ -253,14 +274,23 @@ void VoxelsCA::UpdateVoxels3()
 	  rRot[2][1] = ax[2]*ax[1]*(1-cos(omega)) + ax[0]*sin(omega);
 	  rRot[2][2] = cos(omega) + pow(ax[2],2.0)*(1-cos(omega));
 	  // put into 1st quadrant b/c of symmetry     
-	  dloc[0] = std::abs(rRot[0][0]*delxy[0]+rRot[1][0]*delxy[1]+rRot[2][0]*delxy[2]);
-	  dloc[1] = std::abs(rRot[0][1]*delxy[0]+rRot[1][1]*delxy[1]+rRot[2][1]*delxy[2]);
-	  dloc[2] = std::abs(rRot[0][2]*delxy[0]+rRot[1][2]*delxy[1]+rRot[2][2]*delxy[2]);
-	  dlocnorm = pow(pow(dloc[0],2.0)+pow(dloc[1],2.0)+pow(dloc[2],2.0),.5);
+	  dlocX[0] = std::fabs(rRot[0][0]*dnx[0]+rRot[1][0]*dnx[1]+rRot[2][0]*dnx[2]);
+	  dlocX[1] = std::fabs(rRot[0][1]*dnx[0]+rRot[1][1]*dnx[1]+rRot[2][1]*dnx[2]);
+	  dlocX[2] = std::fabs(rRot[0][2]*dnx[0]+rRot[1][2]*dnx[1]+rRot[2][2]*dnx[2]);
+	  dlocY[0] = std::fabs(rRot[0][0]*dny[0]+rRot[1][0]*dny[1]+rRot[2][0]*dny[2]);
+	  dlocY[1] = std::fabs(rRot[0][1]*dny[0]+rRot[1][1]*dny[1]+rRot[2][1]*dny[2]);
+	  dlocY[2] = std::fabs(rRot[0][2]*dny[0]+rRot[1][2]*dny[1]+rRot[2][2]*dny[2]);
+	  dlocXnorm = pow(pow(dlocX[0],2.0)+pow(dlocX[1],2.0)+pow(dlocX[2],2.0),.5);
+	  dlocYnorm = pow(pow(dlocY[0],2.0)+pow(dlocY[1],2.0)+pow(dlocY[2],2.0),.5);
+	  dlocXYnorm = pow(pow(delxy[0],2.0)+pow(delxy[1],2.0)+pow(delxy[2],2.0),.5);
+
+	  dr = std::fabs(dlocXnorm*(1.0 - (dlocY[0]+dlocY[1]+dlocY[2])/
+	  (dlocX[0]+dlocX[1]+dlocX[2])));
+	  //dr = dlocXYnorm;
 	  velY=(5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
 		 (_xyz->Gamma))*( pow((_xyz->tL - T[V[j][j1]]),2.5)/pow(_xyz->c0,1.5));
-	  vhat = .5*(velY+velX)*dlocnorm/(dloc[0]+dloc[1]+dloc[2]);
-	  time = (dlocnorm-vhat*tmn1[V[j][j1]])/vhat;
+	  vhat = .5*(velY+velX)*dlocXnorm/(dlocX[0]+dlocX[1]+dlocX[2]);
+	  time = (dr-vhat*tmn1[V[j][j1]])/vhat;
 	  if (time < DtMin){
 	    DtMin = time;
 	    js = j;
@@ -281,15 +311,61 @@ void VoxelsCA::UpdateVoxels3()
     G[js] = G[V[js][j1s]];
     for (int j=0;j<Na;++j){tmn1[j]+=DtT[i1];}
     tmn1[js] = 0.0;
+
+
+
+
+
+    /*
+    // 88888888888888888888888888888888888888888888888888888888888
+    // end capture all undercooled liquid voxels by growing grains
+    // bring global variables back to local variables
+    cc1=0;
+    for (int j=0;j<Ntot;++j){
+      if (vState0[j]==2 || (vState0[j]==1 && _temp->TempCurr[j]< _xyz->tL)){
+	vState[j] = vS[j0[_part->myid]+cc1];
+	gID[j] = G[j0[_part->myid]+cc1];
+	cc1+=1;
+      } // if (vState[j]...
+    } // for (int j...
+    // pass information 
+    _part->PassInformation(vState);
+    _part->PassInformation(gID);
+    // mushy (vState=2) to solid (vState=3) if all neighbors 2 
+    ConvertSolid(0);
+    _part->PassInformation(vState);
+
+
+    // write out 
+    //if (_xyz->tInd==3){if (_part->myid==0){std::cout << cc<<std::endl;}}
+    if (_xyz->tInd==4 && cc > 0 && cc <75){
+      filinds.push_back(cc);
+      filtime.push_back(_xyz->time + (double)cc);
+      filout = "CA3D3t"+std::to_string(cc);
+      WriteToVTU1(filout);
+      filout="CA3D3t";
+      WriteToPVD(filout,filinds,filtime);
+      MPI_Barrier(MPI_COMM_WORLD);
+    }      
+    // write out 
+    // 88888888888888888888888888888888888888888888888888888888888
+   */
+
+
+
   } // while (std::any
+
+    // 888888888888888888888888888888888888888888888888888888888888888888
+    //THIS AREA NEEDS TO BE UNCOMMENTED
+
   // end capture all undercooled liquid voxels by growing grains
   // bring global variables back to local variables
-  cc=0;
+  cc1=0;
   for (int j=0;j<Ntot;++j){
     if (vState[j]==2 || (vState[j]==1 && _temp->TempCurr[j]< _xyz->tL)){
-      vState[j] = vS[j0[_part->myid]+cc];
-      gID[j] = G[j0[_part->myid]+cc];
-      cc+=1;
+      vState[j] = vS[j0[_part->myid]+cc1];
+      gID[j] = G[j0[_part->myid]+cc1];
+      cc1+=1;
     } // if (vState[j]...
   } // for (int j...
   // pass information 
@@ -298,6 +374,12 @@ void VoxelsCA::UpdateVoxels3()
   // mushy (vState=2) to solid (vState=3) if all neighbors 2 
   ConvertSolid(0);
   _part->PassInformation(vState);
+
+   //THIS AREA NEEDS TO BE UNCOMMENTED
+  // 888888888888888888888888888888888888888888888888888888888888888888888
+  
+
+
 }; // end UpdateVoxels3
 
 void VoxelsCA::ConvertSolid(const int &iswitch)
@@ -524,9 +606,9 @@ void VoxelsCA::ComputeVoxelCapture2(){
 	rRot[2][1] = ax[2]*ax[1]*(1-cos(omega)) + ax[0]*sin(omega);
 	rRot[2][2] = cos(omega) + pow(ax[2],2.0)*(1-cos(omega));
 	// put into 1st quadrant b/c of symmetry
-	dloc[0] = std::abs(rRot[0][0]*delxy[0]+rRot[1][0]*delxy[1]+rRot[2][0]*delxy[2]);
-	dloc[1] = std::abs(rRot[0][1]*delxy[0]+rRot[1][1]*delxy[1]+rRot[2][1]*delxy[2]);
-	dloc[2] = std::abs(rRot[0][2]*delxy[0]+rRot[1][2]*delxy[1]+rRot[2][2]*delxy[2]);
+	dloc[0] = std::fabs(rRot[0][0]*delxy[0]+rRot[1][0]*delxy[1]+rRot[2][0]*delxy[2]);
+	dloc[1] = std::fabs(rRot[0][1]*delxy[0]+rRot[1][1]*delxy[1]+rRot[2][1]*delxy[2]);
+	dloc[2] = std::fabs(rRot[0][2]*delxy[0]+rRot[1][2]*delxy[1]+rRot[2][2]*delxy[2]);
 	dlocnorm = pow(pow(dloc[0],2.0)+pow(dloc[1],2.0)+pow(dloc[2],2.0),.5);
 	vhat = .5*(velT[j1]+velCurr)*dlocnorm/(dloc[0]+dloc[1]+dloc[2]);
 	A[0][j1] = dmin/vhat * 1e6;
@@ -589,7 +671,7 @@ void VoxelsCA::SetLiquid2(){
   for (int j=0;j<Ntot;++j){
     if (_part->icellidLoc[j] <n1){
       j3 = floor(_part->icellidLoc[j]/(_xyz->nX[0]*_xyz->nX[1]));
-      if (j3==NzhBP-1 && _temp->TempCurr[j]> _xyz->tL*.95){vState[j] = 2;}
+      if (j3==NzhBP-1 && _temp->TempCurr[j]> _xyz->tL*.99){vState[j] = 2;}
     } else{
       if (_temp->TempCurr[j] >= _xyz->tL ) {
 	vState[j] = 1;

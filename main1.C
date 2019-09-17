@@ -119,24 +119,9 @@ int main()
     icheck=!std::all_of(vox.vState.begin(),vox.vState.end(),[](int n){return n==3;});
     ichecktmp = icheck;
     MPI_Allreduce(&ichecktmp,&icheck,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
-    // update next step for voxels (time is updated in vox.ComputeExtents() )
-    if (ictrl==0){
-      vox.UpdateVoxels();
-      vox.CheckTimeSkip();
-    }
-    if (ictrl==1){
-      /*
-      if (part.myid==0){std::cout << g.time << std::endl;}
-      MPI_Barrier(MPI_COMM_WORLD);
-      */
-      vox.UpdateVoxels2();
-      g.UpdateTime2(TempF.DelT);
-    }
-    if (ictrl==2){
-      vox.UpdateVoxels3();
-      g.UpdateTime2(TempF.DelT);
-    }
     //vox.ComputeNucleation1();
+
+
     if (irep==0){
       irep=1;
       if (indOut==0 || icheck ==0){ 
@@ -153,6 +138,26 @@ int main()
 	} // if (cc1
 	MPI_Barrier(MPI_COMM_WORLD);
       }
+    }
+
+
+
+    // update next step for voxels (time is updated in vox.ComputeExtents() )
+    if (ictrl==0){
+      vox.UpdateVoxels();
+      vox.CheckTimeSkip();
+    }
+    if (ictrl==1){
+      /*
+      if (part.myid==0){std::cout << g.time << std::endl;}
+      MPI_Barrier(MPI_COMM_WORLD);
+      */
+      vox.UpdateVoxels2();
+      g.UpdateTime2(TempF.DelT);
+    }
+    if (ictrl==2){
+      vox.UpdateVoxels3();
+      g.UpdateTime2(TempF.DelT);
     }
     // update temperature field
     if (TempF.tInd != int(floor(g.time/TempF.DelT))){
