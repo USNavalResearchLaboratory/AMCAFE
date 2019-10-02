@@ -123,7 +123,7 @@ void SampleOrientation::ComputeMeasure(double &t,double & f)
   }
 } // end ComputeMeasure
 
-void SampleOrientation::GenerateSamples(const int &Nsample,std::vector<unsigned int> &seedL, std::vector<std::vector<double>> &axisAngle)
+void SampleOrientation::GenerateSamples(const int Nsample,unsigned int seedL, std::vector<std::vector<double>> &axisAngle)
 {
   int pind;
   double rhoP,dx,t,omega,fmeas,tnorm;
@@ -132,8 +132,8 @@ void SampleOrientation::GenerateSamples(const int &Nsample,std::vector<unsigned 
   std::vector<int> Perm(3),pid(3);
   axisAngle.assign(Nsample,std::vector<double>(4));
   dx = aprime/2.0/Ngrid;
+  std::default_random_engine g1(seedL);
   for (int jn=0;jn<Nsample;++jn){
-    std::default_random_engine g1(seedL[jn]);
     xyz = {aprime*(xrand(g1)-.5),aprime*(xrand(g1)-.5),
 	   aprime*(xrand(g1)-.5)};
     Perm={1,2,3};

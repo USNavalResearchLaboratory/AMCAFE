@@ -44,7 +44,7 @@ void BasePlate::GenerateVoxel()
   int j1,j2,j3;
   GenerateNgrain();
   std::vector<std::vector<double>> Xsite(Ngrain, std::vector<double>(3));
-  std::vector<unsigned int> sdloc;
+  unsigned int sdloc;
   std::uniform_real_distribution<double> xrand(0.0,1.0);
   double Lx = _xyz->dX[0] * _xyz-> nX[0];
   double Ly = _xyz->dX[1] * _xyz->nX[1];
@@ -82,7 +82,7 @@ void BasePlate::GenerateVoxel()
 
   std::default_random_engine g1(531231);
   //  for (int j=0;j<Ngrain;++j){sdloc.push_back(int(g1()/10000 + 1123));}
-  for (int j=0;j<Ngrain;++j){sdloc.push_back(unsigned(double(g1())/double(g1.max())*pow(2.0,32.0)));}
+  sdloc = unsigned(double(g1())/double(g1.max())*pow(2.0,32.0));
   SampleOrientation sa;
   // randomly generate crystallographic orientations
   std::vector<std::vector<double>> aa;

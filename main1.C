@@ -30,7 +30,7 @@ int main()
   int NtM,cc1,nDim;
   std::vector<int> nXM,nX,nTTemp(3,0);
   std::vector<double> dX,dXM,LX;
-  double tL,mL,c0,Gamma,dP,dL,dtM,muN,layerThickness,T0;
+  double tL,mL,c0,Gamma,dP,dL,dtM,muN,layerThickness,T0,dTempM,dTempS,rNmax;
   std::string filbaseTemp,filbaseOut,filout,neighOrder;
   double mu; //2e11;//5e9 // rate for baseplate voronoi;
   double heightBase;
@@ -55,6 +55,9 @@ int main()
   NtM = 50;
   dtM = .05; // must set based on moose results
   tL = 1609; // K
+  dTempM = 2.5; // K (mean undercooling for nucleation)
+  dTempS = 1.0; // K (standard dev undercooling for nucleation)
+  rNmax = 7e14; // m^{-3} maximum nucleation density
   mL = -10.9; // (K / wt%)
   dL = 3e-9; // (m^2/s)
   Gamma = 1e-7;  // (K m)
@@ -73,12 +76,11 @@ int main()
   beamPower = 70; //300; // W
   beamEta = 1.0;
   layerThickness = floor(beamSTD[2]/dX[2])*dX[2]; //30e-6; // m (layer thickness to be multiple of dX[2])
-  Grid g(dX,nX,tL,mL,c0,Gamma,dP,dL,muN,rho,cP,kappa,layerThickness,neighOrder,nDim);
+  Grid g(dX,nX,tL,mL,c0,Gamma,dP,dL,muN,rho,cP,kappa,layerThickness,neighOrder,dTempM,dTempS,rNmax,nDim);
   Partition part(g,myid,nprocs);
   part.PartitionGraph();
   BasePlate bp(g,heightBase,mu, part);
   TempField TempF(g,part,bp);
-
   // initialize appropriate temperature model
   //TempF.InitializeMoose(filbaseTemp,NtM,dtM,nXM,dXM);
   wEst  = pow(8*beamPower/(exp(1.0)*M_PI*rho*cP*(tL-298.0)*beamVel),.5); // see EQ (1) in schwalbach
@@ -119,8 +121,6 @@ int main()
     icheck=!std::all_of(vox.vState.begin(),vox.vState.end(),[](int n){return n==3;});
     ichecktmp = icheck;
     MPI_Allreduce(&ichecktmp,&icheck,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
-    //vox.ComputeNucleation1();
-
 
     if (irep==0){
       irep=1;
@@ -136,6 +136,7 @@ int main()
 	  filout=filbaseOut;
 	  vox.WriteToPVD(filout,filinds,filtime);
 	} // if (cc1
+
 	MPI_Barrier(MPI_COMM_WORLD);
       }
     }

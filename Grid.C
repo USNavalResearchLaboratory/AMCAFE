@@ -13,7 +13,9 @@ Grid::Grid(const std::vector<double> & dxIn, const std::vector<int> & NxIn,
 	   const double &mLIn,const double &c0In,const double &GammaIn,
 	   const double &kPIn,const double &dLIn,const double &muNIn, 
 	   const double & rhoIn, const double & cPIn, const double & kappaIn,
-	   const double &layerThicknessIn, const std::string neighOrderIn,const int &nDimIn)
+	   const double &layerThicknessIn, const std::string neighOrderIn,
+	   const double &dTempMIn, const double &dTempSIn, 
+	   const double &rNmaxIn, const int &nDimIn)
 {
   // read in domain and  material parameters
   nDim = nDimIn;
@@ -33,6 +35,9 @@ Grid::Grid(const std::vector<double> & dxIn, const std::vector<int> & NxIn,
   rho = rhoIn;
   cP = cPIn;
   kappa = kappaIn;
+  dTempM = dTempMIn;
+  dTempS = dTempSIn;
+  rNmax = rNmaxIn;
   layerT = floor(layerThicknessIn/dX[2])*dX[2];
   deltaXmin = *std::min_element(dX.begin(),dX.end());
   deltaTcheck = pow(deltaXmin,2.0)/dL;

@@ -13,7 +13,9 @@ class Grid
 	const double &mL,const double &c0,const double &Gamma, 
 	const double &kP,const double &dL, const double & muN,
 	const double & rhoIn, const double & cPIn, const double & kappaIn,
-	const double &layerThicknessIn, const std::string neighOrderIn,const int &nDimIn);
+	const double &layerThicknessIn, const std::string neighOrderIn,
+	const double &dTempMIn, const double &dTempSIn, 
+	const double &rNmaxIn, const int &nDimIn);
 
   // any functions added here
   void UpdateTime(const double &velo);
@@ -35,6 +37,9 @@ class Grid
   double muN; // nucleation rate coefficient
   double rho; // material density (kg/m^3)
   double kappa; // material thermal conductivity (W/(m-K))
+  double dTempM; // mean undercooling for nucleation (K)
+  double dTempS; // standard dev undercooling for nucleation (K)
+  double rNmax; // maximum nucleation density (m^{-3})
   double cP; // specific heat capacity (J/(kg-K))
   double layerT; // thickness of each layer
   double ethresh; // 1- cut off probability for Delta t max (see latex notes)

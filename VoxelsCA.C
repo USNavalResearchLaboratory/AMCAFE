@@ -131,11 +131,10 @@ void VoxelsCA::UpdateVoxels3()
   /*
     This is the modified updating scheme that is described in notes
    */
-  // set liquid if temperature > TL
+  // set liquid if temperature > TL 
   SetLiquid2();
   // zero voxels above laser (no material there)
   ZeroVoxels();
-  // SetLiquids, ZeroVoxels: no need to pass information for  b/c only local evaluation)
   // solid (vState=3) to mushy (vState=2) if one neighbor liquid (vState=1)
   ConvertSolid(1);
   _part->PassInformation(vState);
@@ -152,15 +151,29 @@ void VoxelsCA::UpdateVoxels3()
   // for file writing purposes
   // 8888888888888888888888888888888888888888888888
 
+  // start:determine nucleation: location and time
+  std::vector<int> nucInd; // index of where nucleation
+  std::vector<double> tnuc; // time within [t,t+DT] when nucleation occurs
+  NucleateGrains(nucInd,tnuc);
+  int Nnuc = nucInd.size(),Nnucvec[_part->nprocs],NnucA=0, jnuc0[_part->nprocs];
+  std::vector<int> :: iterator i1p;
+  MPI_Allgather(&Nnuc,1,MPI_INT,&Nnucvec[0],1,MPI_INT,MPI_COMM_WORLD);
+  for (int j=0;j<_part->nprocs;++j){NnucA+=Nnucvec[j];}
+  jnuc0[0]=0;
+  for (int j=1;j<_part->nprocs;++j){jnuc0[j] = jnuc0[j-1]+Nnucvec[j-1];}
+  int nucA[NnucA];
+  double tnucA[NnucA];
+  // end:determine nucleation: location and time
+  std::vector<std::vector<double>> aa;
+  SampleOrientation sa;
+  unsigned int sdloc; 
   double nA[3] = {1.0/pow(3.0,.5),1.0/pow(3.0,.5),1.0/pow(3.0,.5)},
     pA[3] = {1.0,0.0,0.0};
-
-
-
   for (int j=0;j<Ntot;++j){
     if (vState[j]==2 || (vState[j]==1 && _temp->TempCurr[j]< _xyz->tL)){NlocA+=1;}
   }
   MPI_Allgather(&NlocA,1,MPI_INT,&NvecA[0],1,MPI_INT,MPI_COMM_WORLD);
+
   for (int j=0;j<_part->nprocs;++j){Na+=NvecA[j];}
   double T[Na];
   int vS[Na],V[Na][24],G[Na],vI[Na],j0[_part->nprocs],
@@ -169,12 +182,19 @@ void VoxelsCA::UpdateVoxels3()
   j0[0]=0;
   for (int j=1;j<_part->nprocs;++j){j0[j]= j0[j-1]+NvecA[j-1];}
   cc=0;
+  cc1=0;
   for (int j=0;j<Ntot;++j){
     if (vState[j]==2 || (vState[j]==1 && _temp->TempCurr[j]< _xyz->tL)){
       vS[j0[_part->myid]+cc] = vState[j];
       vI[j0[_part->myid]+cc] = _part->icellidLoc[j];
       G[j0[_part->myid]+cc] = gID[j];
       T[j0[_part->myid]+cc] = _temp->TempCurr[j];
+      i1p=std::find(nucInd.begin(),nucInd.end(),j);
+      if (i1p !=nucInd.end()){
+	nucA[jnuc0[_part->myid]+cc1] = cc + j0[_part->myid];
+	tnucA[jnuc0[_part->myid]+cc1] = tnuc[std::distance(nucInd.begin(),i1p)];
+	cc1+=1;
+      } // if (std::any_of ...
       cc+=1;
     } // if (vState[j]...
   } // for (int j...
@@ -184,6 +204,11 @@ void VoxelsCA::UpdateVoxels3()
     MPI_Bcast(&vI[j0[j]],NvecA[j],MPI_INT,j,MPI_COMM_WORLD);
     MPI_Bcast(&G[j0[j]],NvecA[j],MPI_INT,j,MPI_COMM_WORLD);
     MPI_Bcast(&T[j0[j]],NvecA[j],MPI_DOUBLE,j,MPI_COMM_WORLD);
+  } // for (int j ..
+  for (int j=0;j<_part->nprocs;++j){
+    if (Nnucvec[j]==0){continue;}
+    MPI_Bcast(&nucA[jnuc0[j]],Nnucvec[j],MPI_INT,j,MPI_COMM_WORLD);
+    MPI_Bcast(&tnucA[jnuc0[j]],Nnucvec[j],MPI_DOUBLE,j,MPI_COMM_WORLD);
   } // for (int j ..
   int i1=_xyz->nX[0],i2=_xyz->nX[0]*_xyz->nX[1],jst;
   for (int j=0;j<Na;++j){
@@ -222,13 +247,15 @@ void VoxelsCA::UpdateVoxels3()
   // end assemble arrays to be used to compute grain growth
   // capture all undercooled liquid voxels by growing grains
   int js,j1s,jx[3],jy[3],jTs[_part->nprocs], j1Ts[_part->nprocs],i3;
-  double DtT[_part->nprocs],velX,velY,delxy[3],omega,ax[3],
-    rRot[3][3],dlocX[3],dlocYnorm,dlocXnorm,dlocXYnorm,dlocY[3],dr,vhat,tmn1[Na],
-    time,dnx[3],dny[3],tmp1;
+  double DtT[_part->nprocs],velX,velY,omega,ax[3],
+    rRot[3][3],dlocX[3],dlocYnorm,dlocXnorm,dlocY[3],dr,vhat,tmn1[Na],
+    timeUntil,dnx[3],dny[3],tmp1,tinc=0.0;
   std::fill(tmn1,tmn1+Na,0.0);
   i2 = _xyz->nX[0]; i3 = _xyz->nX[0]*_xyz->nX[1];
   cc=0;
   while (std::any_of(vS,vS+Na,[](int n){return n==1;})) {
+  MPI_Barrier(MPI_COMM_WORLD);
+  //if (_temp->tInd==7){if (_part->myid==0){std::cout << "5,"<<_temp->tInd<<","<<nGrain <<","<<NnucA<< std::endl;}}
     double DtMin=1e6;
     for (int j=iv[_part->myid];j<iv[_part->myid+1];++j){
       if (vS[j]==1){
@@ -253,14 +280,6 @@ void VoxelsCA::UpdateVoxels3()
 	  dny[2] = (jy[2]-jn[2])*_xyz->dX[2];
 	  tmp1 = (dnx[0]*dny[0]+dnx[1]*dny[1]+dnx[2]*dny[2])/
 	    (dnx[0]*dnx[0]+dnx[1]*dnx[1]+dnx[2]*dnx[2]);
-	  delxy[0] = dnx[0];//*(1-tmp1);
-	  delxy[1] = dnx[1];//*(1-tmp1);
-	  delxy[2] = dnx[2];//*(1-tmp1);
-	  /*
-	  delxy[0]=(jy[0]-jx[0])*_xyz->dX[0]; 
-	  delxy[1]=(jy[1]-jx[1])*_xyz->dX[1]; 
-	  delxy[2]=(jy[2]-jx[2])*_xyz->dX[2];
-	  */
 	  omega = cTheta[4*(G[V[j][j1]]-1)];
 	  ax[0]=cTheta[4*(G[V[j][j1]]-1)+1];
 	  ax[1]=cTheta[4*(G[V[j][j1]]-1)+2];
@@ -284,38 +303,57 @@ void VoxelsCA::UpdateVoxels3()
 	  dlocY[2] = std::fabs(rRot[0][2]*dny[0]+rRot[1][2]*dny[1]+rRot[2][2]*dny[2]);
 	  dlocXnorm = pow(pow(dlocX[0],2.0)+pow(dlocX[1],2.0)+pow(dlocX[2],2.0),.5);
 	  dlocYnorm = pow(pow(dlocY[0],2.0)+pow(dlocY[1],2.0)+pow(dlocY[2],2.0),.5);
-	  dlocXYnorm = pow(pow(delxy[0],2.0)+pow(delxy[1],2.0)+pow(delxy[2],2.0),.5);
           dr = - (nA[0]*pA[0]+nA[1]*pA[1]+nA[2]*pA[2])*dlocYnorm;
 	  dr = std::fabs(nA[0]*dlocX[0]+nA[1]*dlocX[1]+nA[2]*dlocX[2] + dr);	  
 	  velY=(5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
 		 (_xyz->Gamma))*( pow((_xyz->tL - T[V[j][j1]]),2.5)/pow(_xyz->c0,1.5));
 	  vhat = .5*(velY+velX)/pow(3.0,.5);
-	  time = (dr-vhat*tmn1[V[j][j1]])/vhat;
-	  if (time < DtMin){
-	    DtMin = time;
+	  timeUntil = (dr-vhat*tmn1[V[j][j1]])/vhat;
+	  if (timeUntil < DtMin){
+	    DtMin = timeUntil;
 	    js = j;
 	    j1s = j1;
-	  } // if (time < ...
+	  } // if (timeUntil < ...
 	} // for (int j1
       } // if (vS[j...
     } // for (int j...
     MPI_Allgather(&DtMin,1,MPI_DOUBLE,&DtT[0],1,MPI_DOUBLE,MPI_COMM_WORLD);
     MPI_Allgather(&js,1,MPI_INT,&jTs[0],1,MPI_INT,MPI_COMM_WORLD);
     MPI_Allgather(&j1s,1,MPI_INT,&j1Ts[0],1,MPI_INT,MPI_COMM_WORLD);
-    i1 = std::distance(DtT,std::min_element(DtT,DtT+_part->nprocs));
-    js = jTs[i1];
-    j1s = j1Ts[i1];
-    //if (cc==0){std::cout << _part->myid<<","<<G[V[js][j1s]]<<","<<j1Ts[0]<<","<<j1Ts[1]<<","<<j1Ts[i1]<<","<<_xyz->tInd<<std::endl;}
-    vS[js] = 2;
+    DtMin = *std::min_element(DtT,DtT+_part->nprocs);
+
+    double DtMin2 = 1.01*DtMin;
+    for (int j=0;j<NnucA;++j){
+      if ( (tnucA[j] > tinc) && (tnucA[j] <= tinc+DtMin)){
+	if (DtMin2> tnucA[j]-tinc){
+	  DtMin2 = tnucA[j]-tinc;
+	  js=nucA[j];
+	} // if (DtMin2...
+      } // if ( (tnucA ...
+    } // for int j ...
+    if (DtMin2 < DtMin){
+    if(_part->myid==0){std::cout <<_temp->tInd<<","<< DtMin2<<","<<DtMin<<std::endl;}
+      vS[js] = 2;
+      nGrain+=1;
+      G[js] = nGrain;
+      sdloc= seed0 + 32*_xyz->tInd +64*nGrain;
+      sa.GenerateSamples(1,sdloc,aa);
+      cTheta.insert(cTheta.end(), &aa[0][0],&aa[0][0]+4);
+      gNucleus.push_back(vI[js]);
+      for (int j=0;j<Na;++j){tmn1[j]+=DtMin2;}
+      tmn1[js] = 0.0;
+    } else {
+      i1 = std::distance(DtT,std::min_element(DtT,DtT+_part->nprocs));
+      js = jTs[i1];
+      j1s = j1Ts[i1];
+      //if (cc==0){std::cout << _part->myid<<","<<G[V[js][j1s]]<<","<<j1Ts[0]<<","<<j1Ts[1]<<","<<j1Ts[i1]<<","<<_xyz->tInd<<std::endl;}
+      vS[js] = 2;
+      G[js] = G[V[js][j1s]];
+      for (int j=0;j<Na;++j){tmn1[j]+=DtMin;}
+      tmn1[js] = 0.0;
+    } // if (DtMin2 < ...
     cc+=1;
-    G[js] = G[V[js][j1s]];
-    for (int j=0;j<Na;++j){tmn1[j]+=DtT[i1];}
-    tmn1[js] = 0.0;
-
-
-
-
-
+    tinc += std::min(DtMin2,DtMin);
     /*
     // 88888888888888888888888888888888888888888888888888888888888
     // end capture all undercooled liquid voxels by growing grains
@@ -350,9 +388,6 @@ void VoxelsCA::UpdateVoxels3()
     // write out 
     // 88888888888888888888888888888888888888888888888888888888888
    */
-
-
-
   } // while (std::any
 
     // 888888888888888888888888888888888888888888888888888888888888888888
@@ -378,7 +413,6 @@ void VoxelsCA::UpdateVoxels3()
    //THIS AREA NEEDS TO BE UNCOMMENTED
   // 888888888888888888888888888888888888888888888888888888888888888888888
   
-
 
 }; // end UpdateVoxels3
 
@@ -800,9 +834,9 @@ void VoxelsCA::ComputeNucleation1(){
   std::vector<double> nrate(Ntot,0),gidtmp,cthtmp,tmpall1,tmp1;
   std::vector<std::vector<double>> aa;
   std::vector<int> ngvec(_part->nprocs,0),ind,tmp2,tmpall2,gnuctmp;
-  std::vector<unsigned int> sdloc;
+  unsigned int sdloc;
   std::srand(std::time(nullptr));
-  std::default_random_engine g(std::rand());
+  std::default_random_engine g(seed1+21*_xyz->tInd);
   std::uniform_real_distribution<double> xrand(0,1);
 
   for (int j=0;j<Ntot;++j){
@@ -813,6 +847,7 @@ void VoxelsCA::ComputeNucleation1(){
     if (vState[j] == 2){itmp +=1;}
   }
   MPI_Allreduce(&itmp,&nmushy,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
+  sdloc = (unsigned( double(g())/double(g.max())*pow(2.0,32.0)));
   for (int j=0;j<Ntot;++j){
     if (vState[j] == 2){
       std::default_random_engine g1(seed1+11*_part->icellidLoc[j] + 21*_xyz->tInd);
@@ -821,7 +856,6 @@ void VoxelsCA::ComputeNucleation1(){
 	ngtmp += 1;
 	gnuctmp.push_back(_part->icellidLoc[j]);
 	//	sdloc.push_back(int(g1()/1000 + 1234));
-	sdloc.push_back(unsigned( double(g1())/double(g1.max())*pow(2.0,32.0)));
       } // if (xrand(g) < ...
     } // if (vState[j]==2
   } // for (int j ...
@@ -1045,6 +1079,61 @@ void VoxelsCA::WriteCSVData(const std::string &filename)
   } // if (_part->myid ..)
   MPI_Barrier(MPI_COMM_WORLD);
 } // WriteCSVData
+
+void VoxelsCA::NucleateGrains(std::vector<int> &nIn, std::vector<double> &tIn)
+{
+  int Ntot=_part->ncellLoc,Nnew1,Nq=0,NqA,ind1[Ntot],Ntot2=_part->ncellLoc+_part->nGhost,cc,cc1;
+  double tNp1= _xyz->time + _temp->DelT,rNuc[Ntot],x1,x2,rmax=0.0,rateX=0.0;
+  std::fill(rNuc,rNuc+Ntot,0.0);
+  std::vector<double> TempNp1(Ntot2,0.0);
+  std::default_random_engine g1(30*_xyz->tInd+seed1);
+  _temp->SchwalbachTempCurr(tNp1,TempNp1);
+  for (int j=0;j<Ntot;++j){
+    if (vState[j]==1 && _temp->TempCurr[j]< _xyz->tL){
+      x2 = ( (_xyz->tL -TempNp1[j]) - _xyz->dTempM)/_xyz->dTempS/pow(2.0,.5);
+      x1 = ( (_xyz->tL - _temp->TempCurr[j]) - _xyz->dTempM)/_xyz->dTempS/pow(2.0,.5);
+      rNuc[j] = _xyz->rNmax*std::max(0.0, .5*(erf(x2) - erf(x1)));
+      rmax = std::max(rmax,rNuc[j]);
+      ind1[Nq] = j;
+      Nq+=1;
+    } // if (vState[j]==1...
+  } // for (int j=0...
+  MPI_Allreduce(&Nq,&NqA,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
+  rateX= (double)NqA *_xyz->dX[0]*_xyz->dX[1]*_xyz->dX[2] * rmax;
+  // sample Poisson distribution from rmax and then do thinning
+  std::poisson_distribution<int> Np(rateX);
+  std::uniform_int_distribution<int> uind(0,Nq-1);
+  std::uniform_real_distribution<double> xrand1(0.0,1.0);
+  Nnew1 = (NqA==0)? 0:  (int)floor( ((double)Nq/(double)NqA)* Np(g1) );
+  Nnew1 = std::min(Nnew1,Nq);
+  int itmp1[Nnew1],itmp2[Nq];
+  double tmp1[Nnew1];
+  std::fill(itmp2,itmp2+Nq,0);
+  x2 = _xyz->time+_temp->DelT;
+  x1 = _xyz->time;
+  cc1=0;
+  while (cc1<Nnew1){
+    cc = uind(g1);
+    itmp2[cc]+=1;
+    if (itmp2[cc]==1){
+      itmp1[cc1] = ind1[cc];
+      tmp1[cc1] = (x2-x1)*xrand1(g1); // what time to be 0 at current time
+      cc1+=1;
+    }
+  } // while (cc1
+  nIn.resize(Nnew1,0);
+  tIn.resize(Nnew1,0);
+  cc=0;
+  //MPI_Barrier(MPI_COMM_WORLD);
+  for (int j=0;j<Nnew1;++j){
+    if (xrand1(g1) > (rNuc[itmp1[j]]/rmax)){continue;}
+    nIn[cc] =itmp1[j];
+    tIn[cc] = tmp1[j];
+    cc+=1;
+  } // for (int j ...
+  nIn.resize(cc);
+  tIn.resize(cc);
+} // end NucleateGrains
 
 void VoxelsCA::WriteCSVDataTest(const std::string &filename)
 {
