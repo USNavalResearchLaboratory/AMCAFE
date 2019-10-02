@@ -26,7 +26,7 @@ class VoxelsCA
   void UpdateVoxels();
   void UpdateVoxels2();
   void UpdateVoxels3();
-  void NucleateGrain();
+  void NucleateGrains(std::vector<int> &nucInd, std::vector<double> &tnuc);
   void ComputeNucleation1();
   void ExtentsInitialize();
   void CheckTimeSkip();

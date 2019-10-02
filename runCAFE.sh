@@ -1,5 +1,5 @@
 #!/bin/bash
 
-/opt/petsc/arch-linux2-c-opt/bin/mpiexec -n 24 ./cafe
+/opt/petsc/arch-linux2-c-opt/bin/mpiexec -n 48 ./cafe
 
 exit

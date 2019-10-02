@@ -105,6 +105,39 @@ void TempField::SchwalbachTempCurr()
   } // if (patternID==0 ...
 } // end SchwalbachTempCurr()
 
+void TempField::SchwalbachTempCurr(double tcurr,std::vector<double> & TempOut )
+{
+  //computes temp field based on Schwalbach et al
+  int Ntot = _part->nGhost+_part->ncellLoc, j1,j2,j3,iplay;
+  double x0,y0,z0,rij,x,y,z,tc,tmin;
+  std::vector<double> lam(3);
+  tmin = tcurr-tcut;
+  nSource = ceil( (tcurr - tmin) / DelT);
+  if (patternID==0){
+    for (int j=0;j<Ntot;++j){
+      j3 = floor(_part->icellidLoc[j]/(_xyz->nX[0]*_xyz->nX[1]));
+      j2 = floor( (_part->icellidLoc[j]- _xyz->nX[0]*_xyz->nX[1]*j3)/_xyz->nX[0]);
+      j1 = _part->icellidLoc[j] - _xyz->nX[0]*_xyz->nX[1]*j3 - _xyz->nX[0]*j2;
+      x0 = (double(j1)+.5)*(_xyz->dX[0]);
+      y0 = (double(j2)+.5)*(_xyz->dX[1]);
+      z0 = (double(j3)+.5)*(_xyz->dX[2]);
+      for (int jt=0;jt<nSource;++jt){
+	// tc,x,y,z space-time location of source
+	tc = tcurr - jt*DelT;
+	x = bmV*fmod(tc,bmPeriod[0]);
+	y = fmod(floor(tc/bmPeriod[0]),bmPeriod[1])*bmS + (_xyz->nX[1]*_xyz->dX[1])/2.0;
+	z = (floor(tc/(bmPeriod[1]*bmPeriod[0]))+1.0)*_xyz->layerT + _bp->height;
+	lam = {pow(bmSTD[0],2.0)+2*alpha*(tcurr - tc), 
+	       pow(bmSTD[1],2.0)+2*alpha*(tcurr - tc),
+	       pow(bmSTD[2],2.0)+2*alpha*(tcurr - tc)};
+	rij = pow(x-x0,2.0)/2/lam[0] +pow(y-y0,2.0)/2/lam[1] +
+	  pow(z-z0,2.0)/2/lam[2];
+	TempOut[j] += Ci/pow(lam[0]*lam[1]*lam[2],.5)*exp(-rij);
+      } // for (int j1...
+    } // for (int j...
+  } // if (patternID==0 ...
+} // end SchwalbachTempCurr()
+
 void TempField::SchwalbachDDtTemp()
 {
   //computes temp field time derivative based on Schwalbach et al

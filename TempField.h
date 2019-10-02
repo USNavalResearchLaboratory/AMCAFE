@@ -28,6 +28,7 @@ class TempField
   void ComputeDDtTempDiscrete();
   void ComputeDDtTempAnalytical();
   void SchwalbachTempCurr();
+  void SchwalbachTempCurr(double tcurr, std::vector<double> &TempOut);
   void SchwalbachDDtTemp();
   void SchwalbachGradTemp();
   void Test2();
