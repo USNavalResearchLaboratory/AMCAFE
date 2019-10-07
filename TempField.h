@@ -16,8 +16,8 @@ class TempField
   TempField(Grid &g, Partition &, BasePlate &);
   void InitializeMoose(std::string & filnambase, const int &NtIn, 
 		       const double &dtM, const std::vector<int> &nXM, const std::vector<double> &dXM);
-  void InitializeSchwalbach(int & patternId, std::vector<double> & beamSTD, double & beamSpacing,
-			    double & beamVelocity, double & beamPower, double & beamEta, std::vector<double> & LxAll,
+  void InitializeSchwalbach(int & patternId, std::vector<double> & beamSTD, 
+			    double & beamVelocity, double & beamPower, double & beamEta, std::vector<double> & Lx,
 			    double & T0);
   void ReadCSVMoose1();
   void ReadCSVMoose2();
@@ -33,10 +33,10 @@ class TempField
   void SchwalbachGradTemp();
   void Test2();
   std::vector<std::vector<double>> Temp;
-  std::vector<double> DDtTemp,dXM,TempCurr, lamXYZ,bmSTD,bmLx,bmX0,bmDX,bmPeriod;
-  std::vector<int> nXM;
+  std::vector<double> DDtTemp,dXM,TempCurr,lamXYZ,bmSTD,bmLx,bmX0,bmDX,bmPeriod,offset;
+  std::vector<int> nXM,nTTemp;
   int NtM,indexM,patternID,nSource,ilaserLoc,tInd;
-  double dtM,bmS,bmV,bmP,bmEta,rcut,tcut,T0,Ci,DelT,alpha;
+  double dtM,bmV,bmP,bmEta,rcut,tcut,T0,Ci,DelT,alpha;
 
  private:
   Grid *_xyz;

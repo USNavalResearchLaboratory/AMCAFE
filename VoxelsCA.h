@@ -30,6 +30,7 @@ class VoxelsCA
   void ComputeNucleation1();
   void ExtentsInitialize();
   void CheckTimeSkip();
+  void WriteToVTU0(const std::string &filname);
   void WriteToVTU1(const std::string &filname);
   void WriteCSVData(const std::string &filname);
   void WriteCSVDataTest(const std::string &filname); // MUST DELETE AFTER TESTING

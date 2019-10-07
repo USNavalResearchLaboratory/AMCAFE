@@ -2,9 +2,9 @@
 
 CPP = /opt/petsc/arch-linux2-c-opt/bin/mpic++
 CPPFLAGS = -std=c++11
-# CPPOOPTTFLAGS = -O2 -Wall
-CPPOOPTTFLAGS = -O2
-#CPPOOPTTFLAGS = -O3
+#CPPOOPTTFLAGS = -O2 -Wall
+#CPPOOPTTFLAGS = -O2
+CPPOOPTTFLAGS = -O3
 
 CPPINCLUDE = -I /opt/petsc/arch-linux2-c-opt/include/ 
 METISLIB = /opt/petsc/arch-linux2-c-opt/lib/libmetis.so

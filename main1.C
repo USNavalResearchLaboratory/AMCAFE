@@ -23,29 +23,31 @@ int main()
 {
   /*-----------------------------------------------
     initialization step */
+  auto texec1 = std::chrono::high_resolution_clock::now();
+
   MPI_Init(NULL,NULL);
   int nprocs,myid,ictrl;
   MPI_Comm_size(MPI_COMM_WORLD,&nprocs);
   MPI_Comm_rank(MPI_COMM_WORLD,&myid);
   int NtM,cc1,nDim;
-  std::vector<int> nXM,nX,nTTemp(3,0);
+  std::vector<int> nXM,nX;
   std::vector<double> dX,dXM,LX;
   double tL,mL,c0,Gamma,dP,dL,dtM,muN,layerThickness,T0,dTempM,dTempS,rNmax;
-  std::string filbaseTemp,filbaseOut,filout,neighOrder;
+  std::string filbaseTemp,filbaseOut,filout,neighOrder,filLogOut;
   double mu; //2e11;//5e9 // rate for baseplate voronoi;
   double heightBase;
   // schwalbach parameters
   int patternID;
-  double beamVel,beamSpacing,beamPower,wEst,cP,rho,kappa,beamEta,rcut;
-  std::vector<double> beamSTD,LxAll;
+  double beamVel,beamPower,wEst,cP,rho,kappa,beamEta,rcut;
+  std::vector<double> beamSTD;
   // schwalbach parameters
   ictrl=2;
   nXM = {20,20,20};
-  nX = {128,32,16};
-  //nX = {64,16,8};
+  nX = {128,128,64};
+  LX = {.002,.002,.001};
+  //nX = {128,32,16};
+  //LX = {.001,.00025,12.5e-5};  
   nDim = nX.size();
-  //  LX = {.002,.002,.001};
-  LX = {.001,.00025,12.5e-5};  
   dX.assign(nDim,0.0);
   dXM.assign(nDim,0.0);
   for (int j=0;j<nDim;++j){
@@ -57,7 +59,7 @@ int main()
   tL = 1609; // K
   dTempM = 2.5; // K (mean undercooling for nucleation)
   dTempS = 1.0; // K (standard dev undercooling for nucleation)
-  rNmax = 7e14; // m^{-3} maximum nucleation density
+  rNmax = 7e14*pow(.001/dX[0],3.0); // m^{-3} maximum nucleation density
   mL = -10.9; // (K / wt%)
   dL = 3e-9; // (m^2/s)
   Gamma = 1e-7;  // (K m)
@@ -84,15 +86,10 @@ int main()
   // initialize appropriate temperature model
   //TempF.InitializeMoose(filbaseTemp,NtM,dtM,nXM,dXM);
   wEst  = pow(8*beamPower/(exp(1.0)*M_PI*rho*cP*(tL-298.0)*beamVel),.5); // see EQ (1) in schwalbach
-  beamSpacing = 4.0/3.0*beamSTD[1]; //wEst*.8;
   patternID = 0;
-  //LxAll = {LX[0]+beamSpacing,LX[1]+beamSpacing,LX[2]}; //{.01,.01,.01}; // domain of entire piece, used for laser pattern (m)
-  LxAll = {LX[0]+1000*beamSpacing,LX[1],LX[2]};
-  //LxAll = {.002+beamSpacing,.002+beamSpacing,.002+beamSpacing}; //{.01,.01,.01}; // domain of entire piece, used for laser pattern (m)
-  nTTemp = {int(floor(LxAll[0]/(4/3.0*beamSTD[0])))+1,int(floor(LxAll[1]/beamSpacing))+1,
-	    int(floor(LxAll[2]/layerThickness))};
+  //LxAll = {LX[0]+1000*beamSpacing,LX[1],LX[2]};
   T0 = 300.0; // initial temperature in (K)
-  TempF.InitializeSchwalbach(patternID,beamSTD,beamSpacing,beamVel,beamPower,beamEta,LxAll,T0);
+  TempF.InitializeSchwalbach(patternID,beamSTD,beamVel,beamPower,beamEta,LX,T0);
   TempF.SchwalbachTempCurr();
   //TempF.SchwalbachDDtTemp();
   //TempF.ReadCSVMoose2();
@@ -105,17 +102,20 @@ int main()
   /*-----------------------------------------------
     execute simulation */
   cc1=0;
-  int outskip=20,indOut;
+  int outskip=20,indOut,nTmax=TempF.nTTemp[0]*TempF.nTTemp[1]*TempF.nTTemp[2];
   std::vector<int> filinds,out2(3,0),j123(3,0);
   std::vector<double> filtime;
   int icheck = 1,ichecktmp,cc2=0, irep=0;
+  std::ofstream fplog;
   filbaseOut = "CA3D";
-  out2 = {1,1,1}; // the increment to skip output per direction
-  while (icheck!=0){
+  filLogOut="CA3D.log";
+  out2 = {1,1,2}; // the increment to skip output per direction
+  if (part.myid==0){fplog.open(filLogOut.c_str());}
+  while (icheck!=0 && TempF.tInd<nTmax){
     cc2+=1;
-    j123[2] = floor(TempF.tInd /(nTTemp[0]*nTTemp[1]));
-    j123[1] = floor((TempF.tInd - (nTTemp[0]*nTTemp[1])*j123[2])/ nTTemp[0]);
-    j123[0] = TempF.tInd - (nTTemp[0]*nTTemp[1])*j123[2] - nTTemp[0]*j123[1];
+    j123[2] = floor(TempF.tInd /(TempF.nTTemp[0]*TempF.nTTemp[1]));
+    j123[1] = floor((TempF.tInd - (TempF.nTTemp[0]*TempF.nTTemp[1])*j123[2])/ TempF.nTTemp[0]);
+    j123[0] = TempF.tInd - (TempF.nTTemp[0]*TempF.nTTemp[1])*j123[2] - TempF.nTTemp[0]*j123[1];
     indOut = j123[2] % out2[2] + j123[1] % out2[1] + j123[0] % out2[0];
     //if (cc2>1000){icheck=0;}
     icheck=!std::all_of(vox.vState.begin(),vox.vState.end(),[](int n){return n==3;});
@@ -140,9 +140,6 @@ int main()
 	MPI_Barrier(MPI_COMM_WORLD);
       }
     }
-
-
-
     // update next step for voxels (time is updated in vox.ComputeExtents() )
     if (ictrl==0){
       vox.UpdateVoxels();
@@ -161,9 +158,9 @@ int main()
       g.UpdateTime2(TempF.DelT);
     }
     // update temperature field
-    if (TempF.tInd != int(floor(g.time/TempF.DelT))){
+    if (TempF.tInd != int(round(g.time/TempF.DelT))){
       if (ictrl==0){vox.ExtentsInitialize();}
-      TempF.tInd = int(floor(g.time/TempF.DelT));
+      TempF.tInd = int(round(g.time/TempF.DelT));
       TempF.SchwalbachTempCurr();
       //TempF.SchwalbachDDtTemp();
       irep=0;
@@ -174,6 +171,10 @@ int main()
       TempF.ComputeDDtTemp();
     }
     */
+    auto texec2 = std::chrono::high_resolution_clock::now();
+    auto delTexec = std::chrono::duration_cast<std::chrono::seconds>( texec2 - texec1 ).count();
+    if (part.myid==0){std::cout << TempF.tInd<<","<< g.time/TempF.DelT<< std::endl;}
+    if (part.myid==0){fplog << "Time index= "<<TempF.tInd<<",Total clock time passed(s)= "<<delTexec<<std::endl;}
     } // while
   MPI_Barrier(MPI_COMM_WORLD);
   MPI_Finalize();

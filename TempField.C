@@ -39,26 +39,37 @@ void TempField::InitializeMoose(std::string &filnambase,
 } // end InitializeMoose()
 
 void TempField::InitializeSchwalbach(int & patternIDIn, std::vector<double> & beamSTDIn, 
-				     double & beamSpacingIn, double & beamVelocityIn,double & beamPowerIn,
-				     double & beamEtaIn, std::vector<double> & LxAllIn, double & T0In)
+				     double & beamVelocityIn,double & beamPowerIn,
+				     double & beamEtaIn, std::vector<double> & LxIn, double & T0In)
 {
   /*
     This follows the model: Schwalbach, Edwin J., et al. "A discrete source model of powder 
     bed fusion additive manufacturing thermal history." Additive Manufacturing 25 (2019): 485-498.
    */
   bmSTD = beamSTDIn;
-  bmS = beamSpacingIn;
   bmV = beamVelocityIn;
   bmP = beamPowerIn;
   bmEta = beamEtaIn;
   patternID = patternIDIn;
-  bmLx = LxAllIn;
   T0 = T0In;
   double tb,minTemp;
   if (patternID==0){
+    /*
+      This pattern is for the laser going in the X direction only with
+      hatch spacing in the Y direction given as bmDX[1] and with layer
+      thickness given in bmDX[2]. This is for a region away from the 
+      boundaries so that the melt pool is completely gone and the growth
+      material has completely solidified at the boundaries before the 
+     */
     DelT = 4.0/3.0*bmSTD[0]/bmV;
-    bmDX = {DelT*bmV,bmS,_xyz->layerT};
-    bmPeriod = {bmLx[0]/bmV,(floor(bmLx[1]/bmS)+1)};
+    bmDX = {DelT*bmV,4.0/3.0*bmSTD[1],_xyz->layerT};
+    offset={bmDX[0],0.0,0.0};
+    //offset={bmDX[0],bmDX[1],0.0};
+    offset={0.0,0.0,0.0};
+    bmLx={LxIn[0]+4*bmDX[0],LxIn[1]+4*bmDX[1],LxIn[2]};
+    bmPeriod = {bmLx[0]/bmV,(floor(bmLx[1]/bmDX[1])+2)};
+    nTTemp = {int(floor(bmLx[0]/bmDX[0] ))+1,int(floor(bmLx[1]/bmDX[1]))+1,
+            int(floor(bmLx[2]/bmDX[2]))};
   }
   rcut = pow( -2* pow(*std::min_element(bmSTD.begin(),bmSTD.end()),2.0)*log(.001),.5);
   Ci = bmEta*bmP*DelT/(_xyz->rho*_xyz->cP*pow(2.0,.5)*pow(M_PI,1.5));
@@ -76,7 +87,8 @@ void TempField::SchwalbachTempCurr()
   //tmin = std::max(0.0,_xyz->time-tcut);
   tmin = _xyz->time-tcut;
   nSource = ceil( (_xyz->time - tmin) / DelT);
-  ilaserLoc = _bp->Nzh + floor( (floor(_xyz->time/(bmPeriod[1]*bmPeriod[0]))+1)*_xyz->layerT/_xyz->dX[2]);
+  //ilaserLoc = _bp->Nzh + floor( (floor(_xyz->time/(bmPeriod[1]*bmPeriod[0]))+1)*_xyz->layerT/_xyz->dX[2]);
+  ilaserLoc = _bp->Nzh + floor( (floor(tInd/(nTTemp[0]*nTTemp[1]))+1)*bmDX[2]/_xyz->dX[2]);
   iplay=_xyz->nX[0]*_xyz->nX[1]*ilaserLoc;
   TempCurr.assign(Ntot,T0);
   if (patternID==0){
@@ -91,9 +103,14 @@ void TempField::SchwalbachTempCurr()
       for (int jt=0;jt<nSource;++jt){
 	// tc,x,y,z space-time location of source
 	tc = _xyz->time - jt*DelT;
-	x = bmV*fmod(tc,bmPeriod[0]);
-	y = fmod(floor(tc/bmPeriod[0]),bmPeriod[1])*bmS + (_xyz->nX[1]*_xyz->dX[1])/2.0;
-	z = (floor(tc/(bmPeriod[1]*bmPeriod[0]))+1.0)*_xyz->layerT + _bp->height;
+	//x = bmV*fmod(tc,bmPeriod[0])-offset[0];
+	//y = fmod(floor(tc/bmPeriod[0]),bmPeriod[1])*bmDX[1] + (_xyz->nX[1]*_xyz->dX[1])/2.0;
+	//y = fmod(floor(tc/bmPeriod[0]),bmPeriod[1])*bmDX[1]-offset[1];
+	//y = fmod(floor(tInd/nTTemp[0]),bmPeriod[1])*bmDX[1]-offset[1];
+	//z = (floor(tc/(bmPeriod[1]*bmPeriod[0]))+1.0)*_xyz->layerT + _bp->height;
+	x = fmod((tc/DelT),nTTemp[0])*bmDX[0] - offset[0];
+	y = floor(fmod((tc/DelT),nTTemp[0]*nTTemp[1])/nTTemp[0])*bmDX[1]-offset[1];
+	z = floor((tc/DelT)/(nTTemp[0]*nTTemp[1])+1.0)*bmDX[2] + _bp->height;
 	lam = {pow(bmSTD[0],2.0)+2*alpha*(_xyz->time - tc), 
 	       pow(bmSTD[1],2.0)+2*alpha*(_xyz->time - tc),
 	       pow(bmSTD[2],2.0)+2*alpha*(_xyz->time - tc)};
@@ -124,9 +141,13 @@ void TempField::SchwalbachTempCurr(double tcurr,std::vector<double> & TempOut )
       for (int jt=0;jt<nSource;++jt){
 	// tc,x,y,z space-time location of source
 	tc = tcurr - jt*DelT;
-	x = bmV*fmod(tc,bmPeriod[0]);
-	y = fmod(floor(tc/bmPeriod[0]),bmPeriod[1])*bmS + (_xyz->nX[1]*_xyz->dX[1])/2.0;
-	z = (floor(tc/(bmPeriod[1]*bmPeriod[0]))+1.0)*_xyz->layerT + _bp->height;
+//	x = bmV*fmod(tc,bmPeriod[0]) - offset[0];
+//	y = fmod(floor(tc/bmPeriod[0]),bmPeriod[1])*bmDX[1] + (_xyz->nX[1]*_xyz->dX[1])/2.0;
+//	y = fmod(floor(tc/bmPeriod[0]),bmPeriod[1])*bmDX[1] - offset[1];
+//	z = (floor(tc/(bmPeriod[1]*bmPeriod[0]))+1.0)*_xyz->layerT + _bp->height;
+	x = fmod((tc/DelT),nTTemp[0])*bmDX[0] - offset[0];
+	y = floor(fmod((tc/DelT),nTTemp[0]*nTTemp[1])/nTTemp[0])*bmDX[1]-offset[1];
+	z = floor((tc/DelT)/(nTTemp[0]*nTTemp[1])+1.0)*bmDX[2] + _bp->height;
 	lam = {pow(bmSTD[0],2.0)+2*alpha*(tcurr - tc), 
 	       pow(bmSTD[1],2.0)+2*alpha*(tcurr - tc),
 	       pow(bmSTD[2],2.0)+2*alpha*(tcurr - tc)};
@@ -159,9 +180,12 @@ void TempField::SchwalbachDDtTemp()
     for (int jt=0;jt<nSource;++jt){
       // tc,x,y,z space-time location of source
       tc = tmin + jt*DelT;
-      x = bmV*fmod(tc,bmPeriod[0]);
-      y = fmod(floor(tc/bmPeriod[0]),bmPeriod[1])*bmS;
-      z = floor(tc/(bmPeriod[1]*bmPeriod[0]))*_xyz->layerT + (_bp->Nzh+1)*_xyz->dX[2];
+      //x = bmV*fmod(tc,bmPeriod[0]);
+      //y = fmod(floor(tc/bmPeriod[0]),bmPeriod[1])*bmDX[1];
+      //z = floor(tc/(bmPeriod[1]*bmPeriod[0]))*_xyz->layerT + (_bp->Nzh+1)*_xyz->dX[2];
+      x = fmod((tc/DelT),nTTemp[0])*bmDX[0] - offset[0];
+      y = floor(fmod((tc/DelT),nTTemp[0]*nTTemp[1])/nTTemp[0])*bmDX[1]-offset[1];
+      z = floor((tc/DelT)/(nTTemp[0]*nTTemp[1])+1.0)*bmDX[2] + _bp->height;
       lam = {pow(bmSTD[0],2.0)+2*alpha*(_xyz->time - tc), 
 	     pow(bmSTD[1],2.0)+2*alpha*(_xyz->time - tc),
 	     pow(bmSTD[2],2.0)+2*alpha*(_xyz->time - tc)};
