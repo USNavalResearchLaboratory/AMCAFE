@@ -332,6 +332,10 @@ void VoxelsCA::UpdateVoxels3()
       } // if ( (tnucA ...
     } // for int j ...
     if (DtMin2 < DtMin){
+<<<<<<< HEAD
+=======
+    if(_part->myid==0){std::cout <<_temp->tInd<<","<< DtMin2<<","<<DtMin<<std::endl;}
+>>>>>>> 2638983a369d7b0b9318998500c094fc0fc646d1
       vS[js] = 2;
       nGrain+=1;
       G[js] = nGrain;
