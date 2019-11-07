@@ -141,14 +141,6 @@ void VoxelsCA::UpdateVoxels3()
   // assemble arrays to be used to compute grain growth
   int NlocA=0,Na=0,NvecA[_part->nprocs],Ntot,cc,cc1,jn[3],itmp[3]={-1,0,1};
   Ntot = _part->ncellLoc;
-  // 8888888888888888888888888888888888888888888888
-  // for file writing purposes
-  std::vector<int> filinds,vState0(Ntot,0);
-  std::vector<double> filtime;
-  std::string filout;
-  for (int j=0;j<Ntot;++j){vState0[j]=vState[j];}
-  // for file writing purposes
-  // 8888888888888888888888888888888888888888888888
   // start:determine nucleation: location and time
   std::vector<int> nucInd; // index of where nucleation
   std::vector<double> tnuc; // time within [t,t+DT] when nucleation occurs
@@ -347,38 +339,6 @@ void VoxelsCA::UpdateVoxels3()
     } // if (DtMin2 < ...
     cc+=1;
     tinc += std::min(DtMin2,DtMin);
-    /*
-    // 88888888888888888888888888888888888888888888888888888888888
-    // end capture all undercooled liquid voxels by growing grains
-    // bring global variables back to local variables
-    cc1=0;
-    for (int j=0;j<Ntot;++j){
-      if (vState0[j]==2 || (vState0[j]==1 && _temp->TempCurr[j]< _xyz->tL)){
-	vState[j] = vS[j0[_part->myid]+cc1];
-	gID[j] = G[j0[_part->myid]+cc1];
-	cc1+=1;
-      } // if (vState[j]...
-    } // for (int j...
-    // pass information 
-    _part->PassInformation(vState);
-    _part->PassInformation(gID);
-    // mushy (vState=2) to solid (vState=3) if all neighbors 2 
-    ConvertSolid(0);
-    _part->PassInformation(vState);
-    // write out 
-    //if (_xyz->tInd==3){if (_part->myid==0){std::cout << cc<<std::endl;}}
-    if (_xyz->tInd==4 && cc > 0 && cc <75){
-      filinds.push_back(cc);
-      filtime.push_back(_xyz->time + (double)cc);
-      filout = "CA3D3t"+std::to_string(cc);
-      WriteToVTU1(filout);
-      filout="CA3D3t";
-      WriteToPVD(filout,filinds,filtime);
-      MPI_Barrier(MPI_COMM_WORLD);
-    }      
-    // write out 
-    // 88888888888888888888888888888888888888888888888888888888888
-   */
   } // while (std::any
   // end capture all undercooled liquid voxels by growing grains
   // bring global variables back to local variables
@@ -391,8 +351,13 @@ void VoxelsCA::UpdateVoxels3()
     } // if (vState[j]...
   } // for (int j...
   // pass information 
-  _part->PassInformation(vState);
-  _part->PassInformation(gID);
+  for (int j=Ntot;j<_part->nGhost+Ntot;++j){
+    cc1=std::distance(vI,std::find(vI,vI+Na,_part->icellidLoc[j]));
+    if (cc1<Na){
+      vState[j] = vS[cc1];
+      gID[j] = G[cc1];
+    } // if (cc1<
+  } // for (int j...
   // mushy (vState=2) to solid (vState=3) if all neighbors 2 
   ConvertSolid(0);
   _part->PassInformation(vState);

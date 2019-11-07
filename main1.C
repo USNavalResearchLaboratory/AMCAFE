@@ -111,20 +111,15 @@ int main()
   filLogOut="CA3D.log";
   out2 = {1,1,2}; // the increment to skip output per direction
   if (part.myid==0){fplog.open(filLogOut.c_str());}
-  while (icheck!=0 && TempF.tInd<nTmax){
+  while (TempF.tInd<nTmax){
     cc2+=1;
     j123[2] = floor(TempF.tInd /(TempF.nTTemp[0]*TempF.nTTemp[1]));
     j123[1] = floor((TempF.tInd - (TempF.nTTemp[0]*TempF.nTTemp[1])*j123[2])/ TempF.nTTemp[0]);
     j123[0] = TempF.tInd - (TempF.nTTemp[0]*TempF.nTTemp[1])*j123[2] - TempF.nTTemp[0]*j123[1];
     indOut = j123[2] % out2[2] + j123[1] % out2[1] + j123[0] % out2[0];
-    //if (cc2>1000){icheck=0;}
-    icheck=!std::all_of(vox.vState.begin(),vox.vState.end(),[](int n){return n==3;});
-    ichecktmp = icheck;
-    MPI_Allreduce(&ichecktmp,&icheck,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
-
     if (irep==0){
       irep=1;
-      if (indOut==0 || icheck ==0){ 
+      if (indOut==0 || TempF.tInd ==(nTmax-1)){ 
 	filinds.push_back(TempF.tInd);
 	filtime.push_back(g.time);
 	filout = filbaseOut+std::to_string(TempF.tInd);
@@ -132,7 +127,7 @@ int main()
 	filout = filbaseOut+".csv";
 	vox.WriteCSVData(filout);
 	cc1+=1;
-	if (cc1 % 20 || icheck==0){
+	if (cc1 % 20 || TempF.tInd==(nTmax-1)){
 	  filout=filbaseOut;
 	  vox.WriteToPVD(filout,filinds,filtime);
 	} // if (cc1
