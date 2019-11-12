@@ -41,9 +41,10 @@ int main()
   double beamVel,beamPower,wEst,cP,rho,kappa,beamEta,rcut;
   std::vector<double> beamSTD;
   // schwalbach parameters
-  ictrl=2;
+  ictrl=3;
   nXM = {20,20,20};
   nX = {128,128,64};
+  nX = {64,64,32};
   LX = {.002,.002,.001};
   //nX = {128,32,16};
   //LX = {.001,.00025,12.5e-5};  
@@ -69,7 +70,7 @@ int main()
   dP = .48;
   c0 = 4.85; // (wt %)
   filbaseTemp = "/Users/kteferra/Documents/research/projects/AMICME/codes/CA/tempData/tempField0.";
-  neighOrder = "second"; // can equal "first", "second", "third"
+  neighOrder = "first"; // can only equal "first"
   rho = 8000.0; // kg /m^3
   cP = 502.0; // J/kg-K)
   kappa = 18.0; // W/(m-K)
@@ -97,7 +98,7 @@ int main()
   //TempF.ComputeDDtTemp();
   VoxelsCA vox(g,TempF, part);
   vox.InitializeVoxels(bp);
-  vox.ExtentsInitialize();
+  //vox.ExtentsInitialize();
   //vox.InitializeTest1();
   /*-----------------------------------------------
     execute simulation */
@@ -131,10 +132,10 @@ int main()
 	  filout=filbaseOut;
 	  vox.WriteToPVD(filout,filinds,filtime);
 	} // if (cc1
-
 	MPI_Barrier(MPI_COMM_WORLD);
       }
     }
+
     // update next step for voxels (time is updated in vox.ComputeExtents() )
     if (ictrl==0){
       vox.UpdateVoxels();
@@ -151,6 +152,12 @@ int main()
     if (ictrl==2){
       vox.UpdateVoxels3();
       g.UpdateTime2(TempF.DelT);
+    }
+    if (ictrl==3){
+      vox.UpdateVoxels4();
+      g.UpdateTime2(TempF.DelT);
+      MPI_Barrier(MPI_COMM_WORLD);
+
     }
     // update temperature field
     if (TempF.tInd != int(round(g.time/TempF.DelT))){
