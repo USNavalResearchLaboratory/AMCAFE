@@ -33,7 +33,7 @@ int main()
   std::vector<int> nXM,nX;
   std::vector<double> dX,dXM,LX;
   double tL,mL,c0,Gamma,dP,dL,dtM,muN,layerThickness,T0,dTempM,dTempS,rNmax;
-  std::string filbaseTemp,filbaseOut,filout,neighOrder,filLogOut;
+  std::string filbaseTemp,filbaseOut,filout,neighOrder,neighType,filLogOut;
   double mu; //2e11;//5e9 // rate for baseplate voronoi;
   double heightBase;
   // schwalbach parameters
@@ -65,12 +65,11 @@ int main()
   dL = 3e-9; // (m^2/s)
   Gamma = 1e-7;  // (K m)
   muN = 9; // 9e-2; // rate for nucleation
-  mu = 2e14; // 2e11
-  heightBase = 2e-5;
   dP = .48;
   c0 = 4.85; // (wt %)
   filbaseTemp = "/Users/kteferra/Documents/research/projects/AMICME/codes/CA/tempData/tempField0.";
   neighOrder = "first"; // can only equal "first"
+  neighType = "VonNeumann"; // either "Moore" or "VonNeumann"
   rho = 8000.0; // kg /m^3
   cP = 502.0; // J/kg-K)
   kappa = 18.0; // W/(m-K)
@@ -79,9 +78,12 @@ int main()
   beamPower = 70; //300; // W
   beamEta = 1.0;
   layerThickness = floor(beamSTD[2]/dX[2])*dX[2]; //30e-6; // m (layer thickness to be multiple of dX[2])
-  Grid g(dX,nX,tL,mL,c0,Gamma,dP,dL,muN,rho,cP,kappa,layerThickness,neighOrder,dTempM,dTempS,rNmax,nDim);
+  Grid g(dX,nX,tL,mL,c0,Gamma,dP,dL,muN,rho,cP,kappa,layerThickness,neighOrder,dTempM,dTempS,rNmax,nDim,neighType);
   Partition part(g,myid,nprocs);
   part.PartitionGraph();
+
+  heightBase = layerThickness; // 2e-5;
+  mu = 2e14; // 2e11 , 2e14
   BasePlate bp(g,heightBase,mu, part);
   TempField TempF(g,part,bp);
   // initialize appropriate temperature model
@@ -110,7 +112,7 @@ int main()
   std::ofstream fplog;
   filbaseOut = "CA3D";
   filLogOut="CA3D.log";
-  out2 = {1,1,2}; // the increment to skip output per direction
+  out2 = {10,10,1}; // the increment to skip output per direction
   if (part.myid==0){fplog.open(filLogOut.c_str());}
   while (TempF.tInd<nTmax){
     cc2+=1;
@@ -175,7 +177,7 @@ int main()
     */
     auto texec2 = std::chrono::high_resolution_clock::now();
     auto delTexec = std::chrono::duration_cast<std::chrono::seconds>( texec2 - texec1 ).count();
-    if (part.myid==0){std::cout << TempF.tInd<<","<< g.time/TempF.DelT<< std::endl;}
+    //if (part.myid==0){std::cout << TempF.tInd<<","<< g.time/TempF.DelT<< std::endl;}
     if (part.myid==0){fplog << "Time index= "<<TempF.tInd<<",Total clock time passed(s)= "<<delTexec<<std::endl;}
     } // while
   MPI_Barrier(MPI_COMM_WORLD);

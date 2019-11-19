@@ -15,11 +15,14 @@ class VoxelsCA
  public:
   VoxelsCA(Grid &, TempField &, Partition &);
   void ConvertSolid(const int &iswitch);
+  void ConvertSolid1(const int &iswitch);
   void InitializeVoxels(BasePlate &bp);
   void InitializeTest1();
   void SetLiquid();
   void SetLiquid2();
+  void SetLiquid3();
   void ZeroVoxels();
+  void ZeroVoxels1();
   void ComputeVoxelCapture();
   void ComputeVoxelCapture2();
   void ComputeExtents();

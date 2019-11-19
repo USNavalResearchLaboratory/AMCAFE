@@ -7,8 +7,8 @@ is from neocortex 8/22/2019
 
 The repository is located in godzilla: godzilla2.nrl.navy.mil:Kirubel/research/projects/AMICME/codes/CA/cafeMPI3D
 
-I'm mostly doing editing in neocortex so i created a branch for neocortex that 
-has the evolution of the code (commits), certaintly as of 20191007
+I'm doing most/all of the editing in neocortex so i created a branch for neocortex that 
+has the evolution of the code (commits), certainly as of 20191007
 
 When i push updates from neocortex to godzilla2:
 1) make sure godzilla2 is mounted (see line "sudo mount ..." in ~/.bashrc,

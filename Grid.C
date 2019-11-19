@@ -15,7 +15,7 @@ Grid::Grid(const std::vector<double> & dxIn, const std::vector<int> & NxIn,
 	   const double & rhoIn, const double & cPIn, const double & kappaIn,
 	   const double &layerThicknessIn, const std::string neighOrderIn,
 	   const double &dTempMIn, const double &dTempSIn, 
-	   const double &rNmaxIn, const int &nDimIn)
+	   const double &rNmaxIn, const int &nDimIn, const std::string ntypeIn)
 {
   // read in domain and  material parameters
   nDim = nDimIn;
@@ -45,6 +45,7 @@ Grid::Grid(const std::vector<double> & dxIn, const std::vector<int> & NxIn,
   tInd =0;
   dt=0;
   neighOrder = neighOrderIn;
+  ntype = ntypeIn;
   nnodePerCell = pow(2,nDim);
 
   // this should change into a user parameter
@@ -82,30 +83,28 @@ void Grid::SkipTime(const double &DelT)
   //tInd +=1;
 } // end UpdateTime2
 
-
-
 void Grid::ComputeNeighborhood(int &j, std::string &nO,std::vector<int> &nn){
   // determines neighborhood of voxel j
   int nSize,nSize1;
   if (nO.compare("first")==0){
-    ComputeNeighborhoodFirst(j,nn);
+    ComputeNeighborhoodFirst(j,ntype,nn);
   } else if (nO.compare("second")==0){
     std::vector<int> nntmp;
-    ComputeNeighborhoodFirst(j,nn);
+    ComputeNeighborhoodFirst(j,ntype,nn);
     nSize = nn.size();
     for (int j1 =0;j1<nSize;++j1){
-      ComputeNeighborhoodFirst(nn[j1],nntmp);
+      ComputeNeighborhoodFirst(nn[j1],ntype,nntmp);
       nn.insert(nn.end(),nntmp.begin(),nntmp.end());
     } // for int j1
   } else if (nO.compare("third")==0){
     std::vector<int> nntmp1,nntmp2;
-    ComputeNeighborhoodFirst(j,nn);
+    ComputeNeighborhoodFirst(j,ntype,nn);
     nSize=nn.size();
     for (int j1 =0;j1<nSize;++j1){
-      ComputeNeighborhoodFirst(nn[j1],nntmp1);
+      ComputeNeighborhoodFirst(nn[j1],ntype,nntmp1);
       nn.insert(nn.end(),nntmp1.begin(),nntmp1.end());
       for (int j2=0;j2<nntmp1.size();++j2){
-	ComputeNeighborhoodFirst(nntmp1[j2],nntmp2);
+	ComputeNeighborhoodFirst(nntmp1[j2],ntype,nntmp2);
 	nn.insert(nn.end(),nntmp2.begin(),nntmp2.end());
       }
     } // for int j1
@@ -116,40 +115,80 @@ void Grid::ComputeNeighborhood(int &j, std::string &nO,std::vector<int> &nn){
   nn.erase(std::remove(nn.begin(),nn.end(),j),nn.end());
 }; // end ComputeNeighborhood
 
-void Grid::ComputeNeighborhoodFirst(int &j, std::vector<int> &nn){
-  // This is the Moore neighborhood
+void Grid::ComputeNeighborhoodFirst(int &j,std::string &ntype, std::vector<int> &nn){
   // determines neighborhood of voxel j
   nn.assign(0,0);
-  if (nDim ==2){
-    int j2,j1,jst;
-    j2 = floor(j/( nX[0] ));
-    j1 = j - (nX[0])*j2;
-    std::vector<int> itmp = {-1,0,1};
-    for (int i2 =0;i2<3;++i2){
-      if ( (j2+itmp[i2]<0) || (j2+itmp[i2]>=nX[1])){continue;}
-      for (int i1 =0;i1<3;++i1){
-	if ( (j1+itmp[i1]<0) || (j1+itmp[i1]>=nX[0])){continue;}
-	  jst = nX[0]*(j2+itmp[i2])+j1+itmp[i1];
-	  if (jst !=j){nn.push_back(jst);}
-      }
-    }
-  } else {
-    int j3,j2,j1,jst;
-    j3 = floor(j /( nX[0]*nX[1]) );
-    j2 = floor( (j - nX[0]*nX[1]*j3)/nX[0] );
-    j1 = j - nX[0]*nX[1]*j3 - nX[0]*j2;
-    std::vector<int> itmp = {-1,0,1};
-    for (int i3 =0;i3<3;++i3){
-      if ( (j3+itmp[i3]<0) || (j3+itmp[i3]>=nX[2])){continue;}
+  if (ntype.compare("Moore")){
+    if (nDim ==2){
+      int j2,j1,jst;
+      j2 = floor(j/( nX[0] ));
+      j1 = j - (nX[0])*j2;
+      std::vector<int> itmp = {-1,0,1};
       for (int i2 =0;i2<3;++i2){
 	if ( (j2+itmp[i2]<0) || (j2+itmp[i2]>=nX[1])){continue;}
 	for (int i1 =0;i1<3;++i1){
 	  if ( (j1+itmp[i1]<0) || (j1+itmp[i1]>=nX[0])){continue;}
-	  jst = nX[0]*nX[1]*(j3+itmp[i3])+nX[0]*(j2+itmp[i2])+j1+itmp[i1];
+	  jst = nX[0]*(j2+itmp[i2])+j1+itmp[i1];
 	  if (jst !=j){nn.push_back(jst);}
 	}
       }
-    }
-  } // if (nDim==2 ...
+    } else {
+      int j3,j2,j1,jst;
+      j3 = floor(j /( nX[0]*nX[1]) );
+      j2 = floor( (j - nX[0]*nX[1]*j3)/nX[0] );
+      j1 = j - nX[0]*nX[1]*j3 - nX[0]*j2;
+      std::vector<int> itmp = {-1,0,1};
+      for (int i3 =0;i3<3;++i3){
+	if ( (j3+itmp[i3]<0) || (j3+itmp[i3]>=nX[2])){continue;}
+	for (int i2 =0;i2<3;++i2){
+	  if ( (j2+itmp[i2]<0) || (j2+itmp[i2]>=nX[1])){continue;}
+	  for (int i1 =0;i1<3;++i1){
+	    if ( (j1+itmp[i1]<0) || (j1+itmp[i1]>=nX[0])){continue;}
+	    jst = nX[0]*nX[1]*(j3+itmp[i3])+nX[0]*(j2+itmp[i2])+j1+itmp[i1];
+	    if (jst !=j){nn.push_back(jst);}
+	  }
+	}
+      }
+    } // if (nDim==2 ...
+  } else { // this is for VonNeumann
+    if (nDim ==2){
+      int j2,j1,jst;
+      j2 = floor(j/( nX[0] ));
+      j1 = j - (nX[0])*j2;
+      std::vector<int> itmp = {-1,1};
+      for (int i1 =0;i1<2;++i1){
+	if ( (j2+itmp[i1]<0) || (j2+itmp[i1]>=nX[1])){continue;}
+	  jst = nX[0]*(j2+itmp[i1])+j1;
+	  nn.push_back(jst);
+      } // for int i1 ...
+      for (int i1 =0;i1<2;++i1){
+	if ( (j1+itmp[i1]<0) || (j1+itmp[i1]>=nX[0])){continue;}
+	  jst = nX[0]*j2 +j1+itmp[i1];
+	  nn.push_back(jst);
+      } // for int i1 ...
+    } else {
+      int j3,j2,j1,jst;
+      j3 = floor(j /( nX[0]*nX[1]) );
+      j2 = floor( (j - nX[0]*nX[1]*j3)/nX[0] );
+      j1 = j - nX[0]*nX[1]*j3 - nX[0]*j2;
+      std::vector<int> itmp = {-1,1};
+      for (int i1=0;i1<2;++i1){
+	if ( (j3+itmp[i1]<0) || (j3+itmp[i1]>=nX[2])){continue;}
+	jst = nX[0]*nX[1]*(j3+itmp[i1])+nX[0]*j2+j1;
+	nn.push_back(jst);
+      } // for (int i1...
+      for (int i1=0;i1<2;++i1){
+	if ( (j2+itmp[i1]<0) || (j2+itmp[i1]>=nX[1])){continue;}
+	jst = nX[0]*nX[1]*j3+nX[0]*(j2+itmp[i1])+j1;
+	nn.push_back(jst);
+      } // for (int i1...
+      for (int i1=0;i1<2;++i1){
+	if ( (j1+itmp[i1]<0) || (j1+itmp[i1]>=nX[0])){continue;}
+	jst = nX[0]*nX[1]*j3+nX[0]*j2+j1+itmp[i1];
+	nn.push_back(jst);
+      } // for (int i1...
+    } // if (nDim==2 ...
+  } // if (ntype.compare...
+
 }; // end ComputeNeighborhoodFirst
 

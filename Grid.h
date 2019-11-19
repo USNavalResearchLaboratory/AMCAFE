@@ -15,7 +15,7 @@ class Grid
 	const double & rhoIn, const double & cPIn, const double & kappaIn,
 	const double &layerThicknessIn, const std::string neighOrderIn,
 	const double &dTempMIn, const double &dTempSIn, 
-	const double &rNmaxIn, const int &nDimIn);
+	const double &rNmaxIn, const int &nDimIn, const std::string ntypeIn);
 
   // any functions added here
   void UpdateTime(const double &velo);
@@ -23,7 +23,7 @@ class Grid
   void UpdateTimeTest1(const double &velo);
   void SkipTime(const double &DelT);
   void ComputeNeighborhood(int &j, std::string & nO,std::vector<int> & nn);
-  void ComputeNeighborhoodFirst(int &j, std::vector<int> &nn);
+  void ComputeNeighborhoodFirst(int &j, std::string & ntype, std::vector<int> &nn);
   double deltaXmin,deltaTcheck,dt,time;
   std::vector<double> dX;
   std::vector<int> nX;
@@ -44,6 +44,7 @@ class Grid
   double layerT; // thickness of each layer
   double ethresh; // 1- cut off probability for Delta t max (see latex notes)
   double deltaThresh; // threshold value of pmf for allowing if voxel can be captured
+  std::string ntype; // type of neighborhood: Moore or VonNeumann
   std::string neighOrder; // order of neighborhood
 }; // end class Grid
 
