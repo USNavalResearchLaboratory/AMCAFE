@@ -38,6 +38,31 @@ void TempField::InitializeMoose(std::string &filnambase,
   indexM = 0;
 } // end InitializeMoose()
 
+void TempField::Test2ComputeTemp(double T20, double T10, double a,double tcurr)
+{
+  int Ntot = _part->nGhost+_part->ncellLoc, j1,j2,j3,j;
+  double T1,T2,x,y,z,Lx[3];
+  for (int j=0;j<3;++j){Lx[j] = _xyz->dX[j]*_xyz->nX[j];}
+  T2 = T20 - a*tcurr;
+  T1 = T10 - a*tcurr;
+  TempCurr.assign(Ntot,0.0);
+  for (int j=0;j<Ntot;++j){
+    j3 = floor(_part->icellidLoc[j]/(_xyz->nX[0]*_xyz->nX[1]));
+    j2 = floor( (_part->icellidLoc[j]- _xyz->nX[0]*_xyz->nX[1]*j3)/_xyz->nX[0]);
+    j1 = _part->icellidLoc[j] - _xyz->nX[0]*_xyz->nX[1]*j3 - _xyz->nX[0]*j2;
+    x = (j1+.5)*_xyz->dX[0];
+    y = (j2+.5)*_xyz->dX[1];
+    z = (j3+.5)*_xyz->dX[2];
+    //TempCurr[j]  = (T2-T1)/3*(x/Lx[0]+y/Lx[1]+z/Lx[2]) + T1;
+    TempCurr[j]  = (T2-T1)*(z/Lx[2]) + T1;
+    DelT = .000006;
+    DelT = .0006;
+    //DelT = .001;
+    //DelT = .0125;
+  } // for (int j...     
+}
+
+
 void TempField::InitializeSchwalbach(int & patternIDIn, std::vector<double> & beamSTDIn, 
 				     double & beamVelocityIn,double & beamPowerIn,
 				     double & beamEtaIn, std::vector<double> & LxIn, double & T0In)
@@ -64,8 +89,8 @@ void TempField::InitializeSchwalbach(int & patternIDIn, std::vector<double> & be
     DelT = 4.0/3.0*bmSTD[0]/bmV;
     bmDX = {DelT*bmV,4.0/3.0*bmSTD[1],_xyz->layerT};
     offset={1.5*bmDX[0],0.0,0.0};
-    //offset={bmDX[0],bmDX[1],0.0};
-    offset={0.0,0.0,0.0};
+    offset={-bmDX[0],-2*bmDX[1],0.0};
+    //offset={0.0,0.0,0.0};
     //offset={bmDX[0],bmDX[1]/2.0,0.0};
     bmLx={LxIn[0]+1*bmDX[0],LxIn[1]+1*bmDX[1],LxIn[2]};
     bmPeriod = {bmLx[0]/bmV,(floor(bmLx[1]/bmDX[1])+2)};

@@ -42,12 +42,17 @@ int main()
   std::vector<double> beamSTD;
   // schwalbach parameters
   ictrl=3;
-  nXM = {20,20,20};
+  if (ictrl==4){
+    nX = {32,32,32}; // KT: THIS IS FOR TEST
+    LX = {.002,.002,.002}; // KT: THIS IS FOR TEST
+  } else {
   nX = {128,128,64};
   nX = {64,64,32};
   LX = {.002,.002,.001};
   //nX = {128,32,16};
   //LX = {.001,.00025,12.5e-5};  
+  }
+  nXM = {20,20,20};
   nDim = nX.size();
   dX.assign(nDim,0.0);
   dXM.assign(nDim,0.0);
@@ -69,7 +74,7 @@ int main()
   c0 = 4.85; // (wt %)
   filbaseTemp = "/Users/kteferra/Documents/research/projects/AMICME/codes/CA/tempData/tempField0.";
   neighOrder = "first"; // can only equal "first"
-  neighType = "VonNeumann"; // either "Moore" or "VonNeumann"
+  neighType = "Moore"; // either "Moore" or "VonNeumann"
   rho = 8000.0; // kg /m^3
   cP = 502.0; // J/kg-K)
   kappa = 18.0; // W/(m-K)
@@ -78,10 +83,9 @@ int main()
   beamPower = 70; //300; // W
   beamEta = 1.0;
   layerThickness = floor(beamSTD[2]/dX[2])*dX[2]; //30e-6; // m (layer thickness to be multiple of dX[2])
-  Grid g(dX,nX,tL,mL,c0,Gamma,dP,dL,muN,rho,cP,kappa,layerThickness,neighOrder,dTempM,dTempS,rNmax,nDim,neighType);
+  Grid g(dX,nX,tL,mL,c0,Gamma,dP,dL,muN,rho,cP,kappa,layerThickness,neighOrder,dTempM,dTempS,rNmax,nDim,neighType,ictrl);
   Partition part(g,myid,nprocs);
   part.PartitionGraph();
-
   heightBase = layerThickness; // 2e-5;
   mu = 2e14; // 2e11 , 2e14
   BasePlate bp(g,heightBase,mu, part);
@@ -92,16 +96,22 @@ int main()
   patternID = 0;
   //LxAll = {LX[0]+1000*beamSpacing,LX[1],LX[2]};
   T0 = 300.0; // initial temperature in (K)
-  TempF.InitializeSchwalbach(patternID,beamSTD,beamVel,beamPower,beamEta,LX,T0);
-  TempF.SchwalbachTempCurr();
-  //TempF.SchwalbachDDtTemp();
-  //TempF.ReadCSVMoose2();
-  //TempF.Test2();
-  //TempF.ComputeDDtTemp();
+  if (ictrl==4){
+    // this is a test case scenario
+    TempF.InitializeSchwalbach(patternID,beamSTD,beamVel,beamPower,beamEta,LX,T0);
+    //TempF.Test2ComputeTemp(1.02*tL,.97*tL,514880,0.0);
+    TempF.Test2ComputeTemp(0.97*tL,.97*tL,0.0,0.0);
+  } else{
+    TempF.InitializeSchwalbach(patternID,beamSTD,beamVel,beamPower,beamEta,LX,T0);
+    TempF.SchwalbachTempCurr();
+  }
   VoxelsCA vox(g,TempF, part);
-  vox.InitializeVoxels(bp);
-  //vox.ExtentsInitialize();
+  if (ictrl==4){
   //vox.InitializeTest1();
+  vox.InitializeTest2();
+  } else{
+    vox.InitializeVoxels(bp);
+  }
   /*-----------------------------------------------
     execute simulation */
   cc1=0;
@@ -112,9 +122,14 @@ int main()
   std::ofstream fplog;
   filbaseOut = "CA3D";
   filLogOut="CA3D.log";
-  out2 = {10,10,1}; // the increment to skip output per direction
+  out2 = {1,1,1}; // the increment to skip output per direction
   if (part.myid==0){fplog.open(filLogOut.c_str());}
-  while (TempF.tInd<nTmax){
+  while (TempF.tInd<nTmax && icheck!=0){
+
+    icheck=!std::all_of(vox.vState.begin(),vox.vState.end(),[](int n){return n==3;});
+    ichecktmp = icheck;
+    MPI_Allreduce(&ichecktmp,&icheck,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
+
     cc2+=1;
     j123[2] = floor(TempF.tInd /(TempF.nTTemp[0]*TempF.nTTemp[1]));
     j123[1] = floor((TempF.tInd - (TempF.nTTemp[0]*TempF.nTTemp[1])*j123[2])/ TempF.nTTemp[0]);
@@ -158,26 +173,24 @@ int main()
     if (ictrl==3){
       vox.UpdateVoxels4();
       g.UpdateTime2(TempF.DelT);
-      MPI_Barrier(MPI_COMM_WORLD);
-
+    }
+    if (ictrl==4){
+      //std::cout << TempF.tInd<<",00,"<<g.time<<","<<g.time/TempF.DelT<<std::endl;
+      vox.UpdateVoxels4();
+      g.UpdateTime2(TempF.DelT);
+      //TempF.Test2ComputeTemp(1.02*tL,.97*tL,514880,g.time);
+      TempF.Test2ComputeTemp(0.97*tL,.97*tL,0.0,g.time);
     }
     // update temperature field
     if (TempF.tInd != int(round(g.time/TempF.DelT))){
       if (ictrl==0){vox.ExtentsInitialize();}
       TempF.tInd = int(round(g.time/TempF.DelT));
-      TempF.SchwalbachTempCurr();
-      //TempF.SchwalbachDDtTemp();
+      if (ictrl!=4){TempF.SchwalbachTempCurr();} // KT AFTER TEST REMOVE IF STATEMENT
       irep=0;
     } // if (TempF.tInd !=
-    /* This is for reading CSV file
-    if (int(floor(g.time/TempF.dtM))!=TempF.indexM){
-      TempF.ReadCSVMoose2();
-      TempF.ComputeDDtTemp();
-    }
-    */
     auto texec2 = std::chrono::high_resolution_clock::now();
     auto delTexec = std::chrono::duration_cast<std::chrono::seconds>( texec2 - texec1 ).count();
-    //if (part.myid==0){std::cout << TempF.tInd<<","<< g.time/TempF.DelT<< std::endl;}
+    if (part.myid==0){std::cout << TempF.tInd<<","<< g.time/TempF.DelT<< std::endl;}
     if (part.myid==0){fplog << "Time index= "<<TempF.tInd<<",Total clock time passed(s)= "<<delTexec<<std::endl;}
     } // while
   MPI_Barrier(MPI_COMM_WORLD);

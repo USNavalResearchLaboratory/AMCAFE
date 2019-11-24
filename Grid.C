@@ -15,7 +15,8 @@ Grid::Grid(const std::vector<double> & dxIn, const std::vector<int> & NxIn,
 	   const double & rhoIn, const double & cPIn, const double & kappaIn,
 	   const double &layerThicknessIn, const std::string neighOrderIn,
 	   const double &dTempMIn, const double &dTempSIn, 
-	   const double &rNmaxIn, const int &nDimIn, const std::string ntypeIn)
+	   const double &rNmaxIn, const int &nDimIn, const std::string ntypeIn,
+	   const int &ictrlIn)
 {
   // read in domain and  material parameters
   nDim = nDimIn;
@@ -46,6 +47,7 @@ Grid::Grid(const std::vector<double> & dxIn, const std::vector<int> & NxIn,
   dt=0;
   neighOrder = neighOrderIn;
   ntype = ntypeIn;
+  ictrl = ictrlIn;
   nnodePerCell = pow(2,nDim);
 
   // this should change into a user parameter
@@ -118,7 +120,7 @@ void Grid::ComputeNeighborhood(int &j, std::string &nO,std::vector<int> &nn){
 void Grid::ComputeNeighborhoodFirst(int &j,std::string &ntype, std::vector<int> &nn){
   // determines neighborhood of voxel j
   nn.assign(0,0);
-  if (ntype.compare("Moore")){
+  if (ntype.compare("Moore")==0){
     if (nDim ==2){
       int j2,j1,jst;
       j2 = floor(j/( nX[0] ));

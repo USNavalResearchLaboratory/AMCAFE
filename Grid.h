@@ -15,7 +15,8 @@ class Grid
 	const double & rhoIn, const double & cPIn, const double & kappaIn,
 	const double &layerThicknessIn, const std::string neighOrderIn,
 	const double &dTempMIn, const double &dTempSIn, 
-	const double &rNmaxIn, const int &nDimIn, const std::string ntypeIn);
+	const double &rNmaxIn, const int &nDimIn, const std::string ntypeIn,
+	const int &ictrlIn);
 
   // any functions added here
   void UpdateTime(const double &velo);
@@ -27,7 +28,7 @@ class Grid
   double deltaXmin,deltaTcheck,dt,time;
   std::vector<double> dX;
   std::vector<int> nX;
-  int nDim,tInd,nnodePerCell;
+  int nDim,tInd,nnodePerCell,ictrl;
   double tL; // liquid temp (K)
   double mL; // liquidus slope of (K/wt%)
   double c0; // initial concentration (wt %)

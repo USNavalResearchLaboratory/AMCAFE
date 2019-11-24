@@ -19,6 +19,7 @@ class TempField
   void InitializeSchwalbach(int & patternId, std::vector<double> & beamSTD, 
 			    double & beamVelocity, double & beamPower, double & beamEta, std::vector<double> & Lx,
 			    double & T0);
+  void Test2ComputeTemp(double T20, double T10, double a,double tcurr);
   void ReadCSVMoose1();
   void ReadCSVMoose2();
   void InterpolateToGrid1(const std::vector<double> &tempM,const std::vector<double> &xM,
