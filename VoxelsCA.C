@@ -90,14 +90,14 @@ void VoxelsCA::InitializeTest2()
   sdloc = unsigned(double(gen1())/double(gen1.max())*pow(2.0,32.0));
   SampleOrientation sa1;
   // randomly generate crystallographic orientations
-  std::vector<std::vector<double>> aa;
+  std::vector<double> aa;
   sa1.GenerateSamples(nGrain,sdloc,aa);
   cTheta.assign(nGrain*4,0);
   for (int j1=0;j1<nGrain;++j1){
-    cTheta[4*j1] = aa[j1][0];
-    cTheta[4*j1+1] =aa[j1][1];
-    cTheta[4*j1+2] = aa[j1][2];
-    cTheta[4*j1+3] = aa[j1][3];
+    cTheta[4*j1] = aa[4*j1];
+    cTheta[4*j1+1] =aa[4*j1+1];
+    cTheta[4*j1+2] = aa[4*j1+2];
+    cTheta[4*j1+3] = aa[4*j1+3];
   } // end for j1        
   //std::cout << cTheta[0]<<","<<cTheta[1]<<","<<cTheta[2]<<","<<cTheta[3]<<","<<std::endl;
   for (int j =0; j <Ntot; ++j){ vState[j] = 1;}
@@ -205,7 +205,7 @@ void VoxelsCA::UpdateVoxels3()
   Ntot = _part->ncellLoc;
   // start:determine nucleation: location and time
   std::vector<int> nucInd; // index of where nucleation
-  std::vector<double> tnuc; // time within [t,t+DT] when nucleation occurs
+  std::vector<double> aa,tnuc; // time within [t,t+DT] when nucleation occurs
   NucleateGrains(nucInd,tnuc);
   int Nnuc = nucInd.size(),Nnucvec[_part->nprocs],NnucA=0, jnuc0[_part->nprocs];
   std::vector<int> :: iterator i1p;
@@ -216,7 +216,6 @@ void VoxelsCA::UpdateVoxels3()
   int nucA[NnucA];
   double tnucA[NnucA];
   // end:determine nucleation: location and time
-  std::vector<std::vector<double>> aa;
   SampleOrientation sa;
   unsigned int sdloc; 
   double nA[3] = {1.0/pow(3.0,.5),1.0/pow(3.0,.5),1.0/pow(3.0,.5)},
@@ -385,7 +384,7 @@ void VoxelsCA::UpdateVoxels3()
       G[js] = nGrain;
       sdloc= seed0 + 32*_xyz->tInd +64*nGrain;
       sa.GenerateSamples(1,sdloc,aa);
-      cTheta.insert(cTheta.end(), &aa[0][0],&aa[0][0]+4);
+      cTheta.insert(cTheta.end(), aa.begin(),aa.end());
       gNucleus.push_back(vI[js]);
       for (int j=0;j<Na;++j){tmn1[j]+=DtMin2;}
       tmn1[js] = 0.0;
@@ -449,12 +448,12 @@ void VoxelsCA::UpdateVoxels4()
   ConvertSolid1(1);
   _part->PassInformation(vState);
   // assemble arrays to be used to compute grain growth
-  int NlocA=0,Na=0,NvecA[_part->nprocs],Ntot,cc,cc1,jn[3];
+  int NlocA=0,Na=0,NvecA[_part->nprocs],Ntot,cc,cc1,jn[3],nHaz=0,nHazT=0;
   Ntot = _part->ncellLoc;
   // start:determine nucleation: location and time
   std::vector<int> nucInd; // index of where nucleation
-  std::vector<double> tnuc; // time within [t,t+DT] when nucleation occurs
-  NucleateGrains(nucInd,tnuc); // KT CHANGE AFTER TEST
+  std::vector<double> tnuc,aa; // time within [t,t+DT] when nucleation occurs
+  NucleateGrains(nucInd,tnuc); 
   int Nnuc = nucInd.size(),NnucA=0;
   std::vector<int> Nnucvec(_part->nprocs,0),jnuc0(_part->nprocs,0);
   std::vector<int> :: iterator i1p;
@@ -462,31 +461,67 @@ void VoxelsCA::UpdateVoxels4()
   for (int j=0;j<_part->nprocs;++j){NnucA+=Nnucvec[j];}
   jnuc0[0]=0;
   for (int j=1;j<_part->nprocs;++j){jnuc0[j] = jnuc0[j-1]+Nnucvec[j-1];}
-  int nucA[NnucA];
-  double tnucA[NnucA];
+  std::vector<int> nucA(NnucA,0),nHazvec(_part->nprocs,0),neigh,vneigh(Ntot,0),j0(_part->nprocs,0);
+  std::vector<double> tnucA(NnucA,0);
   // end:determine nucleation: location and time
-  std::vector<std::vector<double>> aa,sdiag0,sdiag(6,std::vector<double>(3));
+  std::vector<std::vector<double>> sdiag0,sdiag(6,std::vector<double>(3));
   std::vector<std::vector<int>> sInd;
   loadS(sdiag0,sInd); // this is for the decentered octohedron algorithm
   SampleOrientation sa;
-  unsigned int sdloc; 
+  unsigned int sdloc;
+/*
+  // THIS AREA NEEDS TO BE TESTED (ALSO CHECK ZeroVoxels1 to change cut off)
   for (int j=0;j<Ntot;++j){
-    if (vState[j]==2 || (vState[j]==1 && _temp->TempCurr[j]< _xyz->tL)){NlocA+=1;}
+    jn[2] = floor(_part->icellidLoc[j]/(_xyz->nX[0]*_xyz->nX[1]));
+    cc = _temp->ilaserLoc - floor(_xyz->layerT/_xyz->dX[2]);
+    if (jn[2]<_temp->ilaserLoc && jn[2]>cc && vState[j]==1){
+      _xyz->ComputeNeighborhoodFirst(_part->icellidLoc[j],_xyz->ntype,neigh);
+      for (int j1=0;j1<neigh.size();++j1){
+	cc1 = std::distance(_part->icellidLoc.begin(),
+			   std::find(_part->icellidLoc.begin(),_part->icellidLoc.begin()+Ntot,neigh[j1]));
+	if (vState[cc1]==0){
+	  vneigh[nHaz] = cc1;
+	  nHaz+=1;
+	} // if (vState...
+      } // for (int j1 ...
+    } // if (jn...
+  } // for (int j...
+  MPI_Allgather(&nHaz,1,MPI_INT,&nHazvec[0],1,MPI_INT,MPI_COMM_WORLD);
+  for (int j=0;j<_part->nprocs;++j){nHazT+=nHazvec[j];}
+  j0[0]=0;
+  for (int j=1;j<_part->nprocs;++j){j0[j]= j0[j-1]+nHazvec[j-1];}
+  for (int j=0;j<nHaz;++j){
+    vState[vneigh[j]]=2;
+    gID[vneigh[j]] = nGrain +1 + j0[_part->myid] + j;
+    jn[2] = floor(_part->icellidLoc[vneigh[j]]/(_xyz->nX[0]*_xyz->nX[1]));
+    jn[1] = floor((_part->icellidLoc[vneigh[j]]- _xyz->nX[0]*_xyz->nX[1]*jn[2])/_xyz->nX[0]);
+    jn[0] = _part->icellidLoc[vneigh[j]] - _xyz->nX[0]*_xyz->nX[1]*jn[2] - _xyz->nX[0]*jn[1];
+    centroidOct[3*vneigh[j]] = (jn[0]+.5)*_xyz->dX[0];
+    centroidOct[3*vneigh[j]+1] = (jn[1]+.5)*_xyz->dX[1];
+    centroidOct[3*vneigh[j]+2] = (jn[2]+.5)*_xyz->dX[2];
+  } // for (int j...
+  cc=nGrain;
+  nGrain +=nHazT;
+  sdloc= seed0 + 22*_xyz->tInd +2*nGrain;
+  sa.GenerateSamples(nHazT,sdloc,aa);
+  cc1=4*nHazT;
+  cTheta.insert(cTheta.end(), aa.begin(),aa.end());
+  // THIS AREA NEEDS TO BE TESTED
+*/
+  for (int j=0;j<Ntot;++j){
+    if (vState[j]==2 || vState[j]==1){NlocA+=1;}
   }
   MPI_Allgather(&NlocA,1,MPI_INT,&NvecA[0],1,MPI_INT,MPI_COMM_WORLD);
   for (int j=0;j<_part->nprocs;++j){Na+=NvecA[j];}
-  std::vector<double> T(Na,0),ExtA(Na,0),CentroidA(3*Na,0);
-  std::vector<int> vS(Na,0),G(Na,0),vI(Na,0),j0(_part->nprocs,0),
-    Nneigh(Na,0),iv(_part->nprocs+1,0);
+  std::vector<double> T(Na,0),ExtA(Na,0.0),CentroidA(3*Na,0);
+  std::vector<int> vS(Na,0),G(Na,0),vI(Na,0),Nneigh(Na,0),iv(_part->nprocs+1,0);
   std::vector<std::vector<int>> V(Na,std::vector<int>(24,0));
-  std::fill(Nneigh.begin(),Nneigh.end(),0); // initialize all to  0
-  std::fill(ExtA.begin(),ExtA.end(),0.0); // initialize all to 0 for each time step
   j0[0]=0;
   for (int j=1;j<_part->nprocs;++j){j0[j]= j0[j-1]+NvecA[j-1];}
   cc=0;
   cc1=0;
   for (int j=0;j<Ntot;++j){
-    if (vState[j]==2 || (vState[j]==1 && _temp->TempCurr[j]< _xyz->tL)){
+    if (vState[j]==2 || (vState[j]==1)){
       vS[j0[_part->myid]+cc] = vState[j];
       vI[j0[_part->myid]+cc] = _part->icellidLoc[j];
       G[j0[_part->myid]+cc] = gID[j];
@@ -518,69 +553,17 @@ void VoxelsCA::UpdateVoxels4()
     MPI_Bcast(&nucA[jnuc0[j]],Nnucvec[j],MPI_INT,j,MPI_COMM_WORLD);
     MPI_Bcast(&tnucA[jnuc0[j]],Nnucvec[j],MPI_DOUBLE,j,MPI_COMM_WORLD);
   } // for (int j ..
-  int i1=_xyz->nX[0],i2=_xyz->nX[0]*_xyz->nX[1],jst;
-  if (_xyz->ntype.compare("Moore")==0){
-    int itmp[3]={-1,0,1},vneigh[26];
-    for (int j=0;j<Na;++j){
-      std::fill(vneigh,vneigh+26,-1);
-      jn[2] = floor(vI[j]/i2);
-      jn[1] = floor((vI[j]- i2*jn[2])/i1);
-      jn[0] = vI[j] - i2*jn[2] - i1*jn[1];
-      cc=0;
-      for (int j3=0;j3<3;++j3){
-	if ( (jn[2]+itmp[j3]<0) || (jn[2]+itmp[j3]>=_xyz->nX[2])){continue;}      
-	for (int j2=0;j2<3;++j2){
-	  if ( (jn[1]+itmp[j2]<0) || (jn[1]+itmp[j2]>=_xyz->nX[1])){continue;}      
-	  for (int j1=0;j1<3;++j1){
-	    if ( (jn[0]+itmp[j1]<0) || (jn[0]+itmp[j1]>=_xyz->nX[0])){continue;}      
-	    jst = i2*(jn[2]+itmp[j3])+i1*(jn[1]+itmp[j2])+jn[0]+itmp[j1];
-	    if (jst !=vI[j]){vneigh[cc]=jst; cc+=1;}
-	  } // for (int j1...
-	} // for (int j2...
-      } // for (int j3...    
-      for (int j1=0;j1<26;++j1){
-	cc=std::distance(vI.begin(),std::find(vI.begin(),vI.end(),vneigh[j1]));
-	if (cc <Na){
-	  V[j][Nneigh[j]] = cc;
-	  Nneigh[j]+=1;
-	} // if (cc < ...
-      } // for (int j1...
-    } // for (int j=0...
-  } else {
-    int itmp[2]={-1,1},vneigh[6];
-    for (int j=0;j<Na;++j){
-      std::fill(vneigh,vneigh+6,-1);
-      jn[2] = floor(vI[j]/i2);
-      jn[1] = floor((vI[j]- i2*jn[2])/i1);
-      jn[0] = vI[j] - i2*jn[2] - i1*jn[1];
-      cc=0;
-      for (int j1=0;j1<2;++j1){
-	if ( (jn[2]+itmp[j1]<0) || (jn[2]+itmp[j1]>=_xyz->nX[2])){continue;}
-	jst = i2*(jn[2]+itmp[j1])+i1*jn[1]+jn[0];
-	vneigh[cc]=jst; 
-	cc+=1;
-      } // for (int j1...
-      for (int j1=0;j1<2;++j1){
-	if ( (jn[1]+itmp[j1]<0) || (jn[1]+itmp[j1]>=_xyz->nX[1])){continue;}
-	jst = i2*jn[2]+i1*(jn[1]+itmp[j1])+jn[0];
-	vneigh[cc]=jst; 
-	cc+=1;
-      } // for (int j1...
-      for (int j1=0;j1<2;++j1){
-	if ( (jn[0]+itmp[j1]<0) || (jn[0]+itmp[j1]>=_xyz->nX[0])){continue;}
-	jst = i2*jn[2]+i1*jn[1]+jn[0]+itmp[j1];
-	vneigh[cc]=jst; 
-	cc+=1;
-      } // for (int j1...
-      for (int j1=0;j1<6;++j1){
-	cc=std::distance(vI.begin(),std::find(vI.begin(),vI.end(),vneigh[j1]));
-	if (cc <Na){
-	  V[j][Nneigh[j]] = cc;
-	  Nneigh[j]+=1;
-	} // if (cc < ...
-      } // for (int j1...
-    } // for (int j=0...
-  } // if (_xyz->ntype.compare...
+  int i1,i2,jst;
+  for (int j=0;j<Na;++j){
+    _xyz->ComputeNeighborhoodMooreFirst(vI[j],neigh);
+    for (int j1=0;j1<neigh.size();++j1){
+      cc=std::distance(vI.begin(),std::find(vI.begin(),vI.end(),neigh[j1]));
+      if (cc <Na){
+	V[j][Nneigh[j]] = cc;
+	Nneigh[j]+=1;
+      } // if (cc < ...
+    } // for (int j1...
+  } // for (int j=0...
   i1 = ceil( (double)Na / (double)_part->nprocs);
   i2 = floor( (double)Na / (double)i1);
   for (int j=0;j<(_part->nprocs+1);++j){
@@ -591,248 +574,254 @@ void VoxelsCA::UpdateVoxels4()
   } // for (int j...
   // end assemble arrays to be used to compute grain growth
   // capture all undercooled liquid voxels by growing grains
-  int js=0,j1s=0,jx[3],jy[3],jTs[_part->nprocs], j1Ts[_part->nprocs],i3,countS=Na;
-  double DtT[_part->nprocs],velX,velY,omega,ax[3],
-    dlocX[3],locX[3],dr,vhat,tmn1[Na],rRot[3][3],
+  int js=0,j1s=0,jx[3],jy[3],i3,countS=Na;
+  double velX,velY,omega,ax[3],
+    dlocX[3],locX[3],dr,vhat,tmelt=_xyz->tL,
     timeUntil,dnx[3],tinc=0.0;
-  std::fill(tmn1,tmn1+Na,0.0);
+  std::vector<int> vSneigh(26,0),jTs(_part->nprocs,0),j1Ts(_part->nprocs,0);
+  std::vector<double> Tneigh(26,0.0),DtT(_part->nprocs,0.0);
+  std::vector<std::vector<double>> rRot(3,std::vector<double>(3,0));
   i2 = _xyz->nX[0]; i3 = _xyz->nX[0]*_xyz->nX[1];
   cc=0;
-  while (std::any_of(vS.begin(),vS.end(),[](int n){return n==1;}) && 
-	 std::count(vS.begin(),vS.end(),2)!=countS && tinc<_temp->DelT) {
+  while (std::count(vS.begin(),vS.end(),2)!=countS && tinc<_temp->DelT) {
+
+    /*
+    if (_temp->tInd==5){
+      for (int j=0;j<NnucA;++j){if (vS[nucA[j]]==2){std::cout<<cc<<","<<vS[nucA[j]]<<std::endl;}}
+      
+    MPI_Barrier(MPI_COMM_WORLD);
+    //throw std::exception();
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    std::vector<double> itmp(NnucA);
+    for (int j=0;j<NnucA;++j){itmp[j]=vS[nucA[j]];}
+    std::sort(itmp.begin(),itmp.end());
+    i1=std::distance(itmp.begin(),std::unique(itmp.begin(),itmp.end()));
+    if (_part->myid>-1){
+    std::cout << "bb,"<<_temp->tInd<<","<<cc<<",";
+    for (int j=0;j<i1;++j){std::cout<<itmp[j]<<",";}
+    std::cout<<std::endl;
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+
+
+
+
+    */
+
+
+
+
+
+
+
     double DtMin=1e6;
     countS = std::count(vS.begin(),vS.end(),2);
     for (int j=iv[_part->myid];j<iv[_part->myid+1];++j){
-      if (vS[j]==1){
-	jx[2] = floor(vI[j]/i3);
-	jx[1] = floor((vI[j]- i3*jx[2])/i2);
-	jx[0] = vI[j] - i3*jx[2] - i2*jx[1];
-	velX=(5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
-		 (_xyz->Gamma))*( pow((_xyz->tL - T[j]),2.5)/pow(_xyz->c0,1.5));
+      if (vS[j]==2){
 	for (int j1=0;j1<Nneigh[j];++j1){
-	  if (vS[V[j][j1]]==1){continue;}
-	  dnx[0] = (double(jx[0])+.5)*_xyz->dX[0] - CentroidA[3*V[j][j1]];
-	  dnx[1] = (double(jx[1])+.5)*_xyz->dX[1] - CentroidA[3*V[j][j1]+1];
-	  dnx[2] = (double(jx[2])+.5)*_xyz->dX[2] - CentroidA[3*V[j][j1]+2];
-	  omega = cTheta[4*(G[V[j][j1]]-1)];
-	  ax[0]=cTheta[4*(G[V[j][j1]]-1)+1];
-	  ax[1]=cTheta[4*(G[V[j][j1]]-1)+2];
-	  ax[2]=cTheta[4*(G[V[j][j1]]-1)+3];
-	  // matrix is local->global; need to multiply by transpose for global->local            
-	  rRot[0][0] = cos(omega) + pow(ax[0],2.0)*(1-cos(omega));
-	  rRot[0][1] = ax[0]*ax[1]*(1-cos(omega)) - ax[2]*sin(omega);
-	  rRot[0][2] = ax[0]*ax[2]*(1-cos(omega)) + ax[1]*sin(omega);
-	  rRot[1][0] = ax[0]*ax[1]*(1-cos(omega)) + ax[2]*sin(omega);
-	  rRot[1][1] = cos(omega) + pow(ax[1],2.0)*(1-cos(omega));
-	  rRot[1][2] = ax[1]*ax[2]*(1-cos(omega)) - ax[0]*sin(omega);
-	  rRot[2][0] = ax[2]*ax[0]*(1-cos(omega)) - ax[1]*sin(omega);
-	  rRot[2][1] = ax[2]*ax[1]*(1-cos(omega)) + ax[0]*sin(omega);
-	  rRot[2][2] = cos(omega) + pow(ax[2],2.0)*(1-cos(omega));
-	  // put into 1st quadrant b/c of symmetry     
-	  dlocX[0] = std::fabs(rRot[0][0]*dnx[0]+rRot[1][0]*dnx[1]+rRot[2][0]*dnx[2]);
-	  dlocX[1] = std::fabs(rRot[0][1]*dnx[0]+rRot[1][1]*dnx[1]+rRot[2][1]*dnx[2]);
-	  dlocX[2] = std::fabs(rRot[0][2]*dnx[0]+rRot[1][2]*dnx[1]+rRot[2][2]*dnx[2]);
-	  dr = dlocX[0]+dlocX[1]+dlocX[2] - ExtA[V[j][j1]];
-	  T[V[j][j1]]>=_xyz->tL ? velY=0.0: velY=(5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
-		 (_xyz->Gamma))*( pow((_xyz->tL - T[V[j][j1]]),2.5)/pow(_xyz->c0,1.5));
-	  //vhat = .5*(velX+velY);
-	  vhat = velY;
-	  //timeUntil = (dr-vhat*tmn1[V[j][j1]])/vhat;
-	  timeUntil = dr/vhat;
-	  if (timeUntil < DtMin){
-	    DtMin = timeUntil;
-	    js = j;
-	    j1s = j1;
-	  } // if (timeUntil < ...
-	} // for (int j1
-      } // if (vS[j...
+	  vSneigh[j1]=vS[V[j][j1]];
+	  Tneigh[j1] = T[V[j][j1]];	
+	} // for (int j1...
+	if (std::any_of(vSneigh.begin(),vSneigh.begin()+Nneigh[j],[](int n){return n==1;}) &&
+	    std::all_of(Tneigh.begin(),Tneigh.begin()+Nneigh[j],[&tmelt](double tchk){return tchk < tmelt;})){
+	  for (int j1=0;j1<Nneigh[j];++j1){
+	    if (vSneigh[j1] != 1 ){continue;}
+	    jx[2] = floor(vI[V[j][j1]]/i3);
+	    jx[1] = floor((vI[V[j][j1]]- i3*jx[2])/i2);
+	    jx[0] = vI[V[j][j1]] - i3*jx[2] - i2*jx[1];
+	    dnx[0] = (double(jx[0])+.5)*_xyz->dX[0] - CentroidA[3*j];
+	    dnx[1] = (double(jx[1])+.5)*_xyz->dX[1] - CentroidA[3*j+1];
+	    dnx[2] = (double(jx[2])+.5)*_xyz->dX[2] - CentroidA[3*j+2];
+	    omega = cTheta[4*(G[j]-1)];
+	    ax[0]=cTheta[4*(G[j]-1)+1];
+	    ax[1]=cTheta[4*(G[j]-1)+2];
+	    ax[2]=cTheta[4*(G[j]-1)+3];
+	    loadRotMat(omega,ax,rRot);	    
+	    // matrix is local->global; need to multiply by transpose for global->local            
+	    // put into 1st quadrant b/c of symmetry     
+	    dlocX[0] = std::fabs(rRot[0][0]*dnx[0]+rRot[1][0]*dnx[1]+rRot[2][0]*dnx[2]);
+	    dlocX[1] = std::fabs(rRot[0][1]*dnx[0]+rRot[1][1]*dnx[1]+rRot[2][1]*dnx[2]);
+	    dlocX[2] = std::fabs(rRot[0][2]*dnx[0]+rRot[1][2]*dnx[1]+rRot[2][2]*dnx[2]);
+	    dr = dlocX[0]+dlocX[1]+dlocX[2] - ExtA[j];
+	    T[j]>=_xyz->tL ? velY=0.0: velY=(5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
+		 (_xyz->Gamma))*( pow((_xyz->tL - T[j]),2.5)/pow(_xyz->c0,1.5));
+	    vhat = velY;
+	    timeUntil = dr/vhat;
+	    if (timeUntil < DtMin){
+	      DtMin = timeUntil;
+	      js = j;  // js is capturing voxel index
+	      j1s = j1;  // V[js][j1s] is index of captured voxel
+	    } // if (timeUntil ...
+	  } // for (int j1...
+	} // if (std::any_of ...  
+      } // if (vS[j]==2...      
     } // for (int j...
     MPI_Allgather(&DtMin,1,MPI_DOUBLE,&DtT[0],1,MPI_DOUBLE,MPI_COMM_WORLD);
     MPI_Allgather(&js,1,MPI_INT,&jTs[0],1,MPI_INT,MPI_COMM_WORLD);
     MPI_Allgather(&j1s,1,MPI_INT,&j1Ts[0],1,MPI_INT,MPI_COMM_WORLD);
-    DtMin = *std::min_element(DtT,DtT+_part->nprocs);
+    DtMin = *std::min_element(DtT.begin(),DtT.end());
     if (DtMin>=1e6){break;}
-    double DtMin2 = 1.01*DtMin;
+    double DtMin2 = 1.01*std::abs(DtMin);
     for (int j=0;j<NnucA;++j){
-      if ( (tnucA[j] > tinc) && (tnucA[j] <= tinc+DtMin)){
-	if (DtMin2> tnucA[j]-tinc){
+      if ( (tnucA[j] > tinc) && (tnucA[j] <= tinc+DtMin) && (vS[nucA[j]]==1)){
+	if ( DtMin2> tnucA[j]-tinc ){
 	  DtMin2 = tnucA[j]-tinc;
 	  js=nucA[j];
 	} // if (DtMin2...
       } // if ( (tnucA ...
     } // for int j ...
-    if (std::abs(DtMin2) < -1e6*std::abs(DtMin)){
+    if (std::abs(DtMin2) < std::abs(DtMin)){
+      // grow all extents that satify appropriate condition
+      for (int j=iv[_part->myid];j<iv[_part->myid+1];++j){
+	if (vS[j] != 2){continue;}
+	for (int j1=0;j1<Nneigh[j];++j1){
+	  vSneigh[j1]=vS[V[j][j1]];
+	  Tneigh[j1] = T[V[j][j1]];
+	} // for (int j1...
+	if (std::any_of(vSneigh.begin(),vSneigh.begin()+Nneigh[j],[](int n){return n==1;}) &&
+	    std::all_of(Tneigh.begin(),Tneigh.begin()+Nneigh[j],[&tmelt](double tchk){return tchk < tmelt;})){
+	  T[j]>=_xyz->tL ? velY=0.0: velY=(5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
+					   (_xyz->Gamma))*( pow((_xyz->tL - T[j]),2.5)/pow(_xyz->c0,1.5));
+	  vhat = velY;
+	  ExtA[j]+=vhat*DtMin2;
+	} // if (std::any_of ...	  
+      } // for (int j=iv...
+      // end grow all extents that satify appropriate condition
       vS[js] = 2;
       nGrain+=1;
       G[js] = nGrain;
       sdloc= seed0 + 32*_xyz->tInd +64*nGrain;
       sa.GenerateSamples(1,sdloc,aa);
-      cTheta.insert(cTheta.end(), &aa[0][0],&aa[0][0]+4);
+      cTheta.insert(cTheta.end(), aa.begin(),aa.end());
       gNucleus.push_back(vI[js]);
-      for (int j=0;j<Na;++j){tmn1[j]+=DtMin2;}
-      tmn1[js] = 0.0;
       jx[2] = floor(vI[js]/i3);
       jx[1] = floor((vI[js]- i3*jx[2])/i2);
       jx[0] = vI[js] - i3*jx[2] - i2*jx[1];
       CentroidA[3*js] = (double(jx[0])+.5)*_xyz->dX[0];
       CentroidA[3*js+1] = (double(jx[1])+.5)*_xyz->dX[1];
       CentroidA[3*js+2] = (double(jx[2])+.5)*_xyz->dX[2];
-      for (int j1=0;j1<Na;++j1){
-	if (vS[j1]==2){
-	  int vStmp[Nneigh[j1]];
-	  for (int j2=0;j2<Nneigh[j1];++j2){vStmp[j2] = vS[V[j1][j2]];}
-	  if (std::any_of(vStmp,vStmp+Nneigh[j1],[](int n){return n==1;})){
-	    T[j1]>=_xyz->tL? velY=0.0: velY=(5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
-				     (_xyz->Gamma))*( pow((_xyz->tL - T[j1]),2.5)/pow(_xyz->c0,1.5));
-	    vhat = velY;
-	    ExtA[j1]+=vhat*DtMin2;
-	  } // if (std:: ...
-	} // if (vS ...
-      } // for (int j1...
       ExtA[js] = extentsInitialValue;
-      std::cout << "nucleation"<<","<<cc<<","<<_part->myid<<std::endl;
     } else {
       double xI[3],xJ[3],d1I,dI2,d1J,dJ3,L12,L13,l,Lmud,dnorm[3],xiL;
-      int j;
+      int jInd,nvoxproc;
       // compute new decentered octohedron return centroid and extents
-      i1 = std::distance(DtT,std::min_element(DtT,DtT+_part->nprocs));
+      i1 = std::distance(DtT.begin(),std::min_element(DtT.begin(),DtT.end()));
       js = jTs[i1];
       j1s = j1Ts[i1];    
-      for (int j1=0;j1<Na;++j1){
-	if (vS[j1]==2){
-	  std::vector<int> vStmp(Nneigh[j1],0);
-	  for (int j2=0;j2<Nneigh[j1];++j2){vStmp[j2] = vS[V[j1][j2]];}
-	  if (std::any_of(vStmp.begin(),vStmp.end(),[](int n){return n==1;})){
-	    T[j1]>=_xyz->tL? velY=0.0: velY=(5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
-				   (_xyz->Gamma))*( pow((_xyz->tL - T[j1]),2.5)/pow(_xyz->c0,1.5));
-	    vhat = velY;
-	    ExtA[j1]+=vhat*DtMin;
-	  } // if (std::...
-	} // if (vS ...
-      } // for (int j1...
-      vS[js] = 2;
-      G[js] = G[V[js][j1s]];
-      for (int j=0;j<Na;++j){tmn1[j]+=DtMin;}
-      tmn1[js] = 0.0;
-      jx[2] = floor(vI[js]/i3);
-      jx[1] = floor((vI[js]- i3*jx[2])/i2);
-      jx[0] = vI[js] - i3*jx[2] - i2*jx[1];
-      jy[2] = floor(vI[V[js][j1s]]/i3);
-      jy[1] =floor( (vI[V[js][j1s]]- i3*jy[2])/i2);
-      jy[0] = vI[V[js][j1s]] -i3*jy[2] - i2*jy[1];
+      // grow all extents that satify appropriate condition
+      for (int j=iv[_part->myid];j<iv[_part->myid+1];++j){
+	if (vS[j]!=2){continue;}
+	for (int j1=0;j1<Nneigh[j];++j1){
+	  vSneigh[j1]=vS[V[j][j1]];
+	  Tneigh[j1] = T[V[j][j1]];
+	} // for (int j1...
+	if (std::any_of(vSneigh.begin(),vSneigh.begin()+Nneigh[j],[](int n){return n==1;}) &&
+	    std::all_of(Tneigh.begin(),Tneigh.begin()+Nneigh[j],[&tmelt](double tchk){return tchk < tmelt;})){
+	  T[j]>=_xyz->tL ? velY=0.0: velY=(5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
+					   (_xyz->Gamma))*( pow((_xyz->tL - T[j]),2.5)/pow(_xyz->c0,1.5));
+	  vhat = velY;
+	  ExtA[j]+=vhat*DtMin;
+	  ExtA[j] = std::max(ExtA[j],0.0);
+	} // if (std::any_of ...	
+      } // for (int j...
+      i1 = std::distance(iv.begin(),std::upper_bound(iv.begin(),iv.end(),js)) - 1;
+      MPI_Bcast(&ExtA[js],1,MPI_DOUBLE,i1,MPI_COMM_WORLD);
+      vS[V[js][j1s]] = 2;
+      G[V[js][j1s]] = G[js];
+      jx[2] = floor(vI[V[js][j1s]]/i3);
+      jx[1] =floor( (vI[V[js][j1s]]- i3*jx[2])/i2);
+      jx[0] = vI[V[js][j1s]] -i3*jx[2] - i2*jx[1];
+      jy[2] = floor(vI[js]/i3);
+      jy[1] = floor((vI[js]- i3*jy[2])/i2);
+      jy[0] = vI[js] - i3*jy[2] - i2*jy[1];
       l = pow( pow((jx[0]-jy[0])*_xyz->dX[0],2)+ pow((jx[1]-jy[1])*_xyz->dX[1],2)+
 	       pow((jx[2]-jy[2])*_xyz->dX[2],2),.5);
-      dnx[0] = (double(jx[0])+.5)*_xyz->dX[0] - CentroidA[3*V[js][j1s]];
-      dnx[1] = (double(jx[1])+.5)*_xyz->dX[1] - CentroidA[3*V[js][j1s]+1];
-      dnx[2] = (double(jx[2])+.5)*_xyz->dX[2] - CentroidA[3*V[js][j1s]+2];
-      omega = cTheta[4*(G[V[js][j1s]]-1)];
-      ax[0]=cTheta[4*(G[V[js][j1s]]-1)+1];
-      ax[1]=cTheta[4*(G[V[js][j1s]]-1)+2];
-      ax[2]=cTheta[4*(G[V[js][j1s]]-1)+3];
+      dnx[0] = (double(jx[0])+.5)*_xyz->dX[0] - CentroidA[3*js];
+      dnx[1] = (double(jx[1])+.5)*_xyz->dX[1] - CentroidA[3*js+1];
+      dnx[2] = (double(jx[2])+.5)*_xyz->dX[2] - CentroidA[3*js+2];
+      omega = cTheta[4*(G[js]-1)];
+      ax[0]=cTheta[4*(G[js]-1)+1];
+      ax[1]=cTheta[4*(G[js]-1)+2];
+      ax[2]=cTheta[4*(G[js]-1)+3];
+      loadRotMat(omega,ax,rRot);	    
       // matrix is local->global; need to multiply by transpose for global->local            
-      rRot[0][0] = cos(omega) + pow(ax[0],2.0)*(1-cos(omega));
-      rRot[0][1] = ax[0]*ax[1]*(1-cos(omega)) - ax[2]*sin(omega);
-      rRot[0][2] = ax[0]*ax[2]*(1-cos(omega)) + ax[1]*sin(omega);
-      rRot[1][0] = ax[0]*ax[1]*(1-cos(omega)) + ax[2]*sin(omega);
-      rRot[1][1] = cos(omega) + pow(ax[1],2.0)*(1-cos(omega));
-      rRot[1][2] = ax[1]*ax[2]*(1-cos(omega)) - ax[0]*sin(omega);
-      rRot[2][0] = ax[2]*ax[0]*(1-cos(omega)) - ax[1]*sin(omega);
-      rRot[2][1] = ax[2]*ax[1]*(1-cos(omega)) + ax[0]*sin(omega);
-      rRot[2][2] = cos(omega) + pow(ax[2],2.0)*(1-cos(omega));
       locX[0] = rRot[0][0]*dnx[0]+rRot[1][0]*dnx[1]+rRot[2][0]*dnx[2];
       locX[1] = rRot[0][1]*dnx[0]+rRot[1][1]*dnx[1]+rRot[2][1]*dnx[2];
       locX[2] = rRot[0][2]*dnx[0]+rRot[1][2]*dnx[1]+rRot[2][2]*dnx[2];
       // signbit returns 0 if positive and 1 if negative
-      dr = ExtA[V[js][j1s]];
+      dr = ExtA[js];
       for (int j1=0;j1<6;++j1){sdiag[j1]={sdiag0[j1][0]*dr,sdiag0[j1][1]*dr,sdiag0[j1][2]*dr};}
-      j = 4*std::signbit(locX[2])+ 2*std::signbit(locX[1])+ std::signbit(locX[0]);
+      jInd = 4*std::signbit(locX[2])+ 2*std::signbit(locX[1])+ std::signbit(locX[0]);
       for (int j1=0;j1<3;++j1){ 
-      dnorm[j1] = pow(locX[0]-sdiag[sInd[j][j1]][0],2.0)+
-	pow(locX[1]-sdiag[sInd[j][j1]][1],2.0)+pow(locX[2]-sdiag[sInd[j][j1]][2],2.0);
+      dnorm[j1] = pow(locX[0]-sdiag[sInd[jInd][j1]][0],2.0)+
+	pow(locX[1]-sdiag[sInd[jInd][j1]][1],2.0)+pow(locX[2]-sdiag[sInd[jInd][j1]][2],2.0);
       } // for (int j1...
       std::iota(jy,jy+3,0);
       std::sort(jy,jy+3,[&dnorm](int j1,int j2){return dnorm[j1]<dnorm[j2];});
-      projectPointLine(locX,&sdiag[sInd[j][jy[0]]][0],&sdiag[sInd[j][jy[1]]][0],xI);
-      projectPointLine(locX,&sdiag[sInd[j][jy[0]]][0],&sdiag[sInd[j][jy[2]]][0],xJ);
-      d1I = pow(pow(sdiag[sInd[j][jy[0]]][0]-xI[0],2.0) + 
-	pow(sdiag[sInd[j][jy[0]]][1]-xI[1],2.0) + 
-	pow(sdiag[sInd[j][jy[0]]][2]-xI[2],2.0),.5);
-      dI2 = pow(pow(sdiag[sInd[j][jy[1]]][0]-xI[0],2.0) + 
-	pow(sdiag[sInd[j][jy[1]]][1]-xI[1],2.0) + 
-	pow(sdiag[sInd[j][jy[1]]][2]-xI[2],2.0),.5);
-      d1J = pow(pow(sdiag[sInd[j][jy[0]]][0]-xJ[0],2.0) + 
-	pow(sdiag[sInd[j][jy[0]]][1]-xJ[1],2.0) + 
-	pow(sdiag[sInd[j][jy[0]]][2]-xJ[2],2.0),.5);
-      dJ3 = pow(pow(sdiag[sInd[j][jy[2]]][0]-xJ[0],2.0) + 
-	pow(sdiag[sInd[j][jy[2]]][1]-xJ[1],2.0) + 
-	pow(sdiag[sInd[j][jy[2]]][2]-xJ[2],2.0),.5);
+      projectPointLine(locX,&sdiag[sInd[jInd][jy[0]]][0],&sdiag[sInd[jInd][jy[1]]][0],xI);
+      projectPointLine(locX,&sdiag[sInd[jInd][jy[0]]][0],&sdiag[sInd[jInd][jy[2]]][0],xJ);
+      d1I = pow(pow(sdiag[sInd[jInd][jy[0]]][0]-xI[0],2.0) + 
+	pow(sdiag[sInd[jInd][jy[0]]][1]-xI[1],2.0) + 
+	pow(sdiag[sInd[jInd][jy[0]]][2]-xI[2],2.0),.5);
+      dI2 = pow(pow(sdiag[sInd[jInd][jy[1]]][0]-xI[0],2.0) + 
+	pow(sdiag[sInd[jInd][jy[1]]][1]-xI[1],2.0) + 
+	pow(sdiag[sInd[jInd][jy[1]]][2]-xI[2],2.0),.5);
+      d1J = pow(pow(sdiag[sInd[jInd][jy[0]]][0]-xJ[0],2.0) + 
+	pow(sdiag[sInd[jInd][jy[0]]][1]-xJ[1],2.0) + 
+	pow(sdiag[sInd[jInd][jy[0]]][2]-xJ[2],2.0),.5);
+      dJ3 = pow(pow(sdiag[sInd[jInd][jy[2]]][0]-xJ[0],2.0) + 
+	pow(sdiag[sInd[jInd][jy[2]]][1]-xJ[1],2.0) + 
+	pow(sdiag[sInd[jInd][jy[2]]][2]-xJ[2],2.0),.5);
       L12 = .5*(std::min(d1I,pow(3.0,.5)*l) + std::min(dI2,pow(3.0,.5)*l) );  
       L13 = .5*(std::min(d1J,pow(3.0,.5)*l) + std::min(dJ3,pow(3.0,.5)*l) );  
       Lmud =  pow(3.0,.5)* (pow(2.0/3.0,.5)*std::max(L12,L13));
-      xiL = -.5*(l/_xyz->dX[0] - 1.0)/(pow(3.0,.5)-1.0) + .9;
-      ExtA[js] = Lmud*xiL;
-      dnx[0] = sdiag[sInd[j][jy[0]]][0] - (2-xiL)*Lmud*sdiag0[sInd[j][jy[0]]][0];
-      dnx[1] = sdiag[sInd[j][jy[0]]][1] - (2-xiL)*Lmud*sdiag0[sInd[j][jy[0]]][1];
-      dnx[2] = sdiag[sInd[j][jy[0]]][2] - (2-xiL)*Lmud*sdiag0[sInd[j][jy[0]]][2];
+      xiL = -.4*(l/_xyz->dX[0] - 1.0)/(pow(3.0,.5)-1.0) + .9;
+      //xiL = -.2*(l/_xyz->dX[0] - 1.0)/(pow(3.0,.5)-1.0) + .6;
+      ExtA[V[js][j1s]] = Lmud*xiL;
+      /*
+      dnx[0] = sdiag[sInd[jInd][jy[0]]][0] - (2-xiL)*Lmud*sdiag0[sInd[jInd][jy[0]]][0];
+      dnx[1] = sdiag[sInd[jInd][jy[0]]][1] - (2-xiL)*Lmud*sdiag0[sInd[jInd][jy[0]]][1];
+      dnx[2] = sdiag[sInd[jInd][jy[0]]][2] - (2-xiL)*Lmud*sdiag0[sInd[jInd][jy[0]]][2];
+      */
+      dnx[0] = sdiag[sInd[jInd][jy[0]]][0] - Lmud*sdiag0[sInd[jInd][jy[0]]][0];
+      dnx[1] = sdiag[sInd[jInd][jy[0]]][1] - Lmud*sdiag0[sInd[jInd][jy[0]]][1];
+      dnx[2] = sdiag[sInd[jInd][jy[0]]][2] - Lmud*sdiag0[sInd[jInd][jy[0]]][2];
       locX[0] = rRot[0][0]*dnx[0]+rRot[0][1]*dnx[1]+rRot[0][2]*dnx[2];
       locX[1] = rRot[1][0]*dnx[0]+rRot[1][1]*dnx[1]+rRot[1][2]*dnx[2];
       locX[2] = rRot[2][0]*dnx[0]+rRot[2][1]*dnx[1]+rRot[2][2]*dnx[2];
-      CentroidA[3*js] = CentroidA[3*V[js][j1s]] + locX[0];
-      CentroidA[3*js+1] = CentroidA[3*V[js][j1s]+1] + locX[1];
-      CentroidA[3*js+2] = CentroidA[3*V[js][j1s]+2] + locX[2];
-      // end compute new decentered octohedron return centroid and extents
-
-      
+      CentroidA[3*V[js][j1s]] = CentroidA[3*js] + locX[0];
+      CentroidA[3*V[js][j1s]+1] = CentroidA[3*js+1] + locX[1];
+      CentroidA[3*V[js][j1s]+2] = CentroidA[3*js+2] + locX[2];      
+      // end compute new decentered octohedron return centroid and extents      
     } // if (DtMin2 < ...
-    cc+=1;
+    cc+=1;    
     tinc += std::min(DtMin2,DtMin);
-
-    int iz;
-    iz=std::distance(vI.begin(),std::find(vI.begin(),vI.end(),8321));
-    if (iz<Na && _part->myid==0){
-      int iz1[Nneigh[iz]];
-      for (int j1=0;j1<Nneigh[iz];++j1){
-	iz1[j1] = vS[V[iz][j1]];
-      }
-
-      std::cout << vS[iz]<<","<<ExtA[iz]<<","<<std::any_of(iz1,iz1+Nneigh[iz],[](int n){return n==1;})<<std::endl;
-      for (int j1=0;j1<Nneigh[iz];++j1){
-	std::cout << iz1[j1]<<",";
-      }
-      std::cout<<std::endl;
-    }
-    /*
-    if (_temp->tInd==2){if (_part->myid==0){
-      std::cout<<tinc<<","<<_temp->DelT<<","<< std::any_of(vS.begin(),vS.end(),[](int n){return n==1;})<<","<<
-	std::count(vS.begin(),vS.end(),2)<<","<<countS<<std::endl;
-
-	}
-    }
-    */
     if (DtMin < 0){
             // ******** KT: delete below after debugging
       
       if (_part->myid==0){
 	std::cout << _temp->tInd<<","<<cc<<","<<vI[js]<<","<<vI[V[js][j1s]]<<std::endl;
 
-	/*
+	
       std::cout << vI[js]<<","<<vI[V[js][j1s]]<<","<< ExtA[js]<<","<<ExtA[V[js][j1s]] <<","
 		<<CentroidA[3*V[js][j1s]]<<","<<CentroidA[3*V[js][j1s]+1]<<","
 		<<CentroidA[3*V[js][j1s]+2]<<","<<omega<<","<<ax[0]<<","<<ax[1]
 		<<","<<ax[2]<<","<<CentroidA[3*js]<<","<<CentroidA[3*js+1]<<","<<
 	CentroidA[3*js+2]<<","<<std::endl;
-      */
-      
-      throw std::exception();
       }
     }
-
   } // while (std::any
+  for (int j=0;j<_part->nprocs;++j){
+    i1 = iv[j+1]-iv[j];
+    MPI_Bcast(&ExtA[iv[j]],i1,MPI_DOUBLE,j,MPI_COMM_WORLD);  
+  } // for (int j ...
   // end capture all undercooled liquid voxels by growing grains
   // bring global variables back to local variables
   cc1=0;
   for (int j=0;j<Ntot;++j){
-    if (vState[j]==2 || (vState[j]==1 && _temp->TempCurr[j]< _xyz->tL)){
+    if (vState[j]==2 || vState[j]==1 ){
       vState[j] = vS[j0[_part->myid]+cc1];
       gID[j] = G[j0[_part->myid]+cc1];
       extents[j] = ExtA[j0[_part->myid]+cc1];
@@ -843,7 +832,6 @@ void VoxelsCA::UpdateVoxels4()
     } // if (vState[j]...
   } // for (int j...
   // pass information 
-  
   for (int j=Ntot;j<_part->nGhost+Ntot;++j){
     cc1=std::distance(vI.begin(),std::find(vI.begin(),vI.end(),_part->icellidLoc[j]));
     if (cc1<Na){
@@ -855,371 +843,6 @@ void VoxelsCA::UpdateVoxels4()
   ConvertSolid1(0);
   _part->PassInformation(vState);
 }; // end UpdateVoxels4
-void VoxelsCA::UpdateVoxels5()
-{
-  /*
-    This is the version that includes the decentered octahedral method
-    and grows out the grains in a continuous time as opposed to 
-    growing out each grain incrementally by finding the first cell to get 
-    captured
-   */
-  // set liquid if temperature > TL 
-
-  //*******************  AFTER TEST, REMEMBER TO SWITCH TO SETLIQUID3
-  //SetLiquid3();  // FOR TEST use SetLiquid4()
-  SetLiquid4(); // KT CHANGE AFTER TEST
-  // zero voxels above laser (no material there)
-  
-  //*******************  AFTER TEST, REMEMBER TO UNCOMMENT ZEROVOXELS
-  //ZeroVoxels1(); // KT CHANGE AFTER TEST
-
-
-  // solid (vState=3) to mushy (vState=2) if one neighbor liquid (vState=1)
-  ConvertSolid1(1);
-  _part->PassInformation(vState);
-  // assemble arrays to be used to compute grain growth
-  int NlocA=0,Na=0,NvecA[_part->nprocs],Ntot,cc,cc1,jn[3];
-  Ntot = _part->ncellLoc;
-  // start:determine nucleation: location and time
-  std::vector<int> nucInd; // index of where nucleation
-  std::vector<double> tnuc; // time within [t,t+DT] when nucleation occurs
-  NucleateGrains(nucInd,tnuc); // KT CHANGE AFTER TEST
-  int Nnuc = nucInd.size(),NnucA=0;
-  std::vector<int> Nnucvec(_part->nprocs,0),jnuc0(_part->nprocs,0);
-  std::vector<int> :: iterator i1p;
-  MPI_Allgather(&Nnuc,1,MPI_INT,&Nnucvec[0],1,MPI_INT,MPI_COMM_WORLD);
-  for (int j=0;j<_part->nprocs;++j){NnucA+=Nnucvec[j];}
-  jnuc0[0]=0;
-  for (int j=1;j<_part->nprocs;++j){jnuc0[j] = jnuc0[j-1]+Nnucvec[j-1];}
-  int nucA[NnucA];
-  double tnucA[NnucA];
-  // end:determine nucleation: location and time
-  std::vector<std::vector<double>> aa,sdiag0,sdiag(6,std::vector<double>(3));
-  std::vector<std::vector<int>> sInd;
-  loadS(sdiag0,sInd); // this is for the decentered octohedron algorithm
-  SampleOrientation sa;
-  unsigned int sdloc; 
-  for (int j=0;j<Ntot;++j){
-    if (vState[j]==2 || (vState[j]==1 && _temp->TempCurr[j]< _xyz->tL)){NlocA+=1;}
-  }
-  MPI_Allgather(&NlocA,1,MPI_INT,&NvecA[0],1,MPI_INT,MPI_COMM_WORLD);
-  for (int j=0;j<_part->nprocs;++j){Na+=NvecA[j];}
-  std::vector<double> T(Na,0),ExtA(Na,0),CentroidA(3*Na,0);
-  std::vector<int> vS(Na,0),G(Na,0),vI(Na,0),j0(_part->nprocs,0),
-    Nneigh(Na,0),iv(_part->nprocs+1,0);
-  std::vector<std::vector<int>> V(Na,std::vector<int>(24,0));
-  std::fill(Nneigh.begin(),Nneigh.end(),0); // initialize all to  0
-  std::fill(ExtA.begin(),ExtA.end(),0.0); // initialize all to 0 for each time step
-  j0[0]=0;
-  for (int j=1;j<_part->nprocs;++j){j0[j]= j0[j-1]+NvecA[j-1];}
-  cc=0;
-  cc1=0;
-  for (int j=0;j<Ntot;++j){
-    if (vState[j]==2 || (vState[j]==1 && _temp->TempCurr[j]< _xyz->tL)){
-      vS[j0[_part->myid]+cc] = vState[j];
-      vI[j0[_part->myid]+cc] = _part->icellidLoc[j];
-      G[j0[_part->myid]+cc] = gID[j];
-      T[j0[_part->myid]+cc] = _temp->TempCurr[j];
-      ExtA[j0[_part->myid]+cc] = extents[j];
-      CentroidA[3*j0[_part->myid]+3*cc]=centroidOct[3*j];
-      CentroidA[3*j0[_part->myid]+3*cc+1]=centroidOct[3*j+1];
-      CentroidA[3*j0[_part->myid]+3*cc+2]=centroidOct[3*j+2];
-      i1p=std::find(nucInd.begin(),nucInd.end(),j);
-      if (i1p !=nucInd.end()){
-	nucA[jnuc0[_part->myid]+cc1] = cc + j0[_part->myid];
-	tnucA[jnuc0[_part->myid]+cc1] = tnuc[std::distance(nucInd.begin(),i1p)];
-	cc1+=1;
-      } // if (std::any_of ...
-      cc+=1;
-    } // if (vState[j]...
-  } // for (int j...
-  for (int j=0;j<_part->nprocs;++j){
-    if (NvecA[j]==0){continue;}
-    MPI_Bcast(&vS[j0[j]],NvecA[j],MPI_INT,j,MPI_COMM_WORLD);
-    MPI_Bcast(&vI[j0[j]],NvecA[j],MPI_INT,j,MPI_COMM_WORLD);
-    MPI_Bcast(&G[j0[j]],NvecA[j],MPI_INT,j,MPI_COMM_WORLD);
-    MPI_Bcast(&T[j0[j]],NvecA[j],MPI_DOUBLE,j,MPI_COMM_WORLD);
-    MPI_Bcast(&ExtA[j0[j]],NvecA[j],MPI_DOUBLE,j,MPI_COMM_WORLD);
-    MPI_Bcast(&CentroidA[3*j0[j]],3*NvecA[j],MPI_DOUBLE,j,MPI_COMM_WORLD);
-  } // for (int j ..
-  for (int j=0;j<_part->nprocs;++j){
-    if (Nnucvec[j]==0){continue;}
-    MPI_Bcast(&nucA[jnuc0[j]],Nnucvec[j],MPI_INT,j,MPI_COMM_WORLD);
-    MPI_Bcast(&tnucA[jnuc0[j]],Nnucvec[j],MPI_DOUBLE,j,MPI_COMM_WORLD);
-  } // for (int j ..
-  int i1=_xyz->nX[0],i2=_xyz->nX[0]*_xyz->nX[1],jst;
-  if (_xyz->ntype.compare("Moore")==0){
-    int itmp[3]={-1,0,1},vneigh[26];
-    for (int j=0;j<Na;++j){
-      std::fill(vneigh,vneigh+26,-1);
-      jn[2] = floor(vI[j]/i2);
-      jn[1] = floor((vI[j]- i2*jn[2])/i1);
-      jn[0] = vI[j] - i2*jn[2] - i1*jn[1];
-      cc=0;
-      for (int j3=0;j3<3;++j3){
-	if ( (jn[2]+itmp[j3]<0) || (jn[2]+itmp[j3]>=_xyz->nX[2])){continue;}      
-	for (int j2=0;j2<3;++j2){
-	  if ( (jn[1]+itmp[j2]<0) || (jn[1]+itmp[j2]>=_xyz->nX[1])){continue;}      
-	  for (int j1=0;j1<3;++j1){
-	    if ( (jn[0]+itmp[j1]<0) || (jn[0]+itmp[j1]>=_xyz->nX[0])){continue;}      
-	    jst = i2*(jn[2]+itmp[j3])+i1*(jn[1]+itmp[j2])+jn[0]+itmp[j1];
-	    if (jst !=vI[j]){vneigh[cc]=jst; cc+=1;}
-	  } // for (int j1...
-	} // for (int j2...
-      } // for (int j3...    
-      for (int j1=0;j1<26;++j1){
-	cc=std::distance(vI.begin(),std::find(vI.begin(),vI.end(),vneigh[j1]));
-	if (cc <Na){
-	  V[j][Nneigh[j]] = cc;
-	  Nneigh[j]+=1;
-	} // if (cc < ...
-      } // for (int j1...
-    } // for (int j=0...
-  } else {
-    int itmp[2]={-1,1},vneigh[6];
-    for (int j=0;j<Na;++j){
-      std::fill(vneigh,vneigh+6,-1);
-      jn[2] = floor(vI[j]/i2);
-      jn[1] = floor((vI[j]- i2*jn[2])/i1);
-      jn[0] = vI[j] - i2*jn[2] - i1*jn[1];
-      cc=0;
-      for (int j1=0;j1<2;++j1){
-	if ( (jn[2]+itmp[j1]<0) || (jn[2]+itmp[j1]>=_xyz->nX[2])){continue;}
-	jst = i2*(jn[2]+itmp[j1])+i1*jn[1]+jn[0];
-	vneigh[cc]=jst; 
-	cc+=1;
-      } // for (int j1...
-      for (int j1=0;j1<2;++j1){
-	if ( (jn[1]+itmp[j1]<0) || (jn[1]+itmp[j1]>=_xyz->nX[1])){continue;}
-	jst = i2*jn[2]+i1*(jn[1]+itmp[j1])+jn[0];
-	vneigh[cc]=jst; 
-	cc+=1;
-      } // for (int j1...
-      for (int j1=0;j1<2;++j1){
-	if ( (jn[0]+itmp[j1]<0) || (jn[0]+itmp[j1]>=_xyz->nX[0])){continue;}
-	jst = i2*jn[2]+i1*jn[1]+jn[0]+itmp[j1];
-	vneigh[cc]=jst; 
-	cc+=1;
-      } // for (int j1...
-      for (int j1=0;j1<6;++j1){
-	cc=std::distance(vI.begin(),std::find(vI.begin(),vI.end(),vneigh[j1]));
-	if (cc <Na){
-	  V[j][Nneigh[j]] = cc;
-	  Nneigh[j]+=1;
-	} // if (cc < ...
-      } // for (int j1...
-    } // for (int j=0...
-  } // if (_xyz->ntype.compare...
-  i1 = ceil( (double)Na / (double)_part->nprocs);
-  i2 = floor( (double)Na / (double)i1);
-  for (int j=0;j<(_part->nprocs+1);++j){
-    if (j < (i2+1)){iv[j] = i1*j;}
-    if (j>i2 && j<_part->nprocs){iv[j] = i2*i1 + 
-	floor( (double)(Na-i2*i1)/(double)(_part->nprocs-i2));}
-    if (j==_part->nprocs){iv[j]=Na;}
-  } // for (int j...
-  // end assemble arrays to be used to compute grain growth
-  // capture all undercooled liquid voxels by growing grains
-  int js=0,j1s=0,jx[3],jy[3],jTs[_part->nprocs], j1Ts[_part->nprocs],i3,countS=Na;
-  double vhatT[_part->nprocs],velX,velY,omega,ax[3],
-    dlocX[3],locX[3],dr,vhat,
-    dnx[3],tinc=0.0,xi=1.0;
-  std::vector<std::vector<double>> rRot(3,std::vector<double>(3,0));
-
-  i2 = _xyz->nX[0]; i3 = _xyz->nX[0]*_xyz->nX[1];
-  cc=0;
-  while (std::any_of(vS.begin(),vS.end(),[](int n){return n==1;}) && 
-	 std::count(vS.begin(),vS.end(),2)!=countS && tinc<_temp->DelT) {
-    vhat = 0;
-    double DtMin=1e6,vhat2;
-    countS = std::count(vS.begin(),vS.end(),2);
-    for (int j=iv[_part->myid];j<iv[_part->myid+1];++j){
-      if (vS[j]==1){
-	for (int j1=0;j1<Nneigh[j];++j1){
-	  if (vS[V[j][j1]]==1){continue;}
-	  T[V[j][j1]]>=_xyz->tL ? velY=0.0: velY=(5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
-		 (_xyz->Gamma))*( pow((_xyz->tL - T[V[j][j1]]),2.5)/pow(_xyz->c0,1.5));
-	  vhat2 = velY;
-	  if (vhat2 > vhat){
-	    vhat = vhat2;
-	    js = j;
-	    j1s = j1;
-	  } // if (vhat2 > ...
-	} // for (int j1
-      } // if (vS[j...
-    } // for (int j...
-    MPI_Allgather(&vhat,1,MPI_DOUBLE,&vhatT[0],1,MPI_DOUBLE,MPI_COMM_WORLD);
-    MPI_Allgather(&js,1,MPI_INT,&jTs[0],1,MPI_INT,MPI_COMM_WORLD);
-    MPI_Allgather(&j1s,1,MPI_INT,&j1Ts[0],1,MPI_INT,MPI_COMM_WORLD);
-    vhat = *std::max_element(vhatT,vhatT+_part->nprocs);
-    DtMin = _xyz->dX[0]/vhat*xi;
-
-    //**************************
-    //****** CHECK IF "J" LOOP CAN BE DONE IN CHUNKS OF PROCESSOR (I.E. IV(PART->PROC))
-
-    for (int j=0;j<Na;++j){
-      if (vS[j]==2){
-	std::vector<int> vStmp(Nneigh[j],0);
-	for (int j1=0;j1<Nneigh[j];++j1){vStmp[j1] = vS[V[j][j1]];}
-	if (std::any_of(vStmp.begin(),vStmp.end(),[](int n){return n==1;})){
-	  T[j]>=_xyz->tL? velY=0.0: velY=(5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
-					   (_xyz->Gamma))*( pow((_xyz->tL - T[j]),2.5)/pow(_xyz->c0,1.5));
-	  vhat = velY;
-	  ExtA[j]+=vhat*DtMin;
-	} // if (std::...
-	// check if any of its neighbors w/ vS=1 are engulfed by it
-	for (int j1=0;j1<Nneigh[j];++j1){
-	  js = V[j][j1];
-	  if (vS[js]!=1){continue;}
-	  j1s = vI[js];
-	  jx[2] = floor(j1s/i3);
-	  jx[1] = floor( (j1s- i3*jx[2]) /i2);
-	  jx[0] = j1s - i3*jx[2] - i2*jx[1];
-	  dnx[0] = (double(jx[0])+.5)*_xyz->dX[0] - CentroidA[3*j];
-	  dnx[1] = (double(jx[1])+.5)*_xyz->dX[1] - CentroidA[3*j+1];
-	  dnx[2] = (double(jx[2])+.5)*_xyz->dX[2] - CentroidA[3*j+2];
-	  omega = cTheta[4*(G[j]-1)];
-	  ax[0]=cTheta[4*(G[j]-1)+1];
-	  ax[1]=cTheta[4*(G[j]-1)+2];
-	  ax[2]=cTheta[4*(G[j]-1)+3];
-	  loadRotMat(omega,ax,rRot);
-	  // matrix is local->global; need to multiply by transpose for global->local            
-	  locX[0] = rRot[0][0]*dnx[0]+rRot[1][0]*dnx[1]+rRot[2][0]*dnx[2];
-	  locX[1] = rRot[0][1]*dnx[0]+rRot[1][1]*dnx[1]+rRot[2][1]*dnx[2];
-	  locX[2] = rRot[0][2]*dnx[0]+rRot[1][2]*dnx[1]+rRot[2][2]*dnx[2];
-
-
-
-	    // HERE
-	  
-	} // for (int j1...
-
-
-      } // if (vS ...
-    } // for (int j...
-
-
-    /*
-      double xI[3],xJ[3],d1I,dI2,d1J,dJ3,L12,L13,l,Lmud;
-      int j;
-      // compute new decentered octohedron return centroid and extents
-      i1 = std::distance(DtT,std::min_element(DtT,DtT+_part->nprocs));
-      js = jTs[i1];
-      j1s = j1Ts[i1];
-      std::cout << _temp->tInd<<","<<DtMin<<","<<std::endl;
-    
-      for (int j1=0;j1<Na;++j1){
-	if (vS[j1]==2){
-	  std::vector<int> vStmp(Nneigh[j1],0);
-	  for (int j2=0;j2<Nneigh[j1];++j2){vStmp[j2] = vS[V[j1][j2]];}
-	  if (std::any_of(vStmp.begin(),vStmp.end(),[](int n){return n==1;})){
-	    T[j1]>=_xyz->tL? velY=0.0: velY=(5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
-				   (_xyz->Gamma))*( pow((_xyz->tL - T[j1]),2.5)/pow(_xyz->c0,1.5));
-	    vhat = velY;
-	    ExtA[j1]+=vhat*DtMin;
-	  } // if (std::...
-	} // if (vS ...
-      } // for (int j1...
-      vS[js] = 2;
-      G[js] = G[V[js][j1s]];
-      jx[2] = floor(vI[js]/i3);
-      jx[1] = floor((vI[js]- i3*jx[2])/i2);
-      jx[0] = vI[js] - i3*jx[2] - i2*jx[1];
-      jy[2] = floor(vI[V[js][j1s]]/i3);
-      jy[1] =floor( (vI[V[js][j1s]]- i3*jy[2])/i2);
-      jy[0] = vI[V[js][j1s]] -i3*jy[2] - i2*jy[1];
-      l = pow( pow((jx[0]-jy[0])*_xyz->dX[0],2)+ pow((jx[1]-jy[1])*_xyz->dX[1],2)+
-	       pow((jx[2]-jy[2])*_xyz->dX[2],2),.5)/2;
-      dnx[0] = (double(jx[0])+.5)*_xyz->dX[0] - CentroidA[3*V[js][j1s]];
-      dnx[1] = (double(jx[1])+.5)*_xyz->dX[1] - CentroidA[3*V[js][j1s]+1];
-      dnx[2] = (double(jx[2])+.5)*_xyz->dX[2] - CentroidA[3*V[js][j1s]+2];
-      omega = cTheta[4*(G[V[js][j1s]]-1)];
-      ax[0]=cTheta[4*(G[V[js][j1s]]-1)+1];
-      ax[1]=cTheta[4*(G[V[js][j1s]]-1)+2];
-      ax[2]=cTheta[4*(G[V[js][j1s]]-1)+3];
-      // matrix is local->global; need to multiply by transpose for global->local            
-      rRot[0][0] = cos(omega) + pow(ax[0],2.0)*(1-cos(omega));
-      rRot[0][1] = ax[0]*ax[1]*(1-cos(omega)) - ax[2]*sin(omega);
-      rRot[0][2] = ax[0]*ax[2]*(1-cos(omega)) + ax[1]*sin(omega);
-      rRot[1][0] = ax[0]*ax[1]*(1-cos(omega)) + ax[2]*sin(omega);
-      rRot[1][1] = cos(omega) + pow(ax[1],2.0)*(1-cos(omega));
-      rRot[1][2] = ax[1]*ax[2]*(1-cos(omega)) - ax[0]*sin(omega);
-      rRot[2][0] = ax[2]*ax[0]*(1-cos(omega)) - ax[1]*sin(omega);
-      rRot[2][1] = ax[2]*ax[1]*(1-cos(omega)) + ax[0]*sin(omega);
-      rRot[2][2] = cos(omega) + pow(ax[2],2.0)*(1-cos(omega));
-      locX[0] = rRot[0][0]*dnx[0]+rRot[1][0]*dnx[1]+rRot[2][0]*dnx[2];
-      locX[1] = rRot[0][1]*dnx[0]+rRot[1][1]*dnx[1]+rRot[2][1]*dnx[2];
-      locX[2] = rRot[0][2]*dnx[0]+rRot[1][2]*dnx[1]+rRot[2][2]*dnx[2];
-      // signbit returns 0 if positive and 1 if negative
-      dr = ExtA[V[js][j1s]];
-      for (int j1=0;j1<6;++j1){sdiag[j1]={sdiag0[j1][0]*dr,sdiag0[j1][1]*dr,sdiag0[j1][2]*dr};}
-      j = 4*std::signbit(locX[2])+ 2*std::signbit(locX[1])+ std::signbit(locX[0]);
-      for (int j1=0;j1<3;++j1){ 
-      ax[j1] = pow(locX[0]-sdiag[sInd[j][j1]][0],2.0)+
-	pow(locX[1]-sdiag[sInd[j][j1]][1],2.0)+pow(locX[2]-sdiag[sInd[j][j1]][2],2.0);
-      } // for (int j1...
-      std::iota(jy,jy+3,0);
-      std::sort(jy,jy+3,[&ax](int j1,int j2){return ax[j1]<ax[j2];});
-      projectPointLine(locX,&sdiag[sInd[j][jy[0]]][0],&sdiag[sInd[j][jy[1]]][0],xI);
-      projectPointLine(locX,&sdiag[sInd[j][jy[0]]][0],&sdiag[sInd[j][jy[2]]][0],xJ);
-      d1I = pow(pow(sdiag[sInd[j][jy[0]]][0]-xI[0],2.0) + 
-	pow(sdiag[sInd[j][jy[0]]][1]-xI[1],2.0) + 
-	pow(sdiag[sInd[j][jy[0]]][2]-xI[2],2.0),.5);
-      dI2 = pow(pow(sdiag[sInd[j][jy[1]]][0]-xI[0],2.0) + 
-	pow(sdiag[sInd[j][jy[1]]][1]-xI[1],2.0) + 
-	pow(sdiag[sInd[j][jy[1]]][2]-xI[2],2.0),.5);
-      d1J = pow(pow(sdiag[sInd[j][jy[0]]][0]-xJ[0],2.0) + 
-	pow(sdiag[sInd[j][jy[0]]][1]-xJ[1],2.0) + 
-	pow(sdiag[sInd[j][jy[0]]][2]-xJ[2],2.0),.5);
-      dJ3 = pow(pow(sdiag[sInd[j][jy[2]]][0]-xJ[0],2.0) + 
-	pow(sdiag[sInd[j][jy[2]]][1]-xJ[1],2.0) + 
-	pow(sdiag[sInd[j][jy[2]]][2]-xJ[2],2.0),.5);
-      L12 = .5*(std::min(d1I,pow(3.0,.5)*l) + std::min(dI2,pow(3.0,.5)*l) );  
-      L13 = .5*(std::min(d1J,pow(3.0,.5)*l) + std::min(dJ3,pow(3.0,.5)*l) );  
-      Lmud =  pow(3.0,.5)* (pow(2.0/3.0,.5)*std::max(L12,L13));
-      ExtA[js] = Lmud;
-      dnx[0] = sdiag[sInd[j][jy[0]]][0] - Lmud*sdiag0[sInd[j][jy[0]]][0];
-      dnx[1] = sdiag[sInd[j][jy[0]]][1] - Lmud*sdiag0[sInd[j][jy[0]]][1];
-      dnx[2] = sdiag[sInd[j][jy[0]]][2] - Lmud*sdiag0[sInd[j][jy[0]]][2];
-      locX[0] = rRot[0][0]*dnx[0]+rRot[0][1]*dnx[1]+rRot[0][2]*dnx[2];
-      locX[1] = rRot[1][0]*dnx[0]+rRot[1][1]*dnx[1]+rRot[1][2]*dnx[2];
-      locX[2] = rRot[2][0]*dnx[0]+rRot[2][1]*dnx[1]+rRot[2][2]*dnx[2];
-      CentroidA[3*js] = CentroidA[3*V[js][j1s]] + locX[0];
-      CentroidA[3*js+1] = CentroidA[3*V[js][j1s]+1] + locX[1];
-      CentroidA[3*js+2] = CentroidA[3*V[js][j1s]+2] + locX[2];
-      // end compute new decentered octohedron return centroid and extents
-    cc+=1;
-    tinc += DtMin;
-    */
-  } // while (std::any
-  // end capture all undercooled liquid voxels by growing grains
-  // bring global variables back to local variables
-  cc1=0;
-  for (int j=0;j<Ntot;++j){
-    if (vState[j]==2 || (vState[j]==1 && _temp->TempCurr[j]< _xyz->tL)){
-      vState[j] = vS[j0[_part->myid]+cc1];
-      gID[j] = G[j0[_part->myid]+cc1];
-      extents[j] = ExtA[j0[_part->myid]+cc1];
-      centroidOct[3*j] = CentroidA[3*j0[_part->myid]+3*cc1];
-      centroidOct[3*j+1] = CentroidA[3*j0[_part->myid]+3*cc1+1];
-      centroidOct[3*j+2] = CentroidA[3*j0[_part->myid]+3*cc1+2];
-      cc1+=1;
-    } // if (vState[j]...
-  } // for (int j...
-  // pass information 
-  
-  for (int j=Ntot;j<_part->nGhost+Ntot;++j){
-    cc1=std::distance(vI.begin(),std::find(vI.begin(),vI.end(),_part->icellidLoc[j]));
-    if (cc1<Na){
-      vState[j] = vS[cc1];
-      gID[j] = G[cc1];
-    } // if (cc1<
-  } // for (int j...
-  // mushy (vState=2) to solid (vState=3) if all neighbors 2 
-  ConvertSolid1(0);
-  _part->PassInformation(vState);
-   
-}; // end UpdateVoxels5
 
 void VoxelsCA::ConvertSolid(const int &iswitch)
 {
@@ -1295,7 +918,8 @@ void VoxelsCA::ConvertSolid1(const int &iswitch)
 			     std::find(_part->icellidLoc.begin(),_part->icellidLoc.end(),neigh[j1]));
 	  vneigh[j1] = vState[j2];
 	}
-	if (std::all_of(vneigh.begin(),vneigh.end(),[](int n){return n>=2;})) {
+	//if (std::all_of(vneigh.begin(),vneigh.end(),[](int n){return n>=2;})) {
+	if (!std::any_of(vneigh.begin(),vneigh.end(),[](int n){return n==1;})) {
 	  i1[cc] = j;
 	  cc +=1;
 	} // if
@@ -1317,6 +941,7 @@ void VoxelsCA::ConvertSolid1(const int &iswitch)
 			     std::find(_part->icellidLoc.begin(),_part->icellidLoc.end(),neigh[j1]));
 	  vneigh[j1] = vState[j2];
 	}
+//	if (!std::all_of(vneigh.begin(),vneigh.end(),[](int n){return n>1;})) {
 	if (std::any_of(vneigh.begin(),vneigh.end(),[](int n){return n==1;})) {
 	  i1[cc] = j;
 	  cc += 1;
@@ -1584,9 +1209,9 @@ void VoxelsCA::SetLiquid3(){
       } else{
 	vState[j] = 1;
 	gID[j] = 0; // flag that it loses its grain
-	if (j<_part->ncellLoc){extents[j] = extentsInitialValue;}
-      } // if (j<n1
-    } 
+      } // if (_part->icellidLoc[j]<n1..
+      extents[j] = extentsInitialValue;
+    } // if (_temp->TempCurr[j]...
   } // end for j
 };
 void VoxelsCA::SetLiquid4(){
@@ -1656,8 +1281,8 @@ void VoxelsCA::ZeroVoxels1(){
   int Ntot = _part->ncellLoc + _part->nGhost,n1; 
   double x,y;
   if (_temp->patternID==0){
-    n1 = _xyz->nX[0]*_xyz->nX[1]*(_temp->ilaserLoc-1);
-    n1 = _xyz->nX[0]*_xyz->nX[1]*(NzhBP);
+    n1 = _xyz->nX[0]*_xyz->nX[1]*_temp->ilaserLoc;
+    //n1 = _xyz->nX[0]*_xyz->nX[1]*(NzhBP+1);
     for (int j=0;j<Ntot;++j){
       if (_part->icellidLoc[j] >=n1){
 	vState[j] = 0;
@@ -1746,8 +1371,7 @@ void VoxelsCA::ComputeExtents(){
 
 void VoxelsCA::ComputeNucleation1(){
   int Ntot = _part->ncellLoc, nmushy,itmp,ngtmp=0,ngnew,cc,seed,cc1;
-  std::vector<double> nrate(Ntot,0),gidtmp,cthtmp,tmpall1,tmp1;
-  std::vector<std::vector<double>> aa;
+  std::vector<double> nrate(Ntot,0),gidtmp,cthtmp,tmpall1,tmp1,aa;
   std::vector<int> ngvec(_part->nprocs,0),ind,tmp2,tmpall2,gnuctmp;
   unsigned int sdloc;
   std::srand(std::time(nullptr));
@@ -1774,14 +1398,14 @@ void VoxelsCA::ComputeNucleation1(){
       } // if (xrand(g) < ...
     } // if (vState[j]==2
   } // for (int j ...
-  aa.assign(ngtmp,std::vector<double>(4));
+  aa.assign(ngtmp*4,0.0);
   SampleOrientation sa;
   sa.GenerateSamples(ngtmp,sdloc,aa);
   for (int j1=0;j1<ngtmp;++j1){
-    cthtmp.push_back(aa[j1][0]);
-    cthtmp.push_back(aa[j1][1]);
-    cthtmp.push_back(aa[j1][2]);
-    cthtmp.push_back(aa[j1][3]);
+    cthtmp.push_back(aa[4*j1]);
+    cthtmp.push_back(aa[4*j1+1]);
+    cthtmp.push_back(aa[4*j1+2]);
+    cthtmp.push_back(aa[4*j1+3]);
   } // end for j1   
 
   MPI_Allgather(&ngtmp,1,MPI_INT,&ngvec[0],1,MPI_INT,MPI_COMM_WORLD);
@@ -2152,10 +1776,10 @@ void VoxelsCA::WriteCSVData(const std::string &filename)
 
 void VoxelsCA::NucleateGrains(std::vector<int> &nIn, std::vector<double> &tIn)
 {
-  int Ntot=_part->ncellLoc,Nnew1,Nq=0,NqA,ind1[Ntot],Ntot2=_part->ncellLoc+_part->nGhost,cc,cc1;
-  double tNp1= _xyz->time + _temp->DelT,rNuc[Ntot],x1,x2,rmax=0.0,rateX=0.0;
-  std::fill(rNuc,rNuc+Ntot,0.0);
-  std::vector<double> TempNp1(Ntot2,0.0);
+  int Ntot=_part->ncellLoc,Nnew1,Nq=0,NqA,Ntot2=_part->ncellLoc+_part->nGhost,cc=0,cc1;
+  std::vector<int> ind1(Ntot);
+  double tNp1= _xyz->time + _temp->DelT,x1,x2,rmax=0.0,rateX=0.0;
+  std::vector<double> TempNp1(Ntot2,0.0),rNuc(Ntot,0);
   std::default_random_engine g1(30*_xyz->tInd+seed1);
   _temp->SchwalbachTempCurr(tNp1,TempNp1);
   for (int j=0;j<Ntot;++j){
@@ -2164,21 +1788,22 @@ void VoxelsCA::NucleateGrains(std::vector<int> &nIn, std::vector<double> &tIn)
       x1 = ( (_xyz->tL - _temp->TempCurr[j]) - _xyz->dTempM)/_xyz->dTempS/pow(2.0,.5);
       rNuc[j] = _xyz->rNmax*std::max(0.0, .5*(erf(x2) - erf(x1)));
       rmax = std::max(rmax,rNuc[j]);
-      ind1[Nq] = j;
-      Nq+=1;
+      ind1[cc] = j;
+      cc+=1;
     } // if (vState[j]==1...
   } // for (int j=0...
-  MPI_Allreduce(&Nq,&NqA,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
+  Nq=cc;
+  MPI_Allreduce(&cc,&NqA,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
+  //rateX= std::min(double(NqA),(double)NqA *_xyz->dX[0]*_xyz->dX[1]*_xyz->dX[2] * rmax);
   rateX= (double)NqA *_xyz->dX[0]*_xyz->dX[1]*_xyz->dX[2] * rmax;
   // sample Poisson distribution from rmax and then do thinning
   std::poisson_distribution<int> Np(rateX);
-  std::uniform_int_distribution<int> uind(0,Nq-1);
+  std::uniform_int_distribution<int> uind(0,std::max(Nq-1,0));
   std::uniform_real_distribution<double> xrand1(0.0,1.0);
-  Nnew1 = (NqA==0)? 0:  (int)floor( ((double)Nq/(double)NqA)* Np(g1) );
+  Nnew1 = (Nq==0)? 0:  int(floor( (double(Nq)/ double(NqA))* Np(g1)));
   Nnew1 = std::min(Nnew1,Nq);
-  int itmp1[Nnew1],itmp2[Nq];
-  double tmp1[Nnew1];
-  std::fill(itmp2,itmp2+Nq,0);
+  std::vector<int> itmp1(Nnew1),itmp2(Nq,0);
+  std::vector<double> tmp1(Nnew1);
   cc1=0;
   while (cc1<Nnew1){
     cc = uind(g1);
@@ -2191,8 +1816,8 @@ void VoxelsCA::NucleateGrains(std::vector<int> &nIn, std::vector<double> &tIn)
   } // while (cc1
   nIn.resize(Nnew1,0);
   tIn.resize(Nnew1,0);
+  // perform thinning process
   cc=0;
-  //MPI_Barrier(MPI_COMM_WORLD);
   for (int j=0;j<Nnew1;++j){
     if (xrand1(g1) > (rNuc[itmp1[j]]/rmax)){continue;}
     nIn[cc] =itmp1[j];

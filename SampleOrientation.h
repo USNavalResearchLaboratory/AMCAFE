@@ -19,7 +19,7 @@ class SampleOrientation
   void ComputeMap2(std::vector<double> & xyz,std::vector<double> &map2);
   void ComputeMap3(std::vector<double> & xyz,std::vector<double> &map3);
   void ComputeMeasure(double & t, double &f);
-  void GenerateSamples(const int Nsample, unsigned int seedin, std::vector<std::vector<double>> &axisAngle);
+  void GenerateSamples(const int Nsample, unsigned int seedin, std::vector<double> &axisAngle);
   int Ngrid, NTgrid;
   double r,a,aprime,R1,beta;
   std::vector<double> coeffA;

@@ -89,8 +89,8 @@ void TempField::InitializeSchwalbach(int & patternIDIn, std::vector<double> & be
     DelT = 4.0/3.0*bmSTD[0]/bmV;
     bmDX = {DelT*bmV,4.0/3.0*bmSTD[1],_xyz->layerT};
     offset={1.5*bmDX[0],0.0,0.0};
-    offset={-bmDX[0],-2*bmDX[1],0.0};
-    //offset={0.0,0.0,0.0};
+    offset={0.0,-2*bmDX[1],0.0};
+    offset={0.0,0.0,0.0};
     //offset={bmDX[0],bmDX[1]/2.0,0.0};
     bmLx={LxIn[0]+1*bmDX[0],LxIn[1]+1*bmDX[1],LxIn[2]};
     bmPeriod = {bmLx[0]/bmV,(floor(bmLx[1]/bmDX[1])+2)};
@@ -110,9 +110,9 @@ void TempField::SchwalbachTempCurr()
   int Ntot = _part->nGhost+_part->ncellLoc, j1,j2,j3,iplay;
   double x0,y0,z0,rij,x,y,z,tc,tmin;
   std::vector<double> lam(3);
-  //tmin = std::max(0.0,_xyz->time-tcut);
-  tmin = _xyz->time-tcut;
-  nSource = ceil( (_xyz->time - tmin) / DelT);
+  tmin = std::max(0.0,_xyz->time-tcut);
+  //tmin = _xyz->time-tcut;
+  nSource = floor( (_xyz->time - tmin) / DelT) + 1;
   ilaserLoc = _bp->Nzh + floor( (floor( (_xyz->time/DelT)/(nTTemp[0]*nTTemp[1]))+1)*_xyz->layerT/_xyz->dX[2]);
   iplay=_xyz->nX[0]*_xyz->nX[1]*ilaserLoc;
   TempCurr.assign(Ntot,T0);
@@ -149,8 +149,9 @@ void TempField::SchwalbachTempCurr(double tcurr,std::vector<double> & TempOut )
   int Ntot = _part->nGhost+_part->ncellLoc, j1,j2,j3,iplay;
   double x0,y0,z0,rij,x,y,z,tc,tmin;
   std::vector<double> lam(3);
-  tmin = tcurr-tcut;
-  nSource = ceil( (tcurr - tmin) / DelT);
+  tmin = std::max(0.0,tcurr-tcut);
+  //tmin = tcurr-tcut;
+  nSource = floor( (tcurr - tmin) / DelT) + 1;
   if (patternID==0){
     for (int j=0;j<Ntot;++j){
       j3 = floor(_part->icellidLoc[j]/(_xyz->nX[0]*_xyz->nX[1]));

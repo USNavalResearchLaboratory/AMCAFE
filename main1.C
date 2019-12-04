@@ -47,7 +47,7 @@ int main()
     LX = {.002,.002,.002}; // KT: THIS IS FOR TEST
   } else {
   nX = {128,128,64};
-  nX = {64,64,32};
+  //nX = {64,64,32};
   LX = {.002,.002,.001};
   //nX = {128,32,16};
   //LX = {.001,.00025,12.5e-5};  
@@ -63,13 +63,13 @@ int main()
   NtM = 50;
   dtM = .05; // must set based on moose results
   tL = 1609; // K
-  dTempM = 2.5; // K (mean undercooling for nucleation)
-  dTempS = 1.0; // K (standard dev undercooling for nucleation)
-  rNmax = 7e14*pow(.001/dX[0],3.0); // m^{-3} maximum nucleation density
+  dTempM = 7.5; // 2.5 // K (mean undercooling for nucleation)
+  dTempS = 5.0; // 1.0 // K (standard dev undercooling for nucleation)
+  rNmax = 7e14; // (m^{-3})  maximum nucleation density
   mL = -10.9; // (K / wt%)
   dL = 3e-9; // (m^2/s)
   Gamma = 1e-7;  // (K m)
-  muN = 9; // 9e-2; // rate for nucleation
+  muN = 9e-3; // 9 // 9e-2; // rate for nucleation
   dP = .48;
   c0 = 4.85; // (wt %)
   filbaseTemp = "/Users/kteferra/Documents/research/projects/AMICME/codes/CA/tempData/tempField0.";
@@ -87,7 +87,7 @@ int main()
   Partition part(g,myid,nprocs);
   part.PartitionGraph();
   heightBase = layerThickness; // 2e-5;
-  mu = 2e14; // 2e11 , 2e14
+  mu = 2e13; // 2e11 , 2e14
   BasePlate bp(g,heightBase,mu, part);
   TempField TempF(g,part,bp);
   // initialize appropriate temperature model
@@ -125,34 +125,10 @@ int main()
   out2 = {1,1,1}; // the increment to skip output per direction
   if (part.myid==0){fplog.open(filLogOut.c_str());}
   while (TempF.tInd<nTmax && icheck!=0){
-
     icheck=!std::all_of(vox.vState.begin(),vox.vState.end(),[](int n){return n==3;});
     ichecktmp = icheck;
     MPI_Allreduce(&ichecktmp,&icheck,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
-
     cc2+=1;
-    j123[2] = floor(TempF.tInd /(TempF.nTTemp[0]*TempF.nTTemp[1]));
-    j123[1] = floor((TempF.tInd - (TempF.nTTemp[0]*TempF.nTTemp[1])*j123[2])/ TempF.nTTemp[0]);
-    j123[0] = TempF.tInd - (TempF.nTTemp[0]*TempF.nTTemp[1])*j123[2] - TempF.nTTemp[0]*j123[1];
-    indOut = j123[2] % out2[2] + j123[1] % out2[1] + j123[0] % out2[0];
-    if (irep==0){
-      irep=1;
-      if (indOut==0 || TempF.tInd ==(nTmax-1)){ 
-	filinds.push_back(TempF.tInd);
-	filtime.push_back(g.time);
-	filout = filbaseOut+std::to_string(TempF.tInd);
-	vox.WriteToVTU1(filout);
-	filout = filbaseOut+".csv";
-	vox.WriteCSVData(filout);
-	cc1+=1;
-	if (cc1 % 20 || TempF.tInd==(nTmax-1)){
-	  filout=filbaseOut;
-	  vox.WriteToPVD(filout,filinds,filtime);
-	} // if (cc1
-	MPI_Barrier(MPI_COMM_WORLD);
-      }
-    }
-
     // update next step for voxels (time is updated in vox.ComputeExtents() )
     if (ictrl==0){
       vox.UpdateVoxels();
@@ -180,6 +156,27 @@ int main()
       g.UpdateTime2(TempF.DelT);
       //TempF.Test2ComputeTemp(1.02*tL,.97*tL,514880,g.time);
       TempF.Test2ComputeTemp(0.97*tL,.97*tL,0.0,g.time);
+    }
+    j123[2] = floor(TempF.tInd /(TempF.nTTemp[0]*TempF.nTTemp[1]));
+    j123[1] = floor((TempF.tInd - (TempF.nTTemp[0]*TempF.nTTemp[1])*j123[2])/ TempF.nTTemp[0]);
+    j123[0] = TempF.tInd - (TempF.nTTemp[0]*TempF.nTTemp[1])*j123[2] - TempF.nTTemp[0]*j123[1];
+    indOut = j123[2] % out2[2] + j123[1] % out2[1] + j123[0] % out2[0];
+    if (irep==0){
+      irep=1;
+      if (indOut==0 || TempF.tInd ==(nTmax-1)){ 
+	filinds.push_back(TempF.tInd);
+	filtime.push_back(g.time);
+	filout = filbaseOut+std::to_string(TempF.tInd);
+	vox.WriteToVTU1(filout);
+	filout = filbaseOut+".csv";
+	vox.WriteCSVData(filout);
+	cc1+=1;
+	if (cc1 % 20 || TempF.tInd==(nTmax-1)){
+	  filout=filbaseOut;
+	  vox.WriteToPVD(filout,filinds,filtime);
+	} // if (cc1
+	MPI_Barrier(MPI_COMM_WORLD);
+      }
     }
     // update temperature field
     if (TempF.tInd != int(round(g.time/TempF.DelT))){

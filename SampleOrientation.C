@@ -123,14 +123,14 @@ void SampleOrientation::ComputeMeasure(double &t,double & f)
   }
 } // end ComputeMeasure
 
-void SampleOrientation::GenerateSamples(const int Nsample,unsigned int seedL, std::vector<std::vector<double>> &axisAngle)
+void SampleOrientation::GenerateSamples(const int Nsample,unsigned int seedL, std::vector<double> &axisAngle)
 {
   int pind;
   double rhoP,dx,t,omega,fmeas,tnorm;
   std::uniform_real_distribution<double> xrand(0.0,1.0);
   std::vector<double> xyz(3),xyz2(3),xyzb(3),xyzs(3),map1(3),map2(3),map3(3);
   std::vector<int> Perm(3),pid(3);
-  axisAngle.assign(Nsample,std::vector<double>(4));
+  axisAngle.assign(Nsample*4,0.0);
   dx = aprime/2.0/Ngrid;
   std::default_random_engine g1(seedL);
   for (int jn=0;jn<Nsample;++jn){
@@ -155,7 +155,10 @@ void SampleOrientation::GenerateSamples(const int Nsample,unsigned int seedL, st
     t=pow(xyzb[0],2.0)+pow(xyzb[1],2.0)+pow(xyzb[2],2.0);
     tnorm = pow(pow(xyzb[0],2.0)+pow(xyzb[1],2.0)+pow(xyzb[2],2.0),.5);
     xyzs = {xyzb[0]/tnorm,xyzb[1]/tnorm,xyzb[2]/tnorm};
-    axisAngle[jn] = {omega,xyzs[0],xyzs[1],xyzs[2]};
+    axisAngle[4*jn] = omega;
+    axisAngle[4*jn+1] = xyzs[0];
+    axisAngle[4*jn+2] = xyzs[1];
+    axisAngle[4*jn+3] = xyzs[2];
   } // for (int jn =0...)
 
 

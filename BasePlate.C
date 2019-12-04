@@ -85,16 +85,13 @@ void BasePlate::GenerateVoxel()
   sdloc = unsigned(double(g1())/double(g1.max())*pow(2.0,32.0));
   SampleOrientation sa;
   // randomly generate crystallographic orientations
-  std::vector<std::vector<double>> aa;
+  std::vector<double> aa;
   sa.GenerateSamples(Ngrain,sdloc,aa);
-
-  MPI_Barrier(MPI_COMM_WORLD);
-
   cTheta.assign(Ngrain*4,0);
   for (int j1=0;j1<Ngrain;++j1){
-    cTheta[4*j1] = aa[j1][0];
-    cTheta[4*j1+1] =aa[j1][1];
-    cTheta[4*j1+2] = aa[j1][2];
-    cTheta[4*j1+3] = aa[j1][3];
+    cTheta[4*j1] = aa[4*j1];
+    cTheta[4*j1+1] =aa[4*j1+1];
+    cTheta[4*j1+2] = aa[4*j1+2];
+    cTheta[4*j1+3] = aa[4*j1+3];
   } // end for j1
 } // end GenerateVoxel()

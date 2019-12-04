@@ -5,7 +5,13 @@ ghidora, lochness, gaffney, neocortex, etc. The initial commit of this code
 is from neocortex 8/22/2019
 
 
-The repository is located in godzilla: godzilla2.nrl.navy.mil:Kirubel/research/projects/AMICME/codes/CA/cafeMPI3D
+Since this is the working repository, I am continuously cloning it in ghidorah by doing
+
+git clone ssh://kteferra@neocortex.nrl.navy.mil:/home/kteferra/Documents/research/projects/AMICME/codes/CA/cafeMPI3D/
+
+as of now, this is done in ghidorah at:
+/Users/kteferra/Documents/research/projects/AMICME/codes/CA/cafeMPI3D/neocortex
+
 
 I'm doing most/all of the editing in neocortex so i created a branch for neocortex that 
 has the evolution of the code (commits), certainly as of 20191007
