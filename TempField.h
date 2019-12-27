@@ -17,7 +17,7 @@ class TempField
   void InitializeMoose(std::string & filnambase, const int &NtIn, 
 		       const double &dtM, const std::vector<int> &nXM, const std::vector<double> &dXM);
   void InitializeSchwalbach(int & patternId, std::vector<double> & beamSTD, 
-			    double & beamVelocity, double & beamPower, double & beamEta, std::vector<double> & Lx,
+			    double & beamVelocity, double & T0targIn, double & beamEta, std::vector<double> & Lx,
 			    double & T0);
   void Test2ComputeTemp(double T20, double T10, double a,double tcurr);
   void ReadCSVMoose1();
@@ -37,7 +37,7 @@ class TempField
   std::vector<double> DDtTemp,dXM,TempCurr,lamXYZ,bmSTD,bmLx,bmX0,bmDX,bmPeriod,offset;
   std::vector<int> nXM,nTTemp;
   int NtM,indexM,patternID,nSource,ilaserLoc,tInd;
-  double dtM,bmV,bmP,bmEta,rcut,tcut,T0,Ci,DelT,alpha;
+  double dtM,bmV,bmP,bmEta,rcut,tcut,T0,Ci,DelT,alpha,T0targ;
 
  private:
   Grid *_xyz;

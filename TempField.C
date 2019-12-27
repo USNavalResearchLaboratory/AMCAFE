@@ -37,7 +37,6 @@ void TempField::InitializeMoose(std::string &filnambase,
   Temp.resize(2,std::vector<double>(_part->ncellLoc + _part->nGhost,0.0));
   indexM = 0;
 } // end InitializeMoose()
-
 void TempField::Test2ComputeTemp(double T20, double T10, double a,double tcurr)
 {
   int Ntot = _part->nGhost+_part->ncellLoc, j1,j2,j3,j;
@@ -61,10 +60,8 @@ void TempField::Test2ComputeTemp(double T20, double T10, double a,double tcurr)
     //DelT = .0125;
   } // for (int j...     
 }
-
-
 void TempField::InitializeSchwalbach(int & patternIDIn, std::vector<double> & beamSTDIn, 
-				     double & beamVelocityIn,double & beamPowerIn,
+				     double & beamVelocityIn,double & T0targIn,
 				     double & beamEtaIn, std::vector<double> & LxIn, double & T0In)
 {
   /*
@@ -73,7 +70,7 @@ void TempField::InitializeSchwalbach(int & patternIDIn, std::vector<double> & be
    */
   bmSTD = beamSTDIn;
   bmV = beamVelocityIn;
-  bmP = beamPowerIn;
+  T0targ = T0targIn;
   bmEta = beamEtaIn;
   patternID = patternIDIn;
   T0 = T0In;
@@ -88,6 +85,8 @@ void TempField::InitializeSchwalbach(int & patternIDIn, std::vector<double> & be
      */
     DelT = 4.0/3.0*bmSTD[0]/bmV;
     bmDX = {DelT*bmV,4.0/3.0*bmSTD[1],_xyz->layerT};
+    double x1 = pow( pow(bmSTD[0],2.0)*pow(bmSTD[1],2.0)*pow(bmSTD[2],2.0),.5);
+    bmP = T0targ*_xyz->cP*_xyz->rho*pow(2.0,.5)*pow(M_PI,1.5)*x1/DelT;
     offset={1.5*bmDX[0],0.0,0.0};
     offset={0.0,-2*bmDX[1],0.0};
     offset={0.0,0.0,0.0};

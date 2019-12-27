@@ -5,11 +5,15 @@ ghidora, lochness, gaffney, neocortex, etc. The initial commit of this code
 is from neocortex 8/22/2019
 
 
-Since this is the working repository, I am continuously cloning it in ghidorah by doing
+Since this is the working repository, I cloned it in ghidorah for keeping a backup by doing
 
 git clone ssh://kteferra@neocortex.nrl.navy.mil:/home/kteferra/Documents/research/projects/AMICME/codes/CA/cafeMPI3D/
 
-as of now, this is done in ghidorah at:
+The above is only done once, and then everything I commit (in neocortex), i pull it in ghidorah
+
+git pull
+
+this is done in ghidorah at:
 /Users/kteferra/Documents/research/projects/AMICME/codes/CA/cafeMPI3D/neocortex
 
 

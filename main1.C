@@ -38,7 +38,7 @@ int main()
   double heightBase;
   // schwalbach parameters
   int patternID;
-  double beamVel,beamPower,wEst,cP,rho,kappa,beamEta,rcut;
+  double beamVel,beamPower,wEst,cP,rho,kappa,beamEta,rcut,T0targ;
   std::vector<double> beamSTD;
   // schwalbach parameters
   ictrl=3;
@@ -49,6 +49,7 @@ int main()
   nX = {128,128,64};
   //nX = {64,64,32};
   LX = {.002,.002,.001};
+  //LX = {nX[0]*1.875e-6,nX[1]*1.875e-6,nX[2]*1.875e-6};
   //nX = {128,32,16};
   //LX = {.001,.00025,12.5e-5};  
   }
@@ -78,16 +79,17 @@ int main()
   rho = 8000.0; // kg /m^3
   cP = 502.0; // J/kg-K)
   kappa = 18.0; // W/(m-K)
-  beamVel = 70e-3; //70e-3 // m/s
-  beamSTD = {5e-5,10e-5,12.5e-5}; //  {20e-6,20e-6,20e-6}; // m
-  beamPower = 70; //300; // W
+  beamVel = 100e-3; //70e-3 // m/s
+  beamSTD = {10e-5,10e-5,12.5e-5}; //  {20e-6,20e-6,20e-6}; // m
+  //beamSTD = {5e-5,5e-5,3.5e-5}; //  {20e-6,20e-6,20e-6}; // m
+  T0targ = 3505.0; // target peak temperature for one ellipsoid
   beamEta = 1.0;
-  layerThickness = floor(beamSTD[2]/dX[2])*dX[2]; //30e-6; // m (layer thickness to be multiple of dX[2])
+  layerThickness = floor(beamSTD[2]/dX[2])*dX[2]; // 30e-6 m (layer thickness to be multiple of dX[2])
   Grid g(dX,nX,tL,mL,c0,Gamma,dP,dL,muN,rho,cP,kappa,layerThickness,neighOrder,dTempM,dTempS,rNmax,nDim,neighType,ictrl);
   Partition part(g,myid,nprocs);
   part.PartitionGraph();
-  heightBase = layerThickness; // 2e-5;
-  mu = 2e13; // 2e11 , 2e14
+  heightBase = 2*dX[2];  //layerThickness; // 2e-5;
+  mu = 1e4/LX[0]/LX[1]/heightBase;//2e13; // 2e11 , 2e14
   BasePlate bp(g,heightBase,mu, part);
   TempField TempF(g,part,bp);
   // initialize appropriate temperature model
@@ -98,11 +100,11 @@ int main()
   T0 = 300.0; // initial temperature in (K)
   if (ictrl==4){
     // this is a test case scenario
-    TempF.InitializeSchwalbach(patternID,beamSTD,beamVel,beamPower,beamEta,LX,T0);
+    TempF.InitializeSchwalbach(patternID,beamSTD,beamVel,T0targ,beamEta,LX,T0);
     //TempF.Test2ComputeTemp(1.02*tL,.97*tL,514880,0.0);
     TempF.Test2ComputeTemp(0.97*tL,.97*tL,0.0,0.0);
   } else{
-    TempF.InitializeSchwalbach(patternID,beamSTD,beamVel,beamPower,beamEta,LX,T0);
+    TempF.InitializeSchwalbach(patternID,beamSTD,beamVel,T0targ,beamEta,LX,T0);
     TempF.SchwalbachTempCurr();
   }
   VoxelsCA vox(g,TempF, part);
@@ -129,34 +131,6 @@ int main()
     ichecktmp = icheck;
     MPI_Allreduce(&ichecktmp,&icheck,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
     cc2+=1;
-    // update next step for voxels (time is updated in vox.ComputeExtents() )
-    if (ictrl==0){
-      vox.UpdateVoxels();
-      vox.CheckTimeSkip();
-    }
-    if (ictrl==1){
-      /*
-      if (part.myid==0){std::cout << g.time << std::endl;}
-      MPI_Barrier(MPI_COMM_WORLD);
-      */
-      vox.UpdateVoxels2();
-      g.UpdateTime2(TempF.DelT);
-    }
-    if (ictrl==2){
-      vox.UpdateVoxels3();
-      g.UpdateTime2(TempF.DelT);
-    }
-    if (ictrl==3){
-      vox.UpdateVoxels4();
-      g.UpdateTime2(TempF.DelT);
-    }
-    if (ictrl==4){
-      //std::cout << TempF.tInd<<",00,"<<g.time<<","<<g.time/TempF.DelT<<std::endl;
-      vox.UpdateVoxels4();
-      g.UpdateTime2(TempF.DelT);
-      //TempF.Test2ComputeTemp(1.02*tL,.97*tL,514880,g.time);
-      TempF.Test2ComputeTemp(0.97*tL,.97*tL,0.0,g.time);
-    }
     j123[2] = floor(TempF.tInd /(TempF.nTTemp[0]*TempF.nTTemp[1]));
     j123[1] = floor((TempF.tInd - (TempF.nTTemp[0]*TempF.nTTemp[1])*j123[2])/ TempF.nTTemp[0]);
     j123[0] = TempF.tInd - (TempF.nTTemp[0]*TempF.nTTemp[1])*j123[2] - TempF.nTTemp[0]*j123[1];
@@ -178,9 +152,20 @@ int main()
 	MPI_Barrier(MPI_COMM_WORLD);
       }
     }
+    // update next step for voxels (time is updated in vox.ComputeExtents() )
+    if (ictrl==3){
+      vox.UpdateVoxels4();
+      g.UpdateTime2(TempF.DelT);
+    }
+    if (ictrl==4){
+      //std::cout << TempF.tInd<<",00,"<<g.time<<","<<g.time/TempF.DelT<<std::endl;
+      vox.UpdateVoxels4();
+      g.UpdateTime2(TempF.DelT);
+      //TempF.Test2ComputeTemp(1.02*tL,.97*tL,514880,g.time);
+      TempF.Test2ComputeTemp(0.97*tL,.97*tL,0.0,g.time);
+    }
     // update temperature field
     if (TempF.tInd != int(round(g.time/TempF.DelT))){
-      if (ictrl==0){vox.ExtentsInitialize();}
       TempF.tInd = int(round(g.time/TempF.DelT));
       if (ictrl!=4){TempF.SchwalbachTempCurr();} // KT AFTER TEST REMOVE IF STATEMENT
       irep=0;
