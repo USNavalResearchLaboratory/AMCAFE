@@ -257,6 +257,163 @@ void Partition::PartitionGraph()
   } // if (myid > 0)
 } // end PartitionGraph()
 
+void Partition::PartitionGraph2(){
+  /*
+    - Creates the partition of the domain by evenly dividing the domain among all the processors,
+    Each domain is a contiguous region where indices go x,y,z. Thus, imagine a block where smallest
+    dimension is the z direction. 
+    - This approach does not require METIS since creating the partition "manually"- this enables not having
+    to do all on 1 processor and MPI_sending to all others
+
+   */
+  int nelemT = _xyz->nX[0]*_xyz->nX[1]*_xyz->nX[2],nelemLoc;
+  int i1,i2;
+  i1 = ceil( (double)nelemT / (double)nprocs);
+  i2 = floor( (double)nelemT / (double)i1);
+  std::vector<int> cellNeigh,ghostId,cellGhost,neigh, 
+    n = _xyz->nX, iv(nprocs+1,0);
+  for (int j=0;j<(nprocs+1);++j){
+    if (j < (i2+1)){iv[j] = i1*j;}
+    if (j>i2 && j<nprocs){iv[j] = i2*i1 +
+        floor( (double)(nelemT-i2*i1)/(double)(nprocs-i2));}
+    if (j==nprocs){iv[j]=nelemT;}
+  } // for (int j...
+  ncellLoc = iv[myid+1] - iv[myid];
+  icellidLoc.assign(ncellLoc,0);
+  cellNeigh.assign(26*ncellLoc,0);
+  int j1,j2,j3,jn,cc=0,cc1=0,nneigh,cc2;
+  std::vector<int> :: iterator tmp;
+  for (int j=iv[myid];j<iv[myid+1];++j){
+    icellidLoc[cc] = j;
+    cc+=1;
+    _xyz->ComputeNeighborhoodMooreFirst(j,neigh);
+    i1=neigh.size();
+    for (int j1=0;j1<i1;++j1){cellNeigh[cc1+j1]=neigh[j1];}
+    cc1+=i1;
+  } // for (int j ...
+  cellNeigh.resize(cc1);
+  // make cellNeigh unique and check which proc owns it  
+  std::sort(cellNeigh.begin(),cellNeigh.end());
+  tmp = std::unique(cellNeigh.begin(),cellNeigh.end());
+  cellNeigh.resize(std::distance(cellNeigh.begin(),tmp));
+  nneigh = cellNeigh.size();
+  cellGhost.assign(nneigh,0);
+  ghostId.assign(nneigh,0);
+  cc=0;
+  for (int j=0;j<nneigh;++j){
+    i1 = std::distance(iv.begin(),std::upper_bound(iv.begin(),
+	   iv.end(),cellNeigh[j])) - 1; // i1= proc owns cellNeigh[j]
+    if (i1 !=myid){
+      cellGhost[cc] = cellNeigh[j];
+      ghostId[cc] = i1;
+      cc+=1;
+    } // if (i1 !=...
+  } // for (int j ...
+  ghostId.resize(cc);
+  cellGhost.resize(cc);
+  nGhost = cc;
+  nelemLoc = nGhost + ncellLoc;
+  icellidLoc.resize(nelemLoc);
+  for (int j=0;j<nGhost;++j){
+     icellidLoc[j+ncellLoc]=cellGhost[j];
+  }
+  ineighProcId = ghostId;
+  std::sort(ineighProcId.begin(),ineighProcId.end());
+  tmp = std::unique(ineighProcId.begin(),ineighProcId.end());
+  ineighProcId.resize(std::distance(ineighProcId.begin(),tmp));
+  nneighProc = ineighProcId.size();
+  ineigh2Locptr.assign(nneighProc+1,0);
+  ineigh2LocVals.assign(nGhost,0);
+  ineigh2Locptr[0]=0;
+  cc1=0;
+  cc=0;
+  for (int j=0;j<nneighProc;++j){
+    for (int j1 =0;j1<nGhost;++j1){
+      if (ghostId[j1]==ineighProcId[j]){
+	ineigh2LocVals[cc1] =  std::distance(icellidLoc.begin(),
+		   std::find(icellidLoc.begin(),icellidLoc.end(),cellGhost[j1]));
+	cc1+=1;
+      }
+    }
+    cc+=1;
+    ineigh2Locptr[cc] = cc1;
+  }
+  iloc2Neighptr.assign(nneighProc+1,0);
+  iloc2NeighVals.assign(ncellLoc,0);
+  cc2=0;
+  for (int jn=0;jn<nneighProc;++jn){
+    i1 = iv[ineighProcId[jn]+1] - iv[ineighProcId[jn]];
+    cellNeigh.assign(26*i1,0);
+    cc1=0;
+    for (int j=iv[ineighProcId[jn]];j<iv[ineighProcId[jn]+1];++j){
+      _xyz->ComputeNeighborhoodMooreFirst(j,neigh);
+      i1=neigh.size();
+      for (int j1=0;j1<i1;++j1){cellNeigh[cc1+j1]=neigh[j1];}
+      cc1+=i1;
+    } // for (int j ..
+    cellNeigh.resize(cc1);
+    std::sort(cellNeigh.begin(),cellNeigh.end());
+    tmp = std::unique(cellNeigh.begin(),cellNeigh.end());
+    cellNeigh.resize(std::distance(cellNeigh.begin(),tmp));
+    nneigh = cellNeigh.size();
+    iloc2Neighptr[jn]=cc2;
+    for (int j=0;j<nneigh;++j){
+      i1 = std::distance(iv.begin(),std::upper_bound(iv.begin(),
+	  iv.end(),cellNeigh[j])) - 1; // i1= proc owns cellNeigh[j]
+      if (i1 ==myid){
+	iloc2NeighVals[cc2] =std::distance(icellidLoc.begin(),
+		 std::find(icellidLoc.begin(),icellidLoc.end(),cellNeigh[j]));
+	cc2+=1;
+      }
+    }
+    iloc2Neighptr[nneighProc]=cc2;
+    iloc2NeighVals.resize(cc2);
+  } // for (int jn ...
+  cc2 = _xyz->nnodePerCell;
+  ipointidLoc.assign(cc2*ncellLoc,0);
+  for (int j =0;j<ncellLoc;++j){
+    j3 = floor(icellidLoc[j]/(n[0]*n[1]));
+    j2 = floor( (icellidLoc[j] - n[0]*n[1]*j3)/n[0]);
+    j1 = icellidLoc[j] - n[0]*n[1]*j3 - n[0]*j2;
+    jn = (n[0]+1)*(n[1]+1)*j3 + (n[0]+1)*j2 + j1;
+    ipointidLoc[cc2*j] = jn;
+    ipointidLoc[cc2*j+1] = jn+1;
+    ipointidLoc[cc2*j+2] = jn+(n[0]+1)+1;
+    ipointidLoc[cc2*j+3] = jn+(n[0]+1);
+    ipointidLoc[cc2*j+4] = jn + (n[0]+1)*(n[1]+1);
+    ipointidLoc[cc2*j+5] = jn+1  + (n[0]+1)*(n[1]+1);
+    ipointidLoc[cc2*j+6] = jn+(n[0]+1)+1 + (n[0]+1)*(n[1]+1);
+    ipointidLoc[cc2*j+7] = jn+(n[0]+1) + (n[0]+1)*(n[1]+1);
+  }
+  std::sort(ipointidLoc.begin(),ipointidLoc.end());
+  tmp =std::unique(ipointidLoc.begin(),ipointidLoc.end());
+  ipointidLoc.resize(std::distance(ipointidLoc.begin(),tmp));
+  npointLoc = ipointidLoc.size();
+  iconnectivityLoc.assign(cc2*ncellLoc,0);
+  for (int j=0;j<ncellLoc;++j){
+    j3 = floor(icellidLoc[j]/(n[0]*n[1]));
+    j2 = floor( (icellidLoc[j] - n[0]*n[1]*j3)/n[0]);
+    j1 = icellidLoc[j] - n[0]*n[1]*j3 - n[0]*j2;
+    jn = (n[0]+1)*(n[1]+1)*j3 + (n[0]+1)*j2 + j1;
+    iconnectivityLoc[cc2*j]=std::distance(ipointidLoc.begin(),
+      std::find(ipointidLoc.begin(),ipointidLoc.end(),jn));
+    iconnectivityLoc[cc2*j+1]=std::distance(ipointidLoc.begin(),
+      std::find(ipointidLoc.begin(),ipointidLoc.end(),jn+1));
+    iconnectivityLoc[cc2*j+2]=std::distance(ipointidLoc.begin(),
+      std::find(ipointidLoc.begin(),ipointidLoc.end(),jn+1+n[0]+1));
+    iconnectivityLoc[cc2*j+3]=std::distance(ipointidLoc.begin(),
+      std::find(ipointidLoc.begin(),ipointidLoc.end(),jn+n[0]+1));
+    iconnectivityLoc[cc2*j+4]=std::distance(ipointidLoc.begin(),
+      std::find(ipointidLoc.begin(),ipointidLoc.end(),jn+(n[0]+1)*(n[1]+1)));
+    iconnectivityLoc[cc2*j+5]=std::distance(ipointidLoc.begin(),
+      std::find(ipointidLoc.begin(),ipointidLoc.end(),jn+1+(n[0]+1)*(n[1]+1)));
+    iconnectivityLoc[cc2*j+6]=std::distance(ipointidLoc.begin(),
+      std::find(ipointidLoc.begin(),ipointidLoc.end(),jn+1+n[0]+1+(n[0]+1)*(n[1]+1)));
+    iconnectivityLoc[cc2*j+7]=std::distance(ipointidLoc.begin(),
+      std::find(ipointidLoc.begin(),ipointidLoc.end(),jn+n[0]+1+(n[0]+1)*(n[1]+1)));
+  } // for (int j...
+} // end PartitionGraph2()
+
 void Partition::PassInformation(std::vector<int> &ivec)
 {
   // passes and receives ghost values of ivec among all processors

@@ -49,7 +49,7 @@ int main()
   nX = {128,128,64};
   //nX = {64,64,32};
   LX = {.002,.002,.001};
-  //LX = {nX[0]*1.875e-6,nX[1]*1.875e-6,nX[2]*1.875e-6};
+  LX = {nX[0]*1.875e-6,nX[1]*1.875e-6,nX[2]*1.875e-6};
   //nX = {128,32,16};
   //LX = {.001,.00025,12.5e-5};  
   }
@@ -80,23 +80,24 @@ int main()
   cP = 502.0; // J/kg-K)
   kappa = 18.0; // W/(m-K)
   beamVel = 100e-3; //70e-3 // m/s
-  beamSTD = {10e-5,10e-5,12.5e-5}; //  {20e-6,20e-6,20e-6}; // m
-  //beamSTD = {5e-5,5e-5,3.5e-5}; //  {20e-6,20e-6,20e-6}; // m
+  //beamSTD = {10e-5,10e-5,12.5e-5}; //  {20e-6,20e-6,20e-6}; // m
+  beamSTD = {5e-5,5e-5,3.5e-5}; // m
   T0targ = 3505.0; // target peak temperature for one ellipsoid
   beamEta = 1.0;
-  layerThickness = floor(beamSTD[2]/dX[2])*dX[2]; // 30e-6 m (layer thickness to be multiple of dX[2])
+  layerThickness = 30e-6; // floor(beamSTD[2]/dX[2])*dX[2]; // (layer thickness to be multiple of dX[2])
   Grid g(dX,nX,tL,mL,c0,Gamma,dP,dL,muN,rho,cP,kappa,layerThickness,neighOrder,dTempM,dTempS,rNmax,nDim,neighType,ictrl);
   Partition part(g,myid,nprocs);
-  part.PartitionGraph();
-  heightBase = 2*dX[2];  //layerThickness; // 2e-5;
+  part.PartitionGraph2();
+  heightBase = dX[2];// layerThickness;//  ;
   mu = 1e4/LX[0]/LX[1]/heightBase;//2e13; // 2e11 , 2e14
   BasePlate bp(g,heightBase,mu, part);
   TempField TempF(g,part,bp);
-  // initialize appropriate temperature model
-  //TempF.InitializeMoose(filbaseTemp,NtM,dtM,nXM,dXM);
   wEst  = pow(8*beamPower/(exp(1.0)*M_PI*rho*cP*(tL-298.0)*beamVel),.5); // see EQ (1) in schwalbach
-  patternID = 0;
-  //LxAll = {LX[0]+1000*beamSpacing,LX[1],LX[2]};
+  /*
+    Notes on patternID: please see TempField.C for description of each
+    - Lx[0] must equal Lx[1] for patternID==3 or 4
+   */
+  patternID = 1; // 0,1,2,3,4;
   T0 = 300.0; // initial temperature in (K)
   if (ictrl==4){
     // this is a test case scenario

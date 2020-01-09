@@ -9,6 +9,7 @@ class Partition
  public:
   Partition(Grid &, int &, int &);
   void PartitionGraph();
+  void PartitionGraph2();
   void PassInformation(std::vector<int> &);
   void PassInformation(std::vector<double> &);
   std::vector<int> icellidLoc,ineighProcId,ineigh2LocVals,ineigh2Locptr,

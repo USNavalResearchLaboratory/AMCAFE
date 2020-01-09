@@ -229,7 +229,7 @@ void VoxelsCA::UpdateVoxels4()
   for (int j=0;j<_part->nprocs;++j){Na+=NvecA[j];}
   std::vector<double> T(Na,0),ExtA(Na,0.0),CentroidA(3*Na,0);
   std::vector<int> vS(Na,0),G(Na,0),vI(Na,0),Nneigh(Na,0),iv(_part->nprocs+1,0);
-  std::vector<std::vector<int>> V(Na,std::vector<int>(24,0));
+  std::vector<std::vector<int>> V(Na,std::vector<int>(26,0));
   j0[0]=0;
   for (int j=1;j<_part->nprocs;++j){j0[j]= j0[j-1]+NvecA[j-1];}
   cc=0;
@@ -267,7 +267,6 @@ void VoxelsCA::UpdateVoxels4()
     MPI_Bcast(&nucA[jnuc0[j]],Nnucvec[j],MPI_INT,j,MPI_COMM_WORLD);
     MPI_Bcast(&tnucA[jnuc0[j]],Nnucvec[j],MPI_DOUBLE,j,MPI_COMM_WORLD);
   } // for (int j ..
-  int i1,i2,jst;
   for (int j=0;j<Na;++j){
     _xyz->ComputeNeighborhoodMooreFirst(vI[j],neigh);
     for (int j1=0;j1<neigh.size();++j1){
@@ -278,6 +277,7 @@ void VoxelsCA::UpdateVoxels4()
       } // if (cc < ...
     } // for (int j1...
   } // for (int j=0...
+  int i1,i2;
   i1 = ceil( (double)Na / (double)_part->nprocs);
   i2 = floor( (double)Na / (double)i1);
   for (int j=0;j<(_part->nprocs+1);++j){
@@ -308,6 +308,11 @@ void VoxelsCA::UpdateVoxels4()
 	} // for (int j1...
 	if (std::any_of(vSneigh.begin(),vSneigh.begin()+Nneigh[j],[](int n){return n==1;}) &&
 	    std::all_of(Tneigh.begin(),Tneigh.begin()+Nneigh[j],[&tmelt](double tchk){return tchk < tmelt;})){
+	  omega = cTheta[4*(G[j]-1)];
+	  ax[0]=cTheta[4*(G[j]-1)+1];
+	  ax[1]=cTheta[4*(G[j]-1)+2];
+	  ax[2]=cTheta[4*(G[j]-1)+3];
+	  loadRotMat(omega,ax,rRot);	    
 	  for (int j1=0;j1<Nneigh[j];++j1){
 	    if (vSneigh[j1] != 1 ){continue;}
 	    jx[2] = floor(vI[V[j][j1]]/i3);
@@ -316,11 +321,6 @@ void VoxelsCA::UpdateVoxels4()
 	    dnx[0] = (double(jx[0])+.5)*_xyz->dX[0] - CentroidA[3*j];
 	    dnx[1] = (double(jx[1])+.5)*_xyz->dX[1] - CentroidA[3*j+1];
 	    dnx[2] = (double(jx[2])+.5)*_xyz->dX[2] - CentroidA[3*j+2];
-	    omega = cTheta[4*(G[j]-1)];
-	    ax[0]=cTheta[4*(G[j]-1)+1];
-	    ax[1]=cTheta[4*(G[j]-1)+2];
-	    ax[2]=cTheta[4*(G[j]-1)+3];
-	    loadRotMat(omega,ax,rRot);	    
 	    // matrix is local->global; need to multiply by transpose for global->local            
 	    // put into 1st quadrant b/c of symmetry     
 	    dlocX[0] = std::fabs(rRot[0][0]*dnx[0]+rRot[1][0]*dnx[1]+rRot[2][0]*dnx[2]);
@@ -459,8 +459,10 @@ void VoxelsCA::UpdateVoxels4()
       L12 = .5*(std::min(d1I,pow(3.0,.5)*l) + std::min(dI2,pow(3.0,.5)*l) );  
       L13 = .5*(std::min(d1J,pow(3.0,.5)*l) + std::min(dJ3,pow(3.0,.5)*l) );  
       Lmud =  pow(3.0,.5)* (pow(2.0/3.0,.5)*std::max(L12,L13));
-      xiL = -.4*(l/_xyz->dX[0] - 1.0)/(pow(3.0,.5)-1.0) + .9;
+      //xiL = -.4*(l/_xyz->dX[0] - 1.0)/(pow(3.0,.5)-1.0) + .9;
       //xiL = -.2*(l/_xyz->dX[0] - 1.0)/(pow(3.0,.5)-1.0) + .6;
+      xiL = .4 + .13*(l/_xyz->dX[0]-1.0);
+      //xiL = .5;
       ExtA[V[js][j1s]] = Lmud*xiL;
       /*
       dnx[0] = sdiag[sInd[jInd][jy[0]]][0] - (2-xiL)*Lmud*sdiag0[sInd[jInd][jy[0]]][0];
@@ -480,9 +482,6 @@ void VoxelsCA::UpdateVoxels4()
     } // if (DtMin2 < ...
     cc+=1;    
     tinc += std::min(DtMin2,DtMin);
-    
-    if (tinc > _temp->DelT){std::cout << "asdfasdf"<<std::endl;}
-
     if (DtMin < 0){
             // ******** KT: delete below after debugging
       
@@ -517,7 +516,7 @@ void VoxelsCA::UpdateVoxels4()
     } // if (vState[j]...
   } // for (int j...
   // pass information 
-  for (int j=Ntot;j<_part->nGhost+Ntot;++j){
+  for (int j=Ntot;j<(_part->nGhost+Ntot);++j){
     cc1=std::distance(vI.begin(),std::find(vI.begin(),vI.end(),_part->icellidLoc[j]));
     if (cc1<Na){
       vState[j] = vS[cc1];
@@ -676,6 +675,7 @@ void VoxelsCA::SetLiquid2(){
 void VoxelsCA::SetLiquid3(){
   // makes cell liquid if temperature exceeds liquidus
   int Ntot = _part->ncellLoc + _part->nGhost,n1,j; 
+  int Ntot1 = _part->ncellLoc;
   n1 = _xyz->nX[0]*_xyz->nX[1];
   for (int j=0;j<Ntot;++j){
     if (_temp->TempCurr[j] >= _xyz->tL ) { 
@@ -685,7 +685,7 @@ void VoxelsCA::SetLiquid3(){
 	vState[j] = 1;
 	gID[j] = 0; // flag that it loses its grain
       } // if (_part->icellidLoc[j]<n1..
-      extents[j] = extentsInitialValue;
+      if (j<Ntot1){extents[j] = extentsInitialValue;}
     } // if (_temp->TempCurr[j]...
   } // end for j
 };
@@ -693,6 +693,7 @@ void VoxelsCA::SetLiquid4(){
   // makes cell liquid if temperature exceeds liquidus
   // this is for test case
   int Ntot = _part->ncellLoc + _part->nGhost,n1; 
+  int Ntot1=_part->ncellLoc;
   int j;
   for (int j=0;j<Ntot;++j){
     n1 = std::distance(gNucleus.begin(),std::find(
@@ -700,7 +701,7 @@ void VoxelsCA::SetLiquid4(){
     if (_temp->TempCurr[j] >= _xyz->tL && n1==nGrain) { 
 	vState[j] = 1;
 	gID[j] = 0; // flag that it loses its grain
-	//extents[j] = extentsInitialValue;
+	// if (j<Ntot1){extents[j] = extentsInitialValue;}
     } // if (
   } // end for j
 };
@@ -755,28 +756,13 @@ void VoxelsCA::ZeroVoxels1(){
   int j,j1b,j2b,j3b,j2,j3;
   int Ntot = _part->ncellLoc + _part->nGhost,n1; 
   double x,y;
-  if (_temp->patternID==0){
-    n1 = _xyz->nX[0]*_xyz->nX[1]*_temp->ilaserLoc;
-    //n1 = _xyz->nX[0]*_xyz->nX[1]*(NzhBP+1);
-    for (int j=0;j<Ntot;++j){
-      if (_part->icellidLoc[j] >=n1){
-	vState[j] = 0;
-	gID[j] = 0;
-      } /*else {
-	j3 = floor(_part->icellidLoc[j]/(_xyz->nX[0]*_xyz->nX[1]));
-	j2 = floor( (_part->icellidLoc[j]- _xyz->nX[0]*_xyz->nX[1]*j3)/_xyz->nX[0]);
-	x = fmod(_temp->tInd,(_temp->nTTemp[0]))*_temp->bmDX[0] - _temp->offset[0];
-	y = floor(fmod(_temp->tInd,(_temp->nTTemp[0]*_temp->nTTemp[1]))/_temp->nTTemp[0])*_temp->bmDX[1]-_temp->offset[1];
-	j2b = int(floor(std::max(y,0.0)/_xyz->dX[1]));
-	j3b = NzhBP + floor( (floor( (_temp->tInd)/(_temp->nTTemp[0]*_temp->nTTemp[1])))*_xyz->layerT/_xyz->dX[2]);
-	if (j3 >= j3b && j2 > j2b){
-	  vState[j] = 0;
-	  gID[j] = 0;
-	} // (if j3 > ...
-      } // if (_part->icellidLoc ...
-      */
-    } // for j
-  } // if (_temp->patternID==0
+  n1 = _xyz->nX[0]*_xyz->nX[1]*_temp->ilaserLoc;
+  for (int j=0;j<Ntot;++j){
+    if (_part->icellidLoc[j] >=n1){
+      vState[j] = 0;
+      gID[j] = 0;
+    } 
+  } // for j
 }; // ZeroVoxels1
 
 void VoxelsCA::CheckTimeSkip(){
