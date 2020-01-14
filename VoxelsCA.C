@@ -154,6 +154,7 @@ void VoxelsCA::UpdateVoxels4()
   }
   //*******************  AFTER TEST, ELIMINATE THIS IF/ELSE AND TEST CASES
 
+
   // solid (vState=3) to mushy (vState=2) if one neighbor liquid (vState=1)
   ConvertSolid1(1);
   _part->PassInformation(vState);
@@ -179,49 +180,6 @@ void VoxelsCA::UpdateVoxels4()
   loadS(sdiag0,sInd); // this is for the decentered octohedron algorithm
   SampleOrientation sa;
   unsigned int sdloc;
-/*
-  // THIS AREA NEEDS TO BE TESTED (ALSO CHECK ZeroVoxels1 to change cut off)
-  // this area is to add new grains at all voxels in the region above the material
-  // to eliminate the artificial issue of only a few grains competing for voxels, which
-  // initially starts as a boundary effect but continues
-  std::vector<int> vneigh(Ntot,0);
-  for (int j=0;j<Ntot;++j){
-    jn[2] = floor(_part->icellidLoc[j]/(_xyz->nX[0]*_xyz->nX[1]));
-    cc = _temp->ilaserLoc - floor(_xyz->layerT/_xyz->dX[2]);
-    if (jn[2]<_temp->ilaserLoc && jn[2]>cc && vState[j]==1){
-      _xyz->ComputeNeighborhoodFirst(_part->icellidLoc[j],_xyz->ntype,neigh);
-      for (int j1=0;j1<neigh.size();++j1){
-	cc1 = std::distance(_part->icellidLoc.begin(),
-			   std::find(_part->icellidLoc.begin(),_part->icellidLoc.begin()+Ntot,neigh[j1]));
-	if (vState[cc1]==0){
-	  vneigh[nHaz] = cc1;
-	  nHaz+=1;
-	} // if (vState...
-      } // for (int j1 ...
-    } // if (jn...
-  } // for (int j...
-  MPI_Allgather(&nHaz,1,MPI_INT,&nHazvec[0],1,MPI_INT,MPI_COMM_WORLD);
-  for (int j=0;j<_part->nprocs;++j){nHazT+=nHazvec[j];}
-  j0[0]=0;
-  for (int j=1;j<_part->nprocs;++j){j0[j]= j0[j-1]+nHazvec[j-1];}
-  for (int j=0;j<nHaz;++j){
-    vState[vneigh[j]]=2;
-    gID[vneigh[j]] = nGrain +1 + j0[_part->myid] + j;
-    jn[2] = floor(_part->icellidLoc[vneigh[j]]/(_xyz->nX[0]*_xyz->nX[1]));
-    jn[1] = floor((_part->icellidLoc[vneigh[j]]- _xyz->nX[0]*_xyz->nX[1]*jn[2])/_xyz->nX[0]);
-    jn[0] = _part->icellidLoc[vneigh[j]] - _xyz->nX[0]*_xyz->nX[1]*jn[2] - _xyz->nX[0]*jn[1];
-    centroidOct[3*vneigh[j]] = (jn[0]+.5)*_xyz->dX[0];
-    centroidOct[3*vneigh[j]+1] = (jn[1]+.5)*_xyz->dX[1];
-    centroidOct[3*vneigh[j]+2] = (jn[2]+.5)*_xyz->dX[2];
-  } // for (int j...
-  cc=nGrain;
-  nGrain +=nHazT;
-  sdloc= seed0 + 22*_xyz->tInd +2*nGrain;
-  sa.GenerateSamples(nHazT,sdloc,aa);
-  cc1=4*nHazT;
-  cTheta.insert(cTheta.end(), aa.begin(),aa.end());
-  // THIS AREA NEEDS TO BE TESTED
-*/
   for (int j=0;j<Ntot;++j){
     if (vState[j]==2 || vState[j]==1){NlocA+=1;}
   }
@@ -461,7 +419,8 @@ void VoxelsCA::UpdateVoxels4()
       Lmud =  pow(3.0,.5)* (pow(2.0/3.0,.5)*std::max(L12,L13));
       //xiL = -.4*(l/_xyz->dX[0] - 1.0)/(pow(3.0,.5)-1.0) + .9;
       //xiL = -.2*(l/_xyz->dX[0] - 1.0)/(pow(3.0,.5)-1.0) + .6;
-      xiL = .4 + .13*(l/_xyz->dX[0]-1.0);
+      //xiL = .4 + .13*(l/_xyz->dX[0]-1.0);
+      xiL = .25 + .75*(l/_xyz->dX[0]-1.0);
       //xiL = .5;
       ExtA[V[js][j1s]] = Lmud*xiL;
       /*
@@ -496,7 +455,7 @@ void VoxelsCA::UpdateVoxels4()
 	CentroidA[3*js+2]<<","<<std::endl;
       }
     }
-  } // while (std::any
+  } // while (std::count(...
   for (int j=0;j<_part->nprocs;++j){
     i1 = iv[j+1]-iv[j];
     MPI_Bcast(&ExtA[iv[j]],i1,MPI_DOUBLE,j,MPI_COMM_WORLD);  
@@ -587,13 +546,12 @@ void VoxelsCA::ConvertSolid1(const int &iswitch)
 {
   // if iswitch =0 then converts mushy to solid
   // else converts solid to mushy
-  int Ntot = (_part->ncellLoc),cc,j2,iplay=_xyz->nX[0]*_xyz->nX[1]*_temp->ilaserLoc;
+  int Ntot = (_part->ncellLoc),cc,j2;
   std::vector<int> vneigh,neigh,i1(_part->ncellLoc,0);
   if (iswitch==0){
     // this checks if all neighbors are >=2 and converts to 3 if currently 2
     cc=0;
     for (int j=0; j < Ntot;++j){
-      //if (_part->icellidLoc[j] >= iplay){continue;}
       if (vState[j]==2){
 	_xyz->ComputeNeighborhood(_part->icellidLoc[j],_xyz->neighOrder,neigh);
 	vneigh.assign(neigh.size(),0);
@@ -602,8 +560,8 @@ void VoxelsCA::ConvertSolid1(const int &iswitch)
 			     std::find(_part->icellidLoc.begin(),_part->icellidLoc.end(),neigh[j1]));
 	  vneigh[j1] = vState[j2];
 	}
-	//if (std::all_of(vneigh.begin(),vneigh.end(),[](int n){return n>=2;})) {
-	if (!std::any_of(vneigh.begin(),vneigh.end(),[](int n){return n==1;})) {
+	if (std::all_of(vneigh.begin(),vneigh.end(),[](int n){return n>=2;})) {
+	//if (!std::any_of(vneigh.begin(),vneigh.end(),[](int n){return n==1;})) {
 	  i1[cc] = j;
 	  cc +=1;
 	} // if

@@ -41,6 +41,21 @@ int main()
   double beamVel,beamPower,wEst,cP,rho,kappa,beamEta,rcut,T0targ;
   std::vector<double> beamSTD;
   // schwalbach parameters
+  
+  /*
+  if (myid==0){
+  unsigned int sdloc;
+  std::default_random_engine g1(531231);
+  sdloc = unsigned(double(g1())/double(g1.max())*pow(2.0,32.0));
+  SampleOrientation sa;
+  std::vector<double> aa;
+  sa.GenerateSamples(9000,sdloc,aa);
+  
+  throw std::exception();
+  }
+  MPI_Barrier(MPI_COMM_WORLD);
+  */
+
   ictrl=3;
   if (ictrl==4){
     nX = {32,32,32}; // KT: THIS IS FOR TEST
@@ -64,13 +79,13 @@ int main()
   NtM = 50;
   dtM = .05; // must set based on moose results
   tL = 1609; // K
-  dTempM = 7.5; // 2.5 // K (mean undercooling for nucleation)
-  dTempS = 5.0; // 1.0 // K (standard dev undercooling for nucleation)
-  rNmax = 7e14; // (m^{-3})  maximum nucleation density
+  dTempM = 500; //7.5; // 2.5 // K (mean undercooling for nucleation)
+  dTempS = 300; //5.0; // 1.0 // K (standard dev undercooling for nucleation)
+  rNmax = 7e16; //7e14; // (m^{-3})  maximum nucleation density
   mL = -10.9; // (K / wt%)
   dL = 3e-9; // (m^2/s)
   Gamma = 1e-7;  // (K m)
-  muN = 9e-3; // 9 // 9e-2; // rate for nucleation
+  muN = 9e-2; // 9 // 9e-2; // rate for nucleation
   dP = .48;
   c0 = 4.85; // (wt %)
   filbaseTemp = "/Users/kteferra/Documents/research/projects/AMICME/codes/CA/tempData/tempField0.";

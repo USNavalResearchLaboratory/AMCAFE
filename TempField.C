@@ -84,6 +84,7 @@ void TempField::InitializeSchwalbach(int & patternIDIn, std::vector<double> & be
   bmEta = beamEtaIn;
   patternID = patternIDIn;
   T0 = T0In;
+  zlaserOff=1.0; // 1.0 (this specifies where laser z value is - see SchwalbachTempCurr)
   double tb,minTemp;
   if (patternID==0 || patternID==1 || patternID==2 || patternID==3 || patternID==4){
     DelT = 4.0/3.0*bmSTD[0]/bmV;
@@ -91,7 +92,7 @@ void TempField::InitializeSchwalbach(int & patternIDIn, std::vector<double> & be
     double x1 = pow( pow(bmSTD[0],2.0)*pow(bmSTD[1],2.0)*pow(bmSTD[2],2.0),.5);
     bmP = T0targ*_xyz->cP*_xyz->rho*pow(2.0,.5)*pow(M_PI,1.5)*x1/DelT;
     offset={0.0,0.0,0.0};
-    //offset={bmDX[0],bmDX[1]/2.0,0.0};
+    //offset={-bmDX[0],-bmDX[1],0.0};
     bmLx={LxIn[0]+1*bmDX[0],LxIn[1]+1*bmDX[1],LxIn[2]};
     nTTemp = {int(floor(bmLx[0]/bmDX[0] ))+1,int(floor(bmLx[1]/bmDX[1]))+1,
             int(floor(bmLx[2]/bmDX[2]))};
@@ -130,7 +131,7 @@ void TempField::SchwalbachTempCurr()
 	tc = _xyz->time - jt*DelT;
 	x = fmod(round(tc/DelT),(nTTemp[0]))*bmDX[0] - offset[0];
 	y = floor(fmod(round(tc/DelT),(nTTemp[0]*nTTemp[1]))/nTTemp[0])*bmDX[1]-offset[1];
-	z = (floor((tc/DelT+DelT*1e-6)/(nTTemp[0]*nTTemp[1]))+1.0)*bmDX[2] + _bp->height - 
+	z = (floor((tc/DelT+DelT*1e-6)/(nTTemp[0]*nTTemp[1]))+zlaserOff)*bmDX[2] + _bp->height - 
 	  ceil(offset[2]/_xyz->dX[2])*_xyz->dX[2];
 	lam = {pow(bmSTD[0],2.0)+2*alpha*(_xyz->time - tc), 
 	       pow(bmSTD[1],2.0)+2*alpha*(_xyz->time - tc),
@@ -158,7 +159,7 @@ void TempField::SchwalbachTempCurr()
 	x = (.5*pow(-1,js2)+.5)*bmLx[0] - 
 	  pow(-1,js2)*fmod(js1,nTTemp[0])*bmDX[0] - offset[0];
 	y = floor(fmod(round(tc/DelT),(nTTemp[0]*nTTemp[1]))/nTTemp[0])*bmDX[1]-offset[1];
-	z = (floor((tc/DelT+DelT*1e-6)/(nTTemp[0]*nTTemp[1]))+1.0)*bmDX[2] + _bp->height - 
+	z = (floor((tc/DelT+DelT*1e-6)/(nTTemp[0]*nTTemp[1]))+zlaserOff)*bmDX[2] + _bp->height - 
 	  ceil(offset[2]/_xyz->dX[2])*_xyz->dX[2];
 	//if (_part->myid==0){if (j==0 & jt==0){std::cout<< tInd<<","<<x<<","<<y<<","<<z<<std::endl;}}
 	lam = {pow(bmSTD[0],2.0)+2*alpha*(_xyz->time - tc), 
@@ -188,7 +189,7 @@ void TempField::SchwalbachTempCurr()
 	x = (.5*pow(-1,js2)+.5)*bmLx[0] - 
 	  pow(-1,js2)*fmod(js1,nTTemp[0])*bmDX[0] - offset[0];
 	y = floor(fmod(round(tc/DelT),(nTTemp[0]*nTTemp[1]))/nTTemp[0])*bmDX[1]-offset[1];
-	z = (floor((tc/DelT+DelT*1e-6)/(nTTemp[0]*nTTemp[1]))+1.0)*bmDX[2] + _bp->height - 
+	z = (floor((tc/DelT+DelT*1e-6)/(nTTemp[0]*nTTemp[1]))+zlaserOff)*bmDX[2] + _bp->height - 
 	  ceil(offset[2]/_xyz->dX[2])*_xyz->dX[2];
 	//if (_part->myid==0){if (j==0 & jt==0){std::cout<< tInd<<","<<x<<","<<y<<","<<z<<std::endl;}}
 	lam = {pow(bmSTD[0],2.0)+2*alpha*(_xyz->time - tc), 
@@ -221,7 +222,7 @@ void TempField::SchwalbachTempCurr()
 	  y = fmod(round(tc/DelT),(nTTemp[0]))*bmDX[0] - offset[0];
 	  x = floor(fmod(round(tc/DelT),(nTTemp[0]*nTTemp[1]))/nTTemp[0])*bmDX[1]-offset[1];
 	}
-	z = (floor((tc/DelT+DelT*1e-6)/(nTTemp[0]*nTTemp[1]))+1.0)*bmDX[2] + _bp->height - 
+	z = (floor((tc/DelT+DelT*1e-6)/(nTTemp[0]*nTTemp[1]))+zlaserOff)*bmDX[2] + _bp->height - 
 	  ceil(offset[2]/_xyz->dX[2])*_xyz->dX[2];
 	lam = {pow(bmSTD[0],2.0)+2*alpha*(_xyz->time - tc), 
 	       pow(bmSTD[1],2.0)+2*alpha*(_xyz->time - tc),
@@ -256,7 +257,7 @@ void TempField::SchwalbachTempCurr()
 	    pow(-1,js2)*fmod(js1,nTTemp[0])*bmDX[0] - offset[0];
 	  x = floor(fmod(round(tc/DelT),(nTTemp[0]*nTTemp[1]))/nTTemp[0])*bmDX[1]-offset[1];
 	}
-	z = (floor((tc/DelT+DelT*1e-6)/(nTTemp[0]*nTTemp[1]))+1.0)*bmDX[2] + _bp->height - 
+	z = (floor((tc/DelT+DelT*1e-6)/(nTTemp[0]*nTTemp[1]))+zlaserOff)*bmDX[2] + _bp->height - 
 	  ceil(offset[2]/_xyz->dX[2])*_xyz->dX[2];
 	//if (_part->myid==0){if (j==0 & jt==0){std::cout<< tInd<<","<<x<<","<<y<<","<<z<<std::endl;}}
 	lam = {pow(bmSTD[0],2.0)+2*alpha*(_xyz->time - tc), 
@@ -292,7 +293,7 @@ void TempField::SchwalbachTempCurr(double tcurr,std::vector<double> & TempOut )
 	tc = tcurr - jt*DelT;
 	x = fmod((tc/DelT),(nTTemp[0]))*bmDX[0] - offset[0];
 	y = floor(fmod((tc/DelT),(nTTemp[0]*nTTemp[1]))/nTTemp[0])*bmDX[1]-offset[1];
-	z = (floor((tc/DelT)/(nTTemp[0]*nTTemp[1]))+1.0)*bmDX[2] + _bp->height - 
+	z = (floor((tc/DelT)/(nTTemp[0]*nTTemp[1]))+zlaserOff)*bmDX[2] + _bp->height - 
 	  ceil(offset[2]/_xyz->dX[2])*_xyz->dX[2];
 	lam = {pow(bmSTD[0],2.0)+2*alpha*(tcurr - tc), 
 	       pow(bmSTD[1],2.0)+2*alpha*(tcurr - tc),
@@ -306,7 +307,6 @@ void TempField::SchwalbachTempCurr(double tcurr,std::vector<double> & TempOut )
   if (patternID==1){
     int js1, js2;
     for (int j=0;j<Ntot;++j){
-      //if (_part->icellidLoc[j] >= iplay){continue;}
       j3 = floor(_part->icellidLoc[j]/(_xyz->nX[0]*_xyz->nX[1]));
       j2 = floor( (_part->icellidLoc[j]- _xyz->nX[0]*_xyz->nX[1]*j3)/_xyz->nX[0]);
       j1 = _part->icellidLoc[j] - _xyz->nX[0]*_xyz->nX[1]*j3 - _xyz->nX[0]*j2;
@@ -321,14 +321,14 @@ void TempField::SchwalbachTempCurr(double tcurr,std::vector<double> & TempOut )
 	x = (.5*pow(-1,js2)+.5)*bmLx[0] - 
 	  pow(-1,js2)*fmod(js1,nTTemp[0])*bmDX[0] - offset[0];
 	y = floor(fmod(round(tc/DelT),(nTTemp[0]*nTTemp[1]))/nTTemp[0])*bmDX[1]-offset[1];
-	z = (floor((tc/DelT+DelT*1e-6)/(nTTemp[0]*nTTemp[1]))+1.0)*bmDX[2] + _bp->height - 
+	z = (floor((tc/DelT+DelT*1e-6)/(nTTemp[0]*nTTemp[1]))+zlaserOff)*bmDX[2] + _bp->height - 
 	  ceil(offset[2]/_xyz->dX[2])*_xyz->dX[2];
 	lam = {pow(bmSTD[0],2.0)+2*alpha*(_xyz->time - tc), 
 	       pow(bmSTD[1],2.0)+2*alpha*(_xyz->time - tc),
 	       pow(bmSTD[2],2.0)+2*alpha*(_xyz->time - tc)};
 	rij = pow(x-x0,2.0)/2/lam[0] +pow(y-y0,2.0)/2/lam[1] +
 	  pow(z-z0,2.0)/2/lam[2];
-	TempCurr[j] += Ci/pow(lam[0]*lam[1]*lam[2],.5)*exp(-rij);
+	TempOut[j] += Ci/pow(lam[0]*lam[1]*lam[2],.5)*exp(-rij);
       } // for (int j1...
     } // for (int j...
   } // if (patternID==1 ...
@@ -350,7 +350,7 @@ void TempField::SchwalbachTempCurr(double tcurr,std::vector<double> & TempOut )
 	x = (.5*pow(-1,js2)+.5)*bmLx[0] - 
 	  pow(-1,js2)*fmod(js1,nTTemp[0])*bmDX[0] - offset[0];
 	y = floor(fmod(round(tc/DelT),(nTTemp[0]*nTTemp[1]))/nTTemp[0])*bmDX[1]-offset[1];
-	z = (floor((tc/DelT+DelT*1e-6)/(nTTemp[0]*nTTemp[1]))+1.0)*bmDX[2] + _bp->height - 
+	z = (floor((tc/DelT+DelT*1e-6)/(nTTemp[0]*nTTemp[1]))+zlaserOff)*bmDX[2] + _bp->height - 
 	  ceil(offset[2]/_xyz->dX[2])*_xyz->dX[2];
 	//if (_part->myid==0){if (j==0 & jt==0){std::cout<< tInd<<","<<x<<","<<y<<","<<z<<std::endl;}}
 	lam = {pow(bmSTD[0],2.0)+2*alpha*(_xyz->time - tc), 
@@ -358,14 +358,13 @@ void TempField::SchwalbachTempCurr(double tcurr,std::vector<double> & TempOut )
 	       pow(bmSTD[2],2.0)+2*alpha*(_xyz->time - tc)};
 	rij = pow(x-x0,2.0)/2/lam[0] +pow(y-y0,2.0)/2/lam[1] +
 	  pow(z-z0,2.0)/2/lam[2];
-	TempCurr[j] += Ci/pow(lam[0]*lam[1]*lam[2],.5)*exp(-rij);
+	TempOut[j] += Ci/pow(lam[0]*lam[1]*lam[2],.5)*exp(-rij);
       } // for (int j1...
     } // for (int j...
   } // if (patternID==2 ...
   if (patternID==3){
     int js;
     for (int j=0;j<Ntot;++j){
-      //if (_part->icellidLoc[j] >= iplay){continue;}
       j3 = floor(_part->icellidLoc[j]/(_xyz->nX[0]*_xyz->nX[1]));
       j2 = floor( (_part->icellidLoc[j]- _xyz->nX[0]*_xyz->nX[1]*j3)/_xyz->nX[0]);
       j1 = _part->icellidLoc[j] - _xyz->nX[0]*_xyz->nX[1]*j3 - _xyz->nX[0]*j2;
@@ -383,14 +382,14 @@ void TempField::SchwalbachTempCurr(double tcurr,std::vector<double> & TempOut )
 	  y = fmod(round(tc/DelT),(nTTemp[0]))*bmDX[0] - offset[0];
 	  x = floor(fmod(round(tc/DelT),(nTTemp[0]*nTTemp[1]))/nTTemp[0])*bmDX[1]-offset[1];
 	}
-	z = (floor((tc/DelT+DelT*1e-6)/(nTTemp[0]*nTTemp[1]))+1.0)*bmDX[2] + _bp->height - 
+	z = (floor((tc/DelT+DelT*1e-6)/(nTTemp[0]*nTTemp[1]))+zlaserOff)*bmDX[2] + _bp->height - 
 	  ceil(offset[2]/_xyz->dX[2])*_xyz->dX[2];
 	lam = {pow(bmSTD[0],2.0)+2*alpha*(_xyz->time - tc), 
 	       pow(bmSTD[1],2.0)+2*alpha*(_xyz->time - tc),
 	       pow(bmSTD[2],2.0)+2*alpha*(_xyz->time - tc)};
 	rij = pow(x-x0,2.0)/2/lam[0] +pow(y-y0,2.0)/2/lam[1] +
 	  pow(z-z0,2.0)/2/lam[2];
-	TempCurr[j] += Ci/pow(lam[0]*lam[1]*lam[2],.5)*exp(-rij);
+	TempOut[j] += Ci/pow(lam[0]*lam[1]*lam[2],.5)*exp(-rij);
       } // for (int j1...
     } // for (int j...
   } // if (patternID==3 ...
@@ -418,15 +417,14 @@ void TempField::SchwalbachTempCurr(double tcurr,std::vector<double> & TempOut )
 	    pow(-1,js2)*fmod(js1,nTTemp[0])*bmDX[0] - offset[0];
 	  x = floor(fmod(round(tc/DelT),(nTTemp[0]*nTTemp[1]))/nTTemp[0])*bmDX[1]-offset[1];
 	}
-	z = (floor((tc/DelT+DelT*1e-6)/(nTTemp[0]*nTTemp[1]))+1.0)*bmDX[2] + _bp->height - 
+	z = (floor((tc/DelT+DelT*1e-6)/(nTTemp[0]*nTTemp[1]))+zlaserOff)*bmDX[2] + _bp->height - 
 	  ceil(offset[2]/_xyz->dX[2])*_xyz->dX[2];
-	//if (_part->myid==0){if (j==0 & jt==0){std::cout<< tInd<<","<<x<<","<<y<<","<<z<<std::endl;}}
 	lam = {pow(bmSTD[0],2.0)+2*alpha*(_xyz->time - tc), 
 	       pow(bmSTD[1],2.0)+2*alpha*(_xyz->time - tc),
 	       pow(bmSTD[2],2.0)+2*alpha*(_xyz->time - tc)};
 	rij = pow(x-x0,2.0)/2/lam[0] +pow(y-y0,2.0)/2/lam[1] +
 	  pow(z-z0,2.0)/2/lam[2];
-	TempCurr[j] += Ci/pow(lam[0]*lam[1]*lam[2],.5)*exp(-rij);
+	TempOut[j] += Ci/pow(lam[0]*lam[1]*lam[2],.5)*exp(-rij);
       } // for (int j1...
     } // for (int j...
   } // if (patternID==4 ...
@@ -455,7 +453,7 @@ void TempField::SchwalbachDDtTemp()
       tc = tmin + jt*DelT;
       x = fmod((tc/DelT),(nTTemp[0]))*bmDX[0] - offset[0];
       y = floor(fmod((tc/DelT),(nTTemp[0]*nTTemp[1]))/nTTemp[0])*bmDX[1]-offset[1];
-      z = (floor((tc/DelT)/(nTTemp[0]*nTTemp[1]))+1.0)*bmDX[2] + _bp->height - 
+      z = (floor((tc/DelT)/(nTTemp[0]*nTTemp[1]))+zlaserOff)*bmDX[2] + _bp->height - 
 	  ceil(offset[2]/_xyz->dX[2])*_xyz->dX[2];
 
       lam = {pow(bmSTD[0],2.0)+2*alpha*(_xyz->time - tc), 

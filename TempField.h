@@ -37,7 +37,7 @@ class TempField
   std::vector<double> DDtTemp,dXM,TempCurr,lamXYZ,bmSTD,bmLx,bmX0,bmDX,bmPeriod,offset;
   std::vector<int> nXM,nTTemp;
   int NtM,indexM,patternID,nSource,ilaserLoc,tInd;
-  double dtM,bmV,bmP,bmEta,rcut,tcut,T0,Ci,DelT,alpha,T0targ;
+  double dtM,bmV,bmP,bmEta,rcut,tcut,T0,Ci,DelT,alpha,T0targ,zlaserOff;
 
  private:
   Grid *_xyz;
