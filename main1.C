@@ -92,9 +92,9 @@ int main()
   neighOrder = "first"; // can only equal "first"
   neighType = "Moore"; // either "Moore" or "VonNeumann"
   rho = 8000.0; // kg /m^3
-  cP = 502.0; // J/kg-K)
-  kappa = 18.0; // W/(m-K)
-  beamVel = 100e-3; //70e-3 // m/s
+  cP = 502; // 502.0; // J/kg-K)
+  kappa = 18; //18.0; // W/(m-K)
+  beamVel = 200e-3; //70e-3 // m/s
   //beamSTD = {10e-5,10e-5,12.5e-5}; //  {20e-6,20e-6,20e-6}; // m
   beamSTD = {5e-5,5e-5,3.5e-5}; // m
   T0targ = 3505.0; // target peak temperature for one ellipsoid
@@ -170,7 +170,7 @@ int main()
     }
     // update next step for voxels (time is updated in vox.ComputeExtents() )
     if (ictrl==3){
-      vox.UpdateVoxels4();
+      //vox.UpdateVoxels4();
       g.UpdateTime2(TempF.DelT);
     }
     if (ictrl==4){
