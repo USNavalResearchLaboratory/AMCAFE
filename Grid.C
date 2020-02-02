@@ -9,7 +9,7 @@
 
 // constructor
 Grid::Grid(const std::vector<double> & dxIn, const std::vector<int> & NxIn, 
-	   const double &tLIn,
+	   const double &tLIn, const double &tSIn,
 	   const double &mLIn,const double &c0In,const double &GammaIn,
 	   const double &kPIn,const double &dLIn,const double &muNIn, 
 	   const double & rhoIn, const double & cPIn, const double & kappaIn,
@@ -27,6 +27,7 @@ Grid::Grid(const std::vector<double> & dxIn, const std::vector<int> & NxIn,
     nX[j] = NxIn[j];
   }
   tL = tLIn;
+  tS = tSIn;
   mL = mLIn;
   c0 = c0In;
   Gamma = GammaIn;

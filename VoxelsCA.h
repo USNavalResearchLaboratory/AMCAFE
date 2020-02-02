@@ -33,6 +33,7 @@ class VoxelsCA
   void UpdateVoxels3();
   void UpdateVoxels4();
   void UpdateVoxels5();
+  void UpdateLayer();
   void NucleateGrains(std::vector<int> &nucInd, std::vector<double> &tnuc);
   void ComputeNucleation1();
   void ExtentsInitialize();
@@ -93,7 +94,17 @@ class VoxelsCA
     rRot[2][1] = ax[2]*ax[1]*(1-cos(omega)) + ax[0]*sin(omega);
     rRot[2][2] = cos(omega) + pow(ax[2],2.0)*(1-cos(omega));
   } // end inline void loadRotMat
-
+  inline double getVelocity(double &tL,double &mL,double &kP,double &Gamma,double &c0,
+			  double &T)
+  {
+    /*
+    double v=(5.51*pow(M_PI,2.0)*pow((-mL)*(1-kP),1.5)*
+       (Gamma))*( pow((tL - T),2.5)/pow(c0,1.5));
+    */
+    double v=(5.51*pow(M_PI,2.0)*pow((-mL)*(1-kP),1.5)*
+       (Gamma))*( pow((tL - T),2.5)/pow(c0,1.5));
+    return v;
+  } // end inline void getVelocity
 
   std::vector<int> gID,gNucleus;
   std::vector<int> vState; // 0=uninitialized; 1=liquid; 2=mushy; 3=solid

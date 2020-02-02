@@ -326,7 +326,6 @@ void Partition::PartitionGraph2(){
   ineigh2LocVals.assign(nGhost,0);
   ineigh2Locptr[0]=0;
   cc1=0;
-  cc=0;
   for (int j=0;j<nneighProc;++j){
     for (int j1 =0;j1<nGhost;++j1){
       if (ghostId[j1]==ineighProcId[j]){
@@ -335,11 +334,10 @@ void Partition::PartitionGraph2(){
 	cc1+=1;
       }
     }
-    cc+=1;
-    ineigh2Locptr[cc] = cc1;
+    ineigh2Locptr[j+1] = cc1;
   }
   iloc2Neighptr.assign(nneighProc+1,0);
-  iloc2NeighVals.assign(ncellLoc,0);
+  iloc2NeighVals.assign(ncellLoc*nneighProc,0);
   cc2=0;
   for (int jn=0;jn<nneighProc;++jn){
     i1 = iv[ineighProcId[jn]+1] - iv[ineighProcId[jn]];
@@ -356,19 +354,18 @@ void Partition::PartitionGraph2(){
     tmp = std::unique(cellNeigh.begin(),cellNeigh.end());
     cellNeigh.resize(std::distance(cellNeigh.begin(),tmp));
     nneigh = cellNeigh.size();
-    iloc2Neighptr[jn]=cc2;
     for (int j=0;j<nneigh;++j){
       i1 = std::distance(iv.begin(),std::upper_bound(iv.begin(),
 	  iv.end(),cellNeigh[j])) - 1; // i1= proc owns cellNeigh[j]
       if (i1 ==myid){
 	iloc2NeighVals[cc2] =std::distance(icellidLoc.begin(),
-		 std::find(icellidLoc.begin(),icellidLoc.end(),cellNeigh[j]));
+		 std::find(icellidLoc.begin(),icellidLoc.begin()+ncellLoc,cellNeigh[j]));
 	cc2+=1;
-      }
+      }      
     }
-    iloc2Neighptr[nneighProc]=cc2;
-    iloc2NeighVals.resize(cc2);
+    iloc2Neighptr[jn+1]=cc2;
   } // for (int jn ...
+  iloc2NeighVals.resize(cc2);
   cc2 = _xyz->nnodePerCell;
   ipointidLoc.assign(cc2*ncellLoc,0);
   for (int j =0;j<ncellLoc;++j){

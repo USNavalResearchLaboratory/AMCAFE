@@ -10,7 +10,7 @@ class Grid
  public:
   // default constructor
   Grid( const std::vector<double> & dxIn, const std::vector<int> & nXIn, 
-	const double &tL,
+	const double &tL, const double &tSIn,
 	const double &mL,const double &c0,const double &Gamma, 
 	const double &kP,const double &dL, const double & muN,
 	const double & rhoIn, const double & cPIn, const double & kappaIn,
@@ -52,7 +52,7 @@ class Grid
   std::vector<double> dX;
   std::vector<int> nX;
   int nDim,tInd,nnodePerCell,ictrl;
-  double tL; // liquid temp (K)
+  double tL,tS; // liquidus and solidus temp (K)
   double mL; // liquidus slope of (K/wt%)
   double c0; // initial concentration (wt %)
   double Gamma; // Gibbs-Thompson coefficient (K m)

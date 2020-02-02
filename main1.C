@@ -32,7 +32,7 @@ int main()
   int NtM,cc1,nDim;
   std::vector<int> nXM,nX;
   std::vector<double> dX,dXM,LX;
-  double tL,mL,c0,Gamma,dP,dL,dtM,muN,layerThickness,T0,dTempM,dTempS,rNmax;
+  double tL,tS,mL,c0,Gamma,dP,dL,dtM,muN,layerThickness,T0,dTempM,dTempS,rNmax;
   std::string filbaseTemp,filbaseOut,filout,neighOrder,neighType,filLogOut;
   double mu; //2e11;//5e9 // rate for baseplate voronoi;
   double heightBase;
@@ -78,14 +78,15 @@ int main()
   }
   NtM = 50;
   dtM = .05; // must set based on moose results
-  tL = 1609; // K
+  tL = 1733; // K
+  tS = 1693; // K
   dTempM = 500; //7.5; // 2.5 // K (mean undercooling for nucleation)
   dTempS = 300; //5.0; // 1.0 // K (standard dev undercooling for nucleation)
-  rNmax = 7e16; //7e14; // (m^{-3})  maximum nucleation density
+  rNmax = 1e0;//7e14; //7e16; // (m^{-3})  maximum nucleation density for new grains
   mL = -10.9; // (K / wt%)
   dL = 3e-9; // (m^2/s)
   Gamma = 1e-7;  // (K m)
-  muN = 9e-2; // 9 // 9e-2; // rate for nucleation
+  muN = 9e-2; // 9 // 9e-2; 
   dP = .48;
   c0 = 4.85; // (wt %)
   filbaseTemp = "/Users/kteferra/Documents/research/projects/AMICME/codes/CA/tempData/tempField0.";
@@ -93,18 +94,18 @@ int main()
   neighType = "Moore"; // either "Moore" or "VonNeumann"
   rho = 8000.0; // kg /m^3
   cP = 502; // 502.0; // J/kg-K)
-  kappa = 18; //18.0; // W/(m-K)
-  beamVel = 200e-3; //70e-3 // m/s
+  kappa = 18; //18; //18.0; // W/(m-K)
+  beamVel = 250e-3;//250e-3;//250e-3; //70e-3 // m/s
   //beamSTD = {10e-5,10e-5,12.5e-5}; //  {20e-6,20e-6,20e-6}; // m
   beamSTD = {5e-5,5e-5,3.5e-5}; // m
-  T0targ = 3505.0; // target peak temperature for one ellipsoid
+  T0targ = 1500;//2000.0; // target peak temperature for one ellipsoid
   beamEta = 1.0;
   layerThickness = 30e-6; // floor(beamSTD[2]/dX[2])*dX[2]; // (layer thickness to be multiple of dX[2])
-  Grid g(dX,nX,tL,mL,c0,Gamma,dP,dL,muN,rho,cP,kappa,layerThickness,neighOrder,dTempM,dTempS,rNmax,nDim,neighType,ictrl);
+  Grid g(dX,nX,tL,tS,mL,c0,Gamma,dP,dL,muN,rho,cP,kappa,layerThickness,neighOrder,dTempM,dTempS,rNmax,nDim,neighType,ictrl);
   Partition part(g,myid,nprocs);
   part.PartitionGraph2();
   heightBase = dX[2];// layerThickness;//  ;
-  mu = 1e4/LX[0]/LX[1]/heightBase;//2e13; // 2e11 , 2e14
+  mu = 1e4/LX[0]/LX[1]/dX[2];// heightBase;//2e13; // 2e11 , 2e14  // rate for nucleation for baseplate 
   BasePlate bp(g,heightBase,mu, part);
   TempField TempF(g,part,bp);
   wEst  = pow(8*beamPower/(exp(1.0)*M_PI*rho*cP*(tL-298.0)*beamVel),.5); // see EQ (1) in schwalbach
@@ -120,8 +121,10 @@ int main()
     //TempF.Test2ComputeTemp(1.02*tL,.97*tL,514880,0.0);
     TempF.Test2ComputeTemp(0.97*tL,.97*tL,0.0,0.0);
   } else{
-    TempF.InitializeSchwalbach(patternID,beamSTD,beamVel,T0targ,beamEta,LX,T0);
-    TempF.SchwalbachTempCurr();
+    //TempF.InitializeSchwalbach(patternID,beamSTD,beamVel,T0targ,beamEta,LX,T0);
+    //TempF.SchwalbachTempCurr();
+    TempF.InitializeAnalytic(patternID,beamSTD,beamVel,LX,T0);
+    TempF.AnalyticTempCurr();
   }
   VoxelsCA vox(g,TempF, part);
   if (ictrl==4){
@@ -159,7 +162,7 @@ int main()
 	filout = filbaseOut+std::to_string(TempF.tInd);
 	vox.WriteToVTU1(filout);
 	filout = filbaseOut+".csv";
-	vox.WriteCSVData(filout);
+	//vox.WriteCSVData(filout);
 	cc1+=1;
 	if (cc1 % 20 || TempF.tInd==(nTmax-1)){
 	  filout=filbaseOut;
@@ -170,7 +173,8 @@ int main()
     }
     // update next step for voxels (time is updated in vox.ComputeExtents() )
     if (ictrl==3){
-      //vox.UpdateVoxels4();
+      if (fmod(TempF.tInd,TempF.nTTemp[0]*TempF.nTTemp[1])==0){vox.UpdateLayer();}
+      vox.UpdateVoxels5();
       g.UpdateTime2(TempF.DelT);
     }
     if (ictrl==4){
@@ -183,7 +187,10 @@ int main()
     // update temperature field
     if (TempF.tInd != int(round(g.time/TempF.DelT))){
       TempF.tInd = int(round(g.time/TempF.DelT));
-      if (ictrl!=4){TempF.SchwalbachTempCurr();} // KT AFTER TEST REMOVE IF STATEMENT
+      if (ictrl!=4){
+	//TempF.SchwalbachTempCurr();
+	TempF.AnalyticTempCurr();
+      } // KT AFTER TEST REMOVE IF STATEMENT
       irep=0;
     } // if (TempF.tInd !=
     auto texec2 = std::chrono::high_resolution_clock::now();
