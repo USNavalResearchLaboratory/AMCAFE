@@ -33,7 +33,7 @@ class VoxelsCA
   void UpdateVoxels3();
   void UpdateVoxels4();
   void UpdateVoxels5();
-  void UpdateLayer();
+  void UpdateLayer(std::string &filCSV);
   void NucleateGrains(std::vector<int> &nucInd, std::vector<double> &tnuc);
   void ComputeNucleation1();
   void ExtentsInitialize();
@@ -41,6 +41,7 @@ class VoxelsCA
   void WriteToVTU0(const std::string &filname);
   void WriteToVTU1(const std::string &filname);
   void WriteCSVData(const std::string &filname);
+  void WriteCSVData1(const std::string &filname);
   void WriteToPVD(const std::string &filname, const std::vector<int> &, const std::vector<double> &);
   inline void loadS(std::vector<std::vector<double>>&S,std::vector<std::vector<int>> &sInd)
   {

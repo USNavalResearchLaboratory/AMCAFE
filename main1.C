@@ -96,11 +96,11 @@ int main()
   cP = 502; // 502.0; // J/kg-K)
   kappa = 18; //18; //18.0; // W/(m-K)
   beamVel = 250e-3;//250e-3;//250e-3; //70e-3 // m/s
+  layerThickness = 30e-6; // floor(beamSTD[2]/dX[2])*dX[2]; // (layer thickness to be multiple of dX[2])
   //beamSTD = {10e-5,10e-5,12.5e-5}; //  {20e-6,20e-6,20e-6}; // m
-  beamSTD = {5e-5,5e-5,3.5e-5}; // m
+  beamSTD = {5e-5,5e-5,layerThickness*1.5}; // m
   T0targ = 1500;//2000.0; // target peak temperature for one ellipsoid
   beamEta = 1.0;
-  layerThickness = 30e-6; // floor(beamSTD[2]/dX[2])*dX[2]; // (layer thickness to be multiple of dX[2])
   Grid g(dX,nX,tL,tS,mL,c0,Gamma,dP,dL,muN,rho,cP,kappa,layerThickness,neighOrder,dTempM,dTempS,rNmax,nDim,neighType,ictrl);
   Partition part(g,myid,nprocs);
   part.PartitionGraph2();
@@ -145,7 +145,8 @@ int main()
   filLogOut="CA3D.log";
   out2 = {1,1,1}; // the increment to skip output per direction
   if (part.myid==0){fplog.open(filLogOut.c_str());}
-  while (TempF.tInd<nTmax && icheck!=0){
+  //while (TempF.tInd<nTmax && icheck!=0){
+  while (TempF.tInd<=nTmax){
     icheck=!std::all_of(vox.vState.begin(),vox.vState.end(),[](int n){return n==3;});
     ichecktmp = icheck;
     MPI_Allreduce(&ichecktmp,&icheck,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
@@ -173,7 +174,10 @@ int main()
     }
     // update next step for voxels (time is updated in vox.ComputeExtents() )
     if (ictrl==3){
-      if (fmod(TempF.tInd,TempF.nTTemp[0]*TempF.nTTemp[1])==0){vox.UpdateLayer();}
+      if (fmod(TempF.tInd,TempF.nTTemp[0]*TempF.nTTemp[1])==0){
+	filout = filbaseOut+".csv";
+	vox.UpdateLayer(filout); // WriteCSVData1 called in UpdateLayer
+      }
       vox.UpdateVoxels5();
       g.UpdateTime2(TempF.DelT);
     }
@@ -190,12 +194,12 @@ int main()
       if (ictrl!=4){
 	//TempF.SchwalbachTempCurr();
 	TempF.AnalyticTempCurr();
-      } // KT AFTER TEST REMOVE IF STATEMENT
+      }
       irep=0;
     } // if (TempF.tInd !=
     auto texec2 = std::chrono::high_resolution_clock::now();
     auto delTexec = std::chrono::duration_cast<std::chrono::seconds>( texec2 - texec1 ).count();
-    if (part.myid==0){std::cout << TempF.tInd<<","<< g.time/TempF.DelT<< std::endl;}
+    if (part.myid==0){std::cout << TempF.tInd<< std::endl;}
     if (part.myid==0){fplog << "Time index= "<<TempF.tInd<<",Total clock time passed(s)= "<<delTexec<<std::endl;}
     } // while
   MPI_Barrier(MPI_COMM_WORLD);

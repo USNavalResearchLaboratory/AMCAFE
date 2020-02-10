@@ -100,14 +100,14 @@ void TempField::InitializeAnalytic(int & patternIDIn, std::vector<double> & beam
   zlaserOff=1.0; // 1.0 (this specifies where laser z value is - see SchwalbachTempCurr)
   if (patternID==0 || patternID==1 || patternID==2 || patternID==3 || patternID==4){
     DelT = 4.0/3.0*bmSTD[0]/bmV;
-    //bmDX = {DelT*bmV,4.0/3.0*bmSTD[1],_xyz->layerT};          
-    bmDX = {DelT*bmV,2.7*bmSTD[1],_xyz->layerT};
+    bmDX = {DelT*bmV,1.5*bmSTD[1],_xyz->layerT};
     offset={0.0,0.0,0.0};
     bmLx={LxIn[0]+1*bmDX[0],LxIn[1]+1*bmDX[1],LxIn[2]};
     if (patternID==1){
-      offset={0.0,-_xyz->nX[1]*_xyz->dX[1]/2.0,0.0}; // positive value means starting outside domain                                                               
+      //offset={0.0,-_xyz->nX[1]*_xyz->dX[1]/2.0,0.0}; // positive value means starting outside domain
+      offset={0.0,0.0,0.0};
       shiftL={3*bmDX[0],0.0,0.0};
-      bmLx={LxIn[0]+shiftL[0],LxIn[1]+1*bmDX[1],LxIn[2]};
+      bmLx={LxIn[0]+shiftL[0],LxIn[1],LxIn[2]};
     } // if (patternID==1...                                                                                                                                       
     nTTemp = {int(floor(bmLx[0]/bmDX[0] ))+1,int(floor(bmLx[1]/bmDX[1]))+1,
             int(floor(bmLx[2]/bmDX[2]))};
@@ -121,7 +121,9 @@ void TempField::AnalyticTempCurr()
   int Ntot = _part->nGhost+_part->ncellLoc, j1,j2,j3,iplay;
   double x0,y0,z0,x,y,z,dsq,dsq2,bx,by,xi;
   std::vector<double> rij1(3),rij2(3),xs1(3),xs2(3);
-  ilaserLoc = _bp->Nzh + floor( (floor( round(_xyz->time/DelT)/(nTTemp[0]*nTTemp[1]))+1)*_xyz->layerT/_xyz->dX[2]);
+  //ilaserLoc = _bp->Nzh + floor( (floor( round(_xyz->time/DelT)/(nTTemp[0]*nTTemp[1]))+1)*_xyz->layerT/_xyz->dX[2]);
+  ilaserLoc = _bp->Nzh + (floor( round(_xyz->time/DelT)/(nTTemp[0]*nTTemp[1]))+1)*_xyz->nZlayer;
+
   iplay=_xyz->nX[0]*_xyz->nX[1]*ilaserLoc;
   TempCurr.assign(Ntot,T0);
   xi = _xyz->tL*(1+std::numeric_limits<double>::epsilon() );
@@ -151,7 +153,7 @@ void TempField::AnalyticTempCurr()
       rij2[1] = fabs(rij1[1]);
       rij2[2] = fabs(rij1[2]);
       //DOUBLE CHECK THIS AREA                      
-      if (rij1[0]>=0){
+      if (rij1[0]*pow(-1,(js2+1))  >=0){
 	dsq = pow(pow(rij2[0]/a1[0],2.0)+pow(rij2[1]/a1[1],2.0)+pow(rij2[2]/a1[2],2.0) ,.5);
 	dsq2 = pow(pow(rij2[0]/a2[0],2.0)+pow(rij2[1]/a2[1],2.0)+pow(rij2[2]/a2[2],2.0) ,.5);
 	if (dsq<1.0){TempCurr[j]=xi;}

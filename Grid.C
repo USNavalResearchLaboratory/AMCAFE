@@ -41,6 +41,7 @@ Grid::Grid(const std::vector<double> & dxIn, const std::vector<int> & NxIn,
   dTempS = dTempSIn;
   rNmax = rNmaxIn;
   layerT = floor(layerThicknessIn/dX[2])*dX[2];
+  nZlayer = round(layerT/dX[2]);
   deltaXmin = *std::min_element(dX.begin(),dX.end());
   deltaTcheck = pow(deltaXmin,2.0)/dL;
   time =0.0;

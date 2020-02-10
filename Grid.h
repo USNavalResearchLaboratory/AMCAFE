@@ -51,7 +51,7 @@ class Grid
   double deltaXmin,deltaTcheck,dt,time;
   std::vector<double> dX;
   std::vector<int> nX;
-  int nDim,tInd,nnodePerCell,ictrl;
+  int nDim,tInd,nnodePerCell,ictrl,nZlayer;
   double tL,tS; // liquidus and solidus temp (K)
   double mL; // liquidus slope of (K/wt%)
   double c0; // initial concentration (wt %)

@@ -507,7 +507,7 @@ void VoxelsCA::UpdateVoxels5()
     SetLiquid4(); 
   } else{
     SetLiquid3();  
-    ZeroVoxels1(); 
+    //ZeroVoxels1(); // voxels are zero'ed in update layer
   }
   //*******************  AFTER TEST, ELIMINATE THIS IF/ELSE AND TEST CASES
   // solid (vState=3) to mushy (vState=2) if one neighbor liquid (vState=1)
@@ -620,7 +620,7 @@ void VoxelsCA::UpdateVoxels5()
 	    dr = dlocX[0]+dlocX[1]+dlocX[2] - ExtA[j];
 	    T[j]>=_xyz->tL ? velY=0.0: velY=(5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
 		 (_xyz->Gamma))*( pow((_xyz->tL - T[j]),2.5)/pow(_xyz->c0,1.5));
-	    vhat = velY;
+	    vhat = 100*velY;
 	    timeUntil = dr/vhat;
 	    if (timeUntil < DtMin){
 	      DtMin = timeUntil;
@@ -655,7 +655,7 @@ void VoxelsCA::UpdateVoxels5()
 						 _xyz->kP,_xyz->Gamma,
 						 _xyz->c0,T[j]);
 
-	vhat = velY;
+	vhat = 100*velY;
 	ExtA[j]+=vhat*DtMin;
 	ExtA[j] = std::max(ExtA[j],0.0);
       } // if (std::any_of ...	
@@ -876,7 +876,7 @@ void VoxelsCA::ConvertSolid1(const int &iswitch)
   } // if (iswitch==0)
 }; // ConvertSolid1
 
-void VoxelsCA::UpdateLayer(){
+void VoxelsCA::UpdateLayer(std::string &filCSV){
   /*
     function adds powder to layer by making every voxel in layer a unique grain
   */
@@ -884,7 +884,7 @@ void VoxelsCA::UpdateLayer(){
   // purge indices of cTheta associated with grains having no volume
   std::vector<double> gVol(nGrain,0.0),gVolT(nGrain,0),ctmp;
   std::vector<int> gtmp,itmp1(nGrain,0);
-  int Ntot,Ntot2,nGtmp,i1t,nVlayer,nZlayer;
+  int Ntot,Ntot2,nGtmp,i1t,nVlayer;
   double vvol;
   Ntot = _part->ncellLoc;
   Ntot2 = _part->ncellLoc + _part->nGhost;
@@ -913,8 +913,8 @@ void VoxelsCA::UpdateLayer(){
     gID[j] =  i1t;
   }
   // create new grains for each voxel in layer
-  nZlayer = round(_xyz->layerT/_xyz->dX[2]);
-  nVlayer = _xyz->nX[0]*_xyz->nX[1]*nZlayer;
+  WriteCSVData1(filCSV);
+  nVlayer = _xyz->nX[0]*_xyz->nX[1]*_xyz->nZlayer;
   std::default_random_engine gen1(3134525);
   unsigned int sdloc;
   sdloc = unsigned(double(gen1())/double(gen1.max())*pow(2.0,32.0));
@@ -927,7 +927,7 @@ void VoxelsCA::UpdateLayer(){
   // LOOK INTO WHETHER GNUCLEUS IS IMPORTANT IN WHICH
   // CASE IT WILL BE THE VOXEL CENTERS
   int j1,j2,j3,iz1,jvox0;
-  iz1 = _temp->ilaserLoc - nZlayer;
+  iz1 = _temp->ilaserLoc - _xyz->nZlayer;
   jvox0 = _xyz->nX[0]*_xyz->nX[1]*iz1;
   for (int j=0;j<Ntot2;++j){
     j3 = floor(_part->icellidLoc[j]/(_xyz->nX[0]*_xyz->nX[1]));
@@ -943,21 +943,16 @@ void VoxelsCA::UpdateLayer(){
       } // if (j<Ntot)
     } // if (j3>=iz1 && j3<_temp->ilaserLoc ...
   } // for (int j...
-
-
-  /*
+  nGrain += _xyz->nX[0]*_xyz->nX[1]*_xyz->nZlayer;
+  
   // assign appropriate vState (including zeroing states above ilaserLoc
- 
-  int iz2;
-  iz2 = _xyz->nX[0]*_xyz->nX[1]*_temp->ilaserLoc;
+  iz1 = _xyz->nX[0]*_xyz->nX[1]*_temp->ilaserLoc;
   for (int j=0;j<Ntot2;++j){
-    if (_part->icellidLoc[j] >=iz2){
+    if (_part->icellidLoc[j] >=iz1){
       vState[j] = 0;
       gID[j] = 0;
     }    
   } // for j  
-  */
-
 }; // UpdateLayer
 
 void VoxelsCA::SetLiquid(){
@@ -996,19 +991,16 @@ void VoxelsCA::SetLiquid2(){
 
 void VoxelsCA::SetLiquid3(){
   // makes cell liquid if temperature exceeds liquidus
-  int Ntot = _part->ncellLoc + _part->nGhost,n1,j,nZlayer,iz1,iz2; 
+  int Ntot = _part->ncellLoc + _part->nGhost,n1,j,nZlayer,iz1; 
   int Ntot1 = _part->ncellLoc;
   n1 = _xyz->nX[0]*_xyz->nX[1];
   nZlayer = round(_xyz->layerT/_xyz->dX[2]);
-  iz1 = (_temp->ilaserLoc - nZlayer)*_xyz->nX[0]*_xyz->nX[1];
-  iz2 = _temp->ilaserLoc*_xyz->nX[0]*_xyz->nX[1];
-
-
+  iz1 = _temp->ilaserLoc*_xyz->nX[0]*_xyz->nX[1];
   for (int j=0;j<Ntot;++j){
     if (_temp->TempCurr[j] >= _xyz->tL ) { 
       if (_part->icellidLoc[j]<n1){
 	vState[j]=2;
-      } else if (_part->icellidLoc[j] >=iz1 && _part->icellidLoc[j]<iz2){
+      } else if ( _part->icellidLoc[j]<iz1){
 	vState[j] = 1;
 	gID[j] = 0; // flag that it loses its grain
       } // if (_part->icellidLoc[j]<n1..
@@ -1561,6 +1553,31 @@ void VoxelsCA::WriteCSVData(const std::string &filename)
   } // if (_part->myid ..)
   MPI_Barrier(MPI_COMM_WORLD);
 } // WriteCSVData
+
+void VoxelsCA::WriteCSVData1(const std::string &filename)
+{
+  // write out csv file with grain id, axis-angle, vstate
+  int j3,j2,j1,Ntot;
+  double x,y,z,vvol;
+  std::vector<double> gVol(nGrain,0.0),gVolT(nGrain,0);
+  std::ofstream fp;
+  Ntot = _part->ncellLoc;
+  vvol = _xyz->dX[0]*_xyz->dX[1]*_xyz->dX[2];
+  for (int j=0;j<Ntot;++j){
+    if (gID[j]>0){gVol[gID[j]-1]+=vvol;}
+  }
+  MPI_Allreduce(&gVol[0],&gVolT[0],nGrain,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+  if (_part->myid==0){
+    fp.open(filename.c_str());
+    fp << "grain nucleation (x,y,z), axis-angle (omega,n), grain Volume" << std::endl;
+    for (int j=0;j<nGrain;++j){
+      fp << cTheta[4*j] << "," << cTheta[4*j+1] << "," << cTheta[4*j+2] << "," << 
+	cTheta[4*j+3]<<","<<gVolT[j] << std::endl;
+    } // end for (int j...
+    fp.close();
+  } // if (_part->myid ..)
+  MPI_Barrier(MPI_COMM_WORLD);
+} // WriteCSVData1
 
 void VoxelsCA::NucleateGrains(std::vector<int> &nIn, std::vector<double> &tIn)
 {
