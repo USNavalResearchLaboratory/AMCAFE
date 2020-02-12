@@ -29,3 +29,13 @@ When i push updates from neocortex to godzilla2:
 
 note that you probably need to do 'sudo git push ...'
    
+
+
+--
+Note that I added a new main file called main1Scale.C as well as a temperature field file
+TempFieldScale.C and TempFieldScale.h. Also, there is a new line in the Makefile to compile
+this and a new run file runCafeScale.sh to run this. This is to enable an automated way to 
+do a scale test of the simulation in terms of parallelization scalability. This will be done
+in HPC. The testing will be the time it takes to run a typical time step. A very large base 
+plate is used and then time between time step 1 and time step 2 will be used for comparison
+as a function of number of processors.

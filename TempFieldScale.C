@@ -1,7 +1,7 @@
 // member functions for TempField
 
 #include "Grid.h"
-#include "TempField.h"
+#include "TempFieldScale.h"
 #include "fstream"
 // #include "iostream"
 #include "math.h"
@@ -104,8 +104,8 @@ void TempField::InitializeAnalytic(int & patternIDIn, std::vector<double> & beam
     offset={0.0,0.0,0.0};
     bmLx={LxIn[0]+1*bmDX[0],LxIn[1]+1*bmDX[1],LxIn[2]};
     if (patternID==1){
-      //offset={-_xyz->nX[0]*_xyz->dX[0]/2.0,-_xyz->nX[1]*_xyz->dX[1]/2.0,0.0}; // positive value means starting outside domain
-      offset={0.0,0.0,0.0};
+      offset={-_xyz->nX[0]*_xyz->dX[0]/2.0,-_xyz->nX[1]*_xyz->dX[1]/2.0,0.0}; // positive value means starting outside domain
+      //offset={0.0,0.0,0.0};
       shiftL={3*bmDX[0],0.0,0.0};
       bmLx={LxIn[0]+shiftL[0],LxIn[1],LxIn[2]};
     } // if (patternID==1...                                                                                                                                       

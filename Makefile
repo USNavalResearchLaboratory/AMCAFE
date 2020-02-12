@@ -12,11 +12,19 @@ METISLIB = /opt/petsc/arch-linux2-c-opt/lib/libmetis.so
 
 #SOURCES = $(wildcard *.C)
 SOURCES = main1.C Grid.C BasePlate.C TempField.C Partition.C SampleOrientation.C VoxelsCA.C 
+SOURCES2 = main1Scale.C Grid.C BasePlate.C TempFieldScale.C Partition.C SampleOrientation.C VoxelsCA.C 
 OBJECTS = $(SOURCES:.C=.o)
+OBJECTS2 = $(SOURCES2:.C=.o)
+
 
 cafe: $(OBJECTS)
 	@rm -f $@
 	$(CPP) -o $@ $^ $(METISLIB)
+
+cafeScale: $(OBJECTS2)
+	@rm -f $@
+	$(CPP) -o $@ $^ $(METISLIB)
+
 clean:
 	rm -f *.o
 
