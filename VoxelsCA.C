@@ -1247,7 +1247,7 @@ void VoxelsCA::WriteToVTU1(const std::string &filename)
   unsigned char cell_type;
   std::vector< float> TempOut(nC,0);
   float IPFmapBD[3*nC];
-  double vBD[3]={0.0,0.0,1.0},omega,ax[3],vCD[3],mxAng,blue,green,red,rRot[3][3];
+  double vBD[3]={0.0,0.0,1.0},omega,ax[3],vCD[3],mxAng,blue,green,red,rRot[3][3],mscale;
   for (int j=0;j<nC;++j){
     TempOut[j] = _temp->TempCurr[j];
     if (gID[j]<1){
@@ -1280,9 +1280,10 @@ void VoxelsCA::WriteToVTU1(const std::string &filename)
       green = mxAng - blue;
       blue *= (1-red)/mxAng;
       green *= (1-red)/mxAng;
-      IPFmapBD[3*j] = red;
-      IPFmapBD[3*j+1] = green;
-      IPFmapBD[3*j+2] = blue;
+      mscale = std::max(red,std::max(green,blue));
+      IPFmapBD[3*j] = red/mscale;
+      IPFmapBD[3*j+1] = green/mscale;
+      IPFmapBD[3*j+2] = blue/mscale;
     }
   }
   if (_xyz->nnodePerCell==4){cell_type=9;}
