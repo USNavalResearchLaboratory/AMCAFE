@@ -95,7 +95,7 @@ int main(int argc, char *argv[])
   Grid g(dX,nX,tL,tS,mL,c0,Gamma,dP,dL,muN,rho,cP,kappa,layerThickness,neighOrder,dTempM,dTempS,rNmax,nDim,neighType,ictrl);
   Partition part(g,myid,nprocs);
   part.PartitionGraph2();
-  heightBase = 10*dX[2];// layerThickness;//  ;
+  heightBase = 24*dX[2];// layerThickness;//  ;
   mu = 1e4/LX[0]/LX[1]/dX[2];// heightBase;//2e13; // 2e11 , 2e14  // rate for nucleation for baseplate 
   BasePlate bp(g,heightBase,mu, part);
   TempField TempF(g,part,bp);
@@ -135,7 +135,10 @@ int main(int argc, char *argv[])
   filbaseOut = "CA3D";
   filLogOut="CA3D"+filextScale+".log";
   out2 = {1,1,1}; // the increment to skip output per direction
-  if (part.myid==0){fplog.open(filLogOut.c_str());}
+  if (part.myid==0){
+    fplog.open(filLogOut.c_str());
+    fplog << "Time index=,Total clock time passed(s) "<<std::endl;
+  }
   //while (TempF.tInd<nTmax && icheck!=0){
   while (TempF.tInd<=2){
     icheck=!std::all_of(vox.vState.begin(),vox.vState.end(),[](int n){return n==3;});
@@ -191,7 +194,7 @@ int main(int argc, char *argv[])
     auto texec2 = std::chrono::high_resolution_clock::now();
     auto delTexec = std::chrono::duration_cast<std::chrono::seconds>( texec2 - texec1 ).count();
     if (part.myid==0){std::cout << TempF.tInd<< std::endl;}
-    if (part.myid==0){fplog << "Time index= "<<TempF.tInd<<",Total clock time passed(s)= "<<delTexec<<std::endl;}
+    if (part.myid==0){fplog << TempF.tInd<<","<<delTexec<<std::endl;}
     } // while
   MPI_Barrier(MPI_COMM_WORLD);
   MPI_Finalize();

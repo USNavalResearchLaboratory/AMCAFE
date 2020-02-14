@@ -1539,7 +1539,7 @@ void VoxelsCA::WriteCSVData(const std::string &filename)
   MPI_Allreduce(&gVol[0],&gVolT[0],nGrain,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
   if (_part->myid==0){
     fp.open(filename.c_str());
-    fp << "grain nucleation (x,y,z), axis-angle (omega,n), grain Volume" << std::endl;
+    fp << "axis-angle (omega,n), grain Volume" << std::endl;
     for (int j=0;j<nGrain;++j){
       j3 = floor(gNucleus[j]/(_xyz->nX[0]*_xyz->nX[1]));
       j2 = floor( (gNucleus[j]-_xyz->nX[0]*_xyz->nX[1]*j3)  /_xyz->nX[0]);

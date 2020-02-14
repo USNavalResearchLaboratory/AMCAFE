@@ -96,24 +96,25 @@ int main()
   cP = 502; // 502.0; // J/kg-K)
   kappa = 18; //18; //18.0; // W/(m-K)
   beamVel = 250e-3;//250e-3;//250e-3; //70e-3 // m/s
+  /*
   layerThickness = 30e-6; // floor(beamSTD[2]/dX[2])*dX[2]; // (layer thickness to be multiple of dX[2])
-  //beamSTD = {10e-5,10e-5,12.5e-5}; //  {20e-6,20e-6,20e-6}; // m
   beamSTD = {5e-5,5e-5,layerThickness*1.5}; // m
+  heightBase = dX[2];// layerThickness;//  ; 
+  patternID = 1; // see TempField.C for description
+  */
+  layerThickness = 25e-6;
+  beamSTD = {7.5e-5,7.5e-5,7.5e-5};
+  heightBase = layerThickness;
+  patternID = 2; // see TempField.C for description
   T0targ = 1500;//2000.0; // target peak temperature for one ellipsoid
   beamEta = 1.0;
   Grid g(dX,nX,tL,tS,mL,c0,Gamma,dP,dL,muN,rho,cP,kappa,layerThickness,neighOrder,dTempM,dTempS,rNmax,nDim,neighType,ictrl);
   Partition part(g,myid,nprocs);
   part.PartitionGraph2();
-  heightBase = dX[2];// layerThickness;//  ;
   mu = 1e4/LX[0]/LX[1]/dX[2];// heightBase;//2e13; // 2e11 , 2e14  // rate for nucleation for baseplate 
   BasePlate bp(g,heightBase,mu, part);
   TempField TempF(g,part,bp);
   wEst  = pow(8*beamPower/(exp(1.0)*M_PI*rho*cP*(tL-298.0)*beamVel),.5); // see EQ (1) in schwalbach
-  /*
-    Notes on patternID: please see TempField.C for description of each
-    - Lx[0] must equal Lx[1] for patternID==3 or 4
-   */
-  patternID = 1; // 0,1,2,3,4;
   T0 = 300.0; // initial temperature in (K)
   if (ictrl==4){
     // this is a test case scenario
@@ -144,7 +145,10 @@ int main()
   filbaseOut = "CA3D";
   filLogOut="CA3D.log";
   out2 = {1,1,1}; // the increment to skip output per direction
-  if (part.myid==0){fplog.open(filLogOut.c_str());}
+  if (part.myid==0){
+    fplog.open(filLogOut.c_str());
+    fplog << "Time index= ,Total clock time passed(s)"<<std::endl;
+  }
   //while (TempF.tInd<nTmax && icheck!=0){
   while (TempF.tInd<=nTmax){
     icheck=!std::all_of(vox.vState.begin(),vox.vState.end(),[](int n){return n==3;});
@@ -200,7 +204,7 @@ int main()
     auto texec2 = std::chrono::high_resolution_clock::now();
     auto delTexec = std::chrono::duration_cast<std::chrono::seconds>( texec2 - texec1 ).count();
     if (part.myid==0){std::cout << TempF.tInd<< std::endl;}
-    if (part.myid==0){fplog << "Time index= "<<TempF.tInd<<",Total clock time passed(s)= "<<delTexec<<std::endl;}
+    if (part.myid==0){fplog << TempF.tInd<<","<<delTexec<<std::endl;}
     } // while
   MPI_Barrier(MPI_COMM_WORLD);
   MPI_Finalize();
