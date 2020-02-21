@@ -53,11 +53,7 @@ int main(int argc, char *argv[])
     LX = {.002,.002,.002}; // KT: THIS IS FOR TEST
   } else {
   nX = {128,128,64};
-  //nX = {64,64,32};
-  LX = {.002,.002,.001};
   LX = {nX[0]*1.875e-6,nX[1]*1.875e-6,nX[2]*1.875e-6};
-  //nX = {128,32,16};
-  //LX = {.001,.00025,12.5e-5};  
   }
   nXM = {20,20,20};
   nDim = nX.size();
@@ -88,15 +84,19 @@ int main(int argc, char *argv[])
   kappa = 18; //18; //18.0; // W/(m-K)
   beamVel = 250e-3;//250e-3;//250e-3; //70e-3 // m/s
   layerThickness = 30e-6; // floor(beamSTD[2]/dX[2])*dX[2]; // (layer thickness to be multiple of dX[2])
-  //beamSTD = {10e-5,10e-5,12.5e-5}; //  {20e-6,20e-6,20e-6}; // m
   beamSTD = {5e-5,5e-5,layerThickness*1.5}; // m
+  //patternID = 1; // 0,1,2,3,4;
+  //layerThickness = 25e-6; // floor(beamSTD[2]/dX[2])*dX[2]; // (layer thickness to be multiple of dX[2])
+  //beamSTD = {7.5e-5,7.5e-5,7.5e-5}; //  {20e-6,20e-6,20e-6}; // m
+  patternID = 2; // 0,1,2,3,4;
   T0targ = 1500;//2000.0; // target peak temperature for one ellipsoid
   beamEta = 1.0;
   Grid g(dX,nX,tL,tS,mL,c0,Gamma,dP,dL,muN,rho,cP,kappa,layerThickness,neighOrder,dTempM,dTempS,rNmax,nDim,neighType,ictrl);
   Partition part(g,myid,nprocs);
   part.PartitionGraph2();
-  heightBase = 24*dX[2];// layerThickness;//  ;
+  heightBase = 2*dX[2];// layerThickness;//  ;
   mu = 1e4/LX[0]/LX[1]/dX[2];// heightBase;//2e13; // 2e11 , 2e14  // rate for nucleation for baseplate 
+  mu = .25*1e4/LX[0]/LX[1]/dX[2];// heightBase;//2e13; // 2e11 , 2e14  // rate for nucleation for baseplate 
   BasePlate bp(g,heightBase,mu, part);
   TempField TempF(g,part,bp);
   wEst  = pow(8*beamPower/(exp(1.0)*M_PI*rho*cP*(tL-298.0)*beamVel),.5); // see EQ (1) in schwalbach
@@ -104,7 +104,6 @@ int main(int argc, char *argv[])
     Notes on patternID: please see TempField.C for description of each
     - Lx[0] must equal Lx[1] for patternID==3 or 4
    */
-  patternID = 1; // 0,1,2,3,4;
   T0 = 300.0; // initial temperature in (K)
   if (ictrl==4){
     // this is a test case scenario
@@ -172,7 +171,7 @@ int main(int argc, char *argv[])
 	filout = filbaseOut+".csv";
 	vox.UpdateLayer(filout); // WriteCSVData1 called in UpdateLayer
       }
-      vox.UpdateVoxels5();
+      vox.UpdateVoxels6();
       g.UpdateTime2(TempF.DelT);
     }
     if (ictrl==4){
