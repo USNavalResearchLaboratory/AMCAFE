@@ -34,6 +34,7 @@ class VoxelsCA
   void UpdateVoxels4();
   void UpdateVoxels5();
   void UpdateVoxels6();
+  void UpdateVoxels7();
   void UpdateLayer(std::string &filCSV);
   void NucleateGrains(std::vector<int> &nucInd, std::vector<double> &tnuc);
   void ComputeNucleation1();
@@ -108,7 +109,7 @@ class VoxelsCA
     return v;
   } // end inline void getVelocity
 
-  std::vector<int> gID,gNucleus;
+  std::vector<int> gID,gNucleus,ineighID,ineighptr;
   std::vector<int> vState; // 0=uninitialized; 1=liquid; 2=mushy; 3=solid
   std::vector<double> cTheta,extents,centroidOct;
   double vmax;
