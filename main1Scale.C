@@ -173,7 +173,6 @@ int main(int argc, char *argv[])
       }
       vox.UpdateVoxels7();
       g.UpdateTime2(TempF.DelT);
-
     }
     if (ictrl==4){
       //std::cout << TempF.tInd<<",00,"<<g.time<<","<<g.time/TempF.DelT<<std::endl;
