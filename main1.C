@@ -168,7 +168,6 @@ int main()
 	filtime.push_back(g.time);
 	filout = filbaseOut+std::to_string(TempF.tInd);
 	vox.WriteToVTU1(filout);
-	filout = filbaseOut+".csv";
 	//vox.WriteCSVData(filout);
 	cc1+=1;
 	if (cc1 % 20 || TempF.tInd==(nTmax-1)){
@@ -181,7 +180,7 @@ int main()
     // update next step for voxels (time is updated in vox.ComputeExtents() )
     if (ictrl==3){
       if (fmod(TempF.tInd,TempF.nTTemp[0]*TempF.nTTemp[1])==0){
-	filout = filbaseOut+".csv";
+	filout = filbaseOut+"_t"+std::to_string(TempF.tInd)+".csv";
 	vox.UpdateLayer(filout); // WriteCSVData1 called in UpdateLayer
       }
       vox.UpdateVoxels5();

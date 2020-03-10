@@ -1116,7 +1116,10 @@ void VoxelsCA::UpdateVoxels7()
     captured as opposed to growing in a continuous time. During the capturing
     of voxels, this version captures voxels Ncap at a time. Ncap is an arbitrarily
     chosen number. Using this file, I run a number of simulations using 
-    main1Scale.C as the main file to see what kind of speed up I can achieve
+    main1Scale.C as the main file to see what kind of speed up I can achieve. 
+    In addition, a big improvement of this version is the way the voxel neighborhoods
+    in the active region are captured. It's much more efficient. The previous ways
+    were in fact a bottleneck of the code.
 
    */
   // set liquid if temperature > TL 
