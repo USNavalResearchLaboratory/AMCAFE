@@ -1263,7 +1263,7 @@ void VoxelsCA::UpdateVoxels7()
   } // for (int j...
   // end assemble arrays to be used to compute grain growth
   // capture all undercooled liquid voxels by growing grains
-  int js=0,j1s=0,jx[3],jy[3],countS=Na,nCap=24,nloc=iv[_part->myid+1]-iv[_part->myid];
+  int js=0,j1s=0,jx[3],jy[3],countS=Na,nCap=1,nloc=iv[_part->myid+1]-iv[_part->myid];
   double velX,velY,omega,ax[3],
     dlocX[3],locX[3],dr,vhat,tmelt=_xyz->tL,
     dnx[3],tinc=0.0;
@@ -1277,7 +1277,8 @@ void VoxelsCA::UpdateVoxels7()
   std::vector<double>::iterator it1;
   cc=0;
   auto tup1 = std::chrono::high_resolution_clock::now();
-
+  struct{double DtT; int rank;} xin[nCap],xout[nCap];
+  for (int j=0;j<nCap;++j){xin[j].rank = _part->myid;}
   while (std::count(vS.begin(),vS.end(),2)!=countS && tinc<_temp->DelT) {
   //while (std::count(vS.begin(),vS.end(),2)!=countS) {
     double DtMin=1e6;
@@ -1325,37 +1326,33 @@ void VoxelsCA::UpdateVoxels7()
 	      i4=std::distance(timeUntil.begin(),it1);
 	      for (int j2=(nCap-1);j2>i4;--j2){
 		timeUntil[j2]=timeUntil[j2-1];
-		jsvec[j2] = jsvec[j2-1];
-		j1svec[j2] = j1svec[j2-1];
+		jTs[j2] = jTs[j2-1];
+		j1Ts[j2] = j1Ts[j2-1];
 	      } // for (int j2 ...
 	      timeUntil[i4]=DtMin;
-	      jsvec[i4] = j;
-	      j1svec[i4] = j1;
+	      jTs[i4] = j;
+	      j1Ts[i4] = j1;
 	    } // if (it1!=...
 	  } // for (int j1...
 	} // if (std::any_of ...  
       } // if (vS[j]==2...      
     } // for (int j...
-    MPI_Allgather(&timeUntil[0],nCap,MPI_DOUBLE,&tmp1[0],nCap,MPI_DOUBLE,MPI_COMM_WORLD);
-    MPI_Allgather(&jsvec[0],nCap,MPI_INT,&itmp1[0],nCap,MPI_INT,MPI_COMM_WORLD);
-    MPI_Allgather(&j1svec[0],nCap,MPI_INT,&itmp2[0],nCap,MPI_INT,MPI_COMM_WORLD);
-    std::iota(itvec1.begin(),itvec1.end(),0);
-    std::partial_sort(itvec1.begin(),itvec1.begin()+nCap,itvec1.end(),
-		      [&tmp1](int j1,int j2){return tmp1[j1]<tmp1[j2];});
+    for (int j=0;j<nCap;++j){xin[j].DtT=timeUntil[j];}
+    MPI_Allreduce(&xin,&xout,nCap,MPI_DOUBLE_INT,MPI_MINLOC,MPI_COMM_WORLD);
     for (int j=0;j<nCap;++j){
-      i1=itvec1[j];
-      jTs[j]=itmp1[i1];
-      j1Ts[j]=itmp2[i1];
-      DtT[j]=tmp1[i1];
+      MPI_Bcast(&jTs[j],1,MPI_INT,xout[j].rank,MPI_COMM_WORLD);
+      MPI_Bcast(&j1Ts[j],1,MPI_INT,xout[j].rank,MPI_COMM_WORLD);
     }
-    i1=std::distance(DtT.begin(),std::find_if(DtT.begin(),DtT.end(),[](double t){return t>=1e6;}));
+    i1=nCap;
+    for (int j=0;j<nCap;++j){if(xout[j].DtT>=1e6){i1=j;}}
+
     nCap = std::min(nCap,i1);
     if (nCap==0){break;}
     for (int j=1;j<nCap;++j){
       i1 = std::distance(j1Ts.begin(),std::find(j1Ts.begin(),j1Ts.begin()+j,j1Ts[j]));
       if (i1<nCap){
-	DtMin = DtT[j]-DtT[j-1];
-	for (int j1=j;j1<nCap;++j1){DtT[j1] -=DtMin;}
+	DtMin = xout[j].DtT-xout[j-1].DtT;
+	for (int j1=j;j1<nCap;++j1){xout[j1].DtT -=DtMin;}
       }
     }
     double xI[3],xJ[3],d1I,dI2,d1J,dJ3,L12,L13,l,Lmud,dnorm[3],xiL,extmp;
@@ -1364,13 +1361,11 @@ void VoxelsCA::UpdateVoxels7()
     i1=iv[_part->myid];
     for (int j=iv[_part->myid];j<iv[_part->myid+1];++j){
       if (vS[j]!=2){continue;}
-      ExtA[j]+=vhatvec[j-i1]*DtT[nCap-1];
+      ExtA[j]+=vhatvec[j-i1]*xout[nCap-1].DtT;
       ExtA[j] = std::max(ExtA[j],0.0);
     } // for (int j...
     for (int j=0;j<nCap;++j){
-      js = jTs[j];
-      i1 = std::distance(iv.begin(),std::upper_bound(iv.begin(),iv.end(),js)) - 1;
-      MPI_Bcast(&ExtA[js],1,MPI_DOUBLE,i1,MPI_COMM_WORLD);
+      MPI_Bcast(&ExtA[jTs[j]],1,MPI_DOUBLE,xout[j].rank,MPI_COMM_WORLD);
     }
     i4 = floor((nCap-1)/_part->nprocs)+1;
     for (int j=0;j<i4;++j){
@@ -1382,12 +1377,12 @@ void VoxelsCA::UpdateVoxels7()
 	j1s = j1Ts[i5];
 	i1 = ineighIDA[ineighAptr[js]+j1s];
 	i6 = 1;
-	DtMin = DtT[i5];
+	DtMin = xout[i5].DtT;
 	T[js]>=_xyz->tL ? velY=0.0: velY=getVelocity(_xyz->tL,_xyz->mL,
 						     _xyz->kP,_xyz->Gamma,
 						     _xyz->c0,T[js]);
 	vhat = 100*velY;
-	extmp  = std::max(ExtA[js] + vhat*(DtMin-DtT[nCap-1]), 0.0);
+	extmp  = std::max(ExtA[js] + vhat*(DtMin-xout[nCap-1].DtT), 0.0);
 	vS[i1] = 2;
 	G[i1] = G[js];
 	jx[2] = floor(vI[i1]/i3);
@@ -1451,7 +1446,7 @@ void VoxelsCA::UpdateVoxels7()
 						     _xyz->c0,T[i1]);
 	vhat = 100*velY;
 	xiL = 1.0;
-	ExtA[i1] = Lmud*xiL + vhat*(DtT[nCap-1]-DtMin);
+	ExtA[i1] = Lmud*xiL + vhat*(xout[nCap-1].DtT-DtMin);
       } // if (i5<nCap ...
       MPI_Allgather(&i6,1,MPI_INT,&itmp3[0],1,MPI_INT,MPI_COMM_WORLD);
       for (int j1=(_part->nprocs-1);j1>-1;--j1){
@@ -1468,7 +1463,7 @@ void VoxelsCA::UpdateVoxels7()
       }
     } // for (int j=0;j<i4 ...
     cc+=nCap;
-    tinc += DtT[nCap-1];
+    tinc += xout[nCap-1].DtT;
   } // while (std::count(...
 
   auto tup2 = std::chrono::high_resolution_clock::now();
