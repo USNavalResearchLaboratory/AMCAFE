@@ -171,7 +171,7 @@ int main(int argc, char *argv[])
 	filout = filbaseOut+"_t"+std::to_string(TempF.tInd)+".csv";
 	vox.UpdateLayer(filout); // WriteCSVData1 called in UpdateLayer
       }
-      vox.UpdateVoxels7();
+      vox.UpdateVoxels5();
       g.UpdateTime2(TempF.DelT);
     }
     if (ictrl==4){
