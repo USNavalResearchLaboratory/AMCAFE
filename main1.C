@@ -80,8 +80,8 @@ int main()
   dtM = .05; // must set based on moose results
   tL = 1733; // K
   tS = 1693; // K
-  dTempM = 500; //7.5; // 2.5 // K (mean undercooling for nucleation)
-  dTempS = 300; //5.0; // 1.0 // K (standard dev undercooling for nucleation)
+  dTempM = (tL-tS)*.75; //7.5; // 2.5 // K (mean undercooling for nucleation)
+  dTempS = (tL-tS)/3.0; //5.0; // 1.0 // K (standard dev undercooling for nucleation)
   rNmax = 1e0;//7e14; //7e16; // (m^{-3})  maximum nucleation density for new grains
   mL = -10.9; // (K / wt%)
   dL = 3e-9; // (m^2/s)
@@ -118,6 +118,7 @@ int main()
   TempField TempF(g,part,bp);
   wEst  = pow(8*beamPower/(exp(1.0)*M_PI*rho*cP*(tL-298.0)*beamVel),.5); // see EQ (1) in schwalbach
   T0 = 300.0; // initial temperature in (K)
+  int Ntot=part.ncellLoc+ part.nGhost;
   if (ictrl==4){
     // this is a test case scenario
     TempF.InitializeSchwalbach(patternID,beamSTD,beamVel,T0targ,beamEta,LX,T0);
@@ -127,7 +128,7 @@ int main()
     //TempF.InitializeSchwalbach(patternID,beamSTD,beamVel,T0targ,beamEta,LX,T0);
     //TempF.SchwalbachTempCurr();
     TempF.InitializeAnalytic(patternID,beamSTD,beamVel,LX,T0);
-    TempF.AnalyticTempCurr();
+    TempF.AnalyticTempCurr(g.time,TempF.TempCurr,part.icellidLoc,Ntot);
   }
   VoxelsCA vox(g,TempF, part);
   if (ictrl==4){
@@ -198,7 +199,7 @@ int main()
       TempF.tInd = int(round(g.time/TempF.DelT));
       if (ictrl!=4){
 	//TempF.SchwalbachTempCurr();
-	TempF.AnalyticTempCurr();
+	TempF.AnalyticTempCurr(g.time,TempF.TempCurr,part.icellidLoc,Ntot);
       }
       irep=0;
     } // if (TempF.tInd !=

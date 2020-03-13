@@ -35,8 +35,14 @@ class VoxelsCA
   void UpdateVoxels5();
   void UpdateVoxels6();
   void UpdateVoxels7();
+  void UpdateVoxels8();
+  void UpdateVoxels9();
   void UpdateLayer(std::string &filCSV);
   void NucleateGrains(std::vector<int> &nucInd, std::vector<double> &tnuc);
+  void NucleateGrains(std::vector<int> &nucA, std::vector<double> &tnucA,
+		      std::vector<double> &quatnuc,std::vector<int> &iv,
+		      std::vector<int> &vI,std::vector<int> &vS,
+		      std::vector<double> &tA);
   void ComputeNucleation1();
   void ExtentsInitialize();
   void CheckTimeSkip();

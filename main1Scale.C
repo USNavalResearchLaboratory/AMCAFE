@@ -67,8 +67,8 @@ int main(int argc, char *argv[])
   dtM = .05; // must set based on moose results
   tL = 1733; // K
   tS = 1693; // K
-  dTempM = 500; //7.5; // 2.5 // K (mean undercooling for nucleation)
-  dTempS = 300; //5.0; // 1.0 // K (standard dev undercooling for nucleation)
+  dTempM = (tL-tS)*.75; //7.5; // 2.5 // K (mean undercooling for nucleation)
+  dTempS = (tL-tS)/3.0; //5.0; // 1.0 // K (standard dev undercooling for nucleation)
   rNmax = 1e0;//7e14; //7e16; // (m^{-3})  maximum nucleation density for new grains
   mL = -10.9; // (K / wt%)
   dL = 3e-9; // (m^2/s)
@@ -105,6 +105,8 @@ int main(int argc, char *argv[])
     - Lx[0] must equal Lx[1] for patternID==3 or 4
    */
   T0 = 300.0; // initial temperature in (K)
+  int Ntot=part.ncellLoc+ part.nGhost;
+
   if (ictrl==4){
     // this is a test case scenario
     TempF.InitializeSchwalbach(patternID,beamSTD,beamVel,T0targ,beamEta,LX,T0);
@@ -114,7 +116,7 @@ int main(int argc, char *argv[])
     //TempF.InitializeSchwalbach(patternID,beamSTD,beamVel,T0targ,beamEta,LX,T0);
     //TempF.SchwalbachTempCurr();
     TempF.InitializeAnalytic(patternID,beamSTD,beamVel,LX,T0);
-    TempF.AnalyticTempCurr();
+    TempF.AnalyticTempCurr(g.time,TempF.TempCurr,part.icellidLoc,Ntot);
   }
   VoxelsCA vox(g,TempF, part);
   if (ictrl==4){
@@ -171,7 +173,7 @@ int main(int argc, char *argv[])
 	filout = filbaseOut+"_t"+std::to_string(TempF.tInd)+".csv";
 	vox.UpdateLayer(filout); // WriteCSVData1 called in UpdateLayer
       }
-      vox.UpdateVoxels7();
+      vox.UpdateVoxels8();
       g.UpdateTime2(TempF.DelT);
     }
     if (ictrl==4){
@@ -186,7 +188,7 @@ int main(int argc, char *argv[])
       TempF.tInd = int(round(g.time/TempF.DelT));
       if (ictrl!=4){
 	//TempF.SchwalbachTempCurr();
-	TempF.AnalyticTempCurr();
+	TempF.AnalyticTempCurr(g.time,TempF.TempCurr,part.icellidLoc,Ntot);
       }
       irep=0;
     } // if (TempF.tInd !=
