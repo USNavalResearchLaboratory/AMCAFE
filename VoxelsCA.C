@@ -29,6 +29,10 @@ VoxelsCA::VoxelsCA(Grid &g,TempField &tf, Partition &part)
   centroidOct.assign(3*Ntot1,0.0);
   seed0= 2132512;
   seed1=2912351;
+  double velY=(5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
+		 (_xyz->Gamma))*( pow((_xyz->tL - _xyz->tS),2.5)/pow(_xyz->c0,1.5));
+  
+  vXi = 3*_temp->bmV/velY;
   // establishes ineighID and ineighptr for convertSolid1 
   int cc=0;
   std::vector<int> neigh;
@@ -666,7 +670,7 @@ void VoxelsCA::UpdateVoxels5()
 	  loadRotMat(omega,ax,rRot);	    
 	  T[j]>=_xyz->tL ? velY=0.0: velY=(5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
 		 (_xyz->Gamma))*( pow((_xyz->tL - T[j]),2.5)/pow(_xyz->c0,1.5));
-	  vhatvec[j-i1] = 100*velY;
+	  vhatvec[j-i1] = vXi*velY;
 	  for (int j1=0;j1<i6;++j1){
 	    if (vSneigh[j1] != 1 ){continue;}
             i4 = ineighIDA[i5+j1];
@@ -957,7 +961,7 @@ void VoxelsCA::UpdateVoxels6()
 	    dr = dlocX[0]+dlocX[1]+dlocX[2] - ExtA[j];
 	    T[j]>=_xyz->tL ? velY=0.0: velY=(5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
 		 (_xyz->Gamma))*( pow((_xyz->tL - T[j]),2.5)/pow(_xyz->c0,1.5));
-	    vhat = 100*velY;
+	    vhat = vXi*velY;
 	    timeUntil = dr/vhat;
 	    trank[j] = timeUntil;
 	    if (timeUntil < DtMin){
@@ -1012,7 +1016,7 @@ void VoxelsCA::UpdateVoxels6()
 						 _xyz->kP,_xyz->Gamma,
 						 _xyz->c0,T[j]);
 
-	vhat = 100*velY;
+	vhat = vXi*velY;
 	ExtA[j]+=vhat*DtMin;
 	ExtA[j] = std::max(ExtA[j],0.0);
       } // if (std::any_of ...	
@@ -1305,7 +1309,7 @@ void VoxelsCA::UpdateVoxels7()
 	  loadRotMat(omega,ax,rRot);	    
 	  T[j]>=_xyz->tL ? velY=0.0: velY=(5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
 		 (_xyz->Gamma))*( pow((_xyz->tL - T[j]),2.5)/pow(_xyz->c0,1.5));
-	  vhatvec[j-i1] = 100*velY;
+	  vhatvec[j-i1] = vXi*velY;
 	  for (int j1=0;j1<(i6);++j1){
 	    if (vSneigh[j1] != 1 ){continue;}
 	    i4 = ineighIDA[i5+j1];
@@ -1381,7 +1385,7 @@ void VoxelsCA::UpdateVoxels7()
 	T[js]>=_xyz->tL ? velY=0.0: velY=getVelocity(_xyz->tL,_xyz->mL,
 						     _xyz->kP,_xyz->Gamma,
 						     _xyz->c0,T[js]);
-	vhat = 100*velY;
+	vhat = vXi*velY;
 	extmp  = std::max(ExtA[js] + vhat*(DtMin-xout[nCap-1].DtT), 0.0);
 	vS[i1] = 2;
 	G[i1] = G[js];
@@ -1445,7 +1449,7 @@ void VoxelsCA::UpdateVoxels7()
 	T[i1]>=_xyz->tL ? velY=0.0: velY=getVelocity(_xyz->tL,_xyz->mL,
 						     _xyz->kP,_xyz->Gamma,
 						     _xyz->c0,T[i1]);
-	vhat = 100*velY;
+	vhat = vXi*velY;
 	xiL = 1.0;
 	ExtA[i1] = Lmud*xiL + vhat*(xout[nCap-1].DtT-DtMin);
       } // if (i5<nCap ...
@@ -1526,8 +1530,6 @@ void VoxelsCA::UpdateVoxels8()
   std::vector<std::vector<double>> sdiag0,sdiag(6,std::vector<double>(3));
   std::vector<std::vector<int>> sInd;
   loadS(sdiag0,sInd); // this is for the decentered octohedron algorithm
-  SampleOrientation sa;
-  unsigned int sdloc;
   for (int j=0;j<Ntot;++j){
     if (vState[j]==2 || (vState[j]==1 && _temp->TempCurr[j]<_xyz->tL) ){
       indA[NlocA]=j;
@@ -1610,13 +1612,26 @@ void VoxelsCA::UpdateVoxels8()
 	floor( (double)(Na-i2*i1)/(double)(_part->nprocs-i2));}
     if (j==_part->nprocs){iv[j]=Na;}
   } // for (int j...
+
   // nucleate grains
+  /*
   int NnucA;
   std::vector<int> nucA;
   std::vector<double> tnucA,quatnuc;
   NucleateGrains(nucA,tnucA,quatnuc,iv,vI,vS,T);
   NnucA=nucA.size();
+
+  }
+  */
+  unsigned int sdloc;
+  SampleOrientation sa;
+  sdloc= seed0 + 32*_xyz->tInd +64*nGrain;
+  std::vector<double> quatnuc(4);
+  std::default_random_engine g1(30*_xyz->tInd+seed1);
+  std::uniform_real_distribution<double> xrand1(0.0,1.0);
+  double rX;
   // end nucleation grains
+
   // end assemble arrays to be used to compute grain growth
   // capture all undercooled liquid voxels by growing grains
   int js=0,j1s=0,jx[3],jy[3],countS=Na;
@@ -1654,7 +1669,7 @@ void VoxelsCA::UpdateVoxels8()
 	  loadRotMat(omega,ax,rRot);	    
 	  T[j]>=_xyz->tL ? velY=0.0: velY=(5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
 		 (_xyz->Gamma))*( pow((_xyz->tL - T[j]),2.5)/pow(_xyz->c0,1.5));
-	  vhatvec[j-i1] = 100*velY;
+	  vhatvec[j-i1] = vXi*velY;
 	  for (int j1=0;j1<i6;++j1){
 	    if (vSneigh[j1] != 1 ){continue;}
             i4 = ineighIDA[i5+j1];
@@ -1683,7 +1698,30 @@ void VoxelsCA::UpdateVoxels8()
     MPI_Allreduce(&xin,&xout,1,MPI_DOUBLE_INT,MPI_MINLOC,MPI_COMM_WORLD);
     MPI_Bcast(&js,1,MPI_INT,xout.rank,MPI_COMM_WORLD);
     MPI_Bcast(&j1s,1,MPI_INT,xout.rank,MPI_COMM_WORLD);
+
     if (xout.DtMin>=1e6){break;}
+
+
+    // test: make captured grain new grain based on rate
+    rX = _xyz->rNmax*exp( - 25*pow( (T[js]-_xyz->tS)/(_xyz->tL-_xyz->tS) ,2.0));
+    if (xrand1(g1)< rX){      
+      i1 = ineighIDA[ineighAptr[js]+j1s];
+      sa.GenerateSamples(1,sdloc,quatnuc);
+      vS[i1] = 2;
+      nGrain+=1;
+      G[i1] = nGrain;
+      cTheta.insert(cTheta.end(),quatnuc.begin(),quatnuc.end());
+      jx[2] = floor(vI[i1]/i3);
+      jx[1] =floor( (vI[i1]- i3*jx[2])/i2);
+      jx[0] = vI[i1] -i3*jx[2] - i2*jx[1];
+      CentroidA[3*i1] = (double(jx[0])+.5)*_xyz->dX[0];
+      CentroidA[3*i1+1] = (double(jx[1])+.5)*_xyz->dX[1];
+      CentroidA[3*i1+2] = (double(jx[2])+.5)*_xyz->dX[2];	
+      sdloc +=10;
+      xout.DtMin=0.0;
+      ExtA[i1] = extentsInitialValue;
+
+    /*
     i4 = std::distance(tnucA.begin(),std::upper_bound(tnucA.begin(),tnucA.end(),tinc));
     i5 = std::distance(tnucA.begin(),std::upper_bound(tnucA.begin(),tnucA.end(),tinc+xout.DtMin));
     cc1=0;    
@@ -1695,6 +1733,8 @@ void VoxelsCA::UpdateVoxels8()
       i4+=1;
     }
     if (cc1==1){
+
+      
       xout.DtMin = tnucA[i4]-tinc;
       js = nucA[i4];
       i1=iv[_part->myid];
@@ -1713,7 +1753,11 @@ void VoxelsCA::UpdateVoxels8()
       CentroidA[3*js] = (double(jx[0])+.5)*_xyz->dX[0];
       CentroidA[3*js+1] = (double(jx[1])+.5)*_xyz->dX[1];
       CentroidA[3*js+2] = (double(jx[2])+.5)*_xyz->dX[2];
-      ExtA[js] = extentsInitialValue;    
+      ExtA[js] = 0.0;    
+      */
+
+
+
     } else {
       double xI[3],xJ[3],d1I,dI2,d1J,dJ3,L12,L13,l,Lmud,dnorm[3],xiL;
       int jInd,nvoxproc;
@@ -2744,29 +2788,32 @@ void VoxelsCA::NucleateGrains(std::vector<int> &nucA, std::vector<double> &tnucA
 {
 
   int Ntot=iv[_part->myid+1]-iv[_part->myid],Nnew1,Nq=0,NqA,cc=0,cc1;
-  std::vector<int> ind1(Ntot),vIloc(Ntot),nIn;
-  double tNp1= _xyz->time + _temp->DelT,x1,x2,rmax=0.0,rateX=0.0;
-  std::vector<double> TempNp1,rNuc(Ntot,0),tIn;
+  std::vector<int> ind1(Ntot),nIn;
+  double tNp1= _xyz->time + _temp->DelT,x1,x2,rmaxloc=0.0,rmax,rateX=0.0;
+  std::vector<double> rNuc(Ntot,0),tIn;
   std::default_random_engine g1(30*_xyz->tInd+seed1);
   cc1=iv[_part->myid];
-  for (int j=0;j<Ntot;++j){vIloc[j]=vI[cc1+j];}
-  _temp->AnalyticTempCurr(tNp1,TempNp1,vIloc,Ntot);
   cc1=0;
   for (int j=iv[_part->myid];j<iv[_part->myid+1];++j){
     if (vS[j]==1 && tA[j]<_xyz->tL){
-      x2 = ( (_xyz->tL -TempNp1[cc1]) - _xyz->dTempM)/_xyz->dTempS/pow(2.0,.5);
+      //x2 = ( (_xyz->tL -TempNp1[cc1]) - _xyz->dTempM)/_xyz->dTempS/pow(2.0,.5);
       x1 = ( (_xyz->tL - tA[j]) - _xyz->dTempM)/_xyz->dTempS/pow(2.0,.5);
-      rNuc[cc1] = _xyz->rNmax*std::max(0.0, .5*(erf(x2) - erf(x1)));
-      rmax = std::max(rmax,rNuc[j]);
+      //rNuc[cc1] = _xyz->rNmax*std::max(0.0, .5*(erf(x2) - erf(x1)));
+      //rNuc[cc1] = std::max(0.0, .5*erf(x1)+.5 );
+      rNuc[cc1] = exp(-.5*pow(x1,2.0));
+      rmaxloc = std::max(rmaxloc,rNuc[cc1]);
       ind1[cc] = j;
       cc+=1;
     } // if (vS[j]...
     cc1+=1;
   } // for (int j=0...
   Nq=cc;
-  MPI_Allreduce(&cc,&NqA,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
+
+
+  MPI_Allreduce(&Nq,&NqA,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
+  MPI_Allreduce(&rmaxloc,&rmax,1,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
   //rateX= std::min(double(NqA),(double)NqA *_xyz->dX[0]*_xyz->dX[1]*_xyz->dX[2] * rmax);
-  rateX= (double)NqA *_xyz->dX[0]*_xyz->dX[1]*_xyz->dX[2] * rmax;
+  rateX= double(NqA) * _xyz->rNmax* rmax;
   // sample Poisson distribution from rmax and then do thinning
   std::poisson_distribution<int> Np(rateX);
   std::uniform_int_distribution<int> uind(0,std::max(Nq-1,0));
@@ -2798,7 +2845,7 @@ void VoxelsCA::NucleateGrains(std::vector<int> &nucA, std::vector<double> &tnucA
   nIn.resize(cc);
   tIn.resize(cc);
   Nq=cc;
-  int NnucA;
+  int NnucA=0;
   std::vector<int> Nnucvec(_part->nprocs,0),jnuc0(_part->nprocs,0);
   MPI_Allgather(&Nq,1,MPI_INT,&Nnucvec[0],1,MPI_INT,MPI_COMM_WORLD);
   for (int j=0;j<_part->nprocs;++j){NnucA+=Nnucvec[j];}

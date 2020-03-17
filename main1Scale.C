@@ -67,9 +67,10 @@ int main(int argc, char *argv[])
   dtM = .05; // must set based on moose results
   tL = 1733; // K
   tS = 1693; // K
-  dTempM = (tL-tS)*.75; //7.5; // 2.5 // K (mean undercooling for nucleation)
+  dTempM = (tL-tS)*.90; //7.5; // 2.5 // K (mean undercooling for nucleation)
   dTempS = (tL-tS)/3.0; //5.0; // 1.0 // K (standard dev undercooling for nucleation)
-  rNmax = 1e0;//7e14; //7e16; // (m^{-3})  maximum nucleation density for new grains
+  rNmax = .05;// maximum nucleation density for new grains and is unitless 
+              // (to convert to m^{-3} divide by dx^3)
   mL = -10.9; // (K / wt%)
   dL = 3e-9; // (m^2/s)
   Gamma = 1e-7;  // (K m)
