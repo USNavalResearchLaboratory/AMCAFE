@@ -439,7 +439,13 @@ void VoxelsCA::UpdateVoxels4()
       } // for (int j1...
       jy[0] = std::distance(dnorm,std::min_element(dnorm,dnorm+3));
       jy[2] = std::distance(dnorm,std::max_element(dnorm,dnorm+3));
-      jy[1] = 3 - jy[0] - jy[2];
+      if (jy[0]==jy[2]){
+	jy[0]=0;
+	jy[1]=1;
+	jy[2]=2;
+      } else{
+	jy[1] = 3 - jy[0] - jy[2];
+      }
       projectPointLine(locX,&sdiag[sInd[jInd][jy[0]]][0],&sdiag[sInd[jInd][jy[1]]][0],xI);
       projectPointLine(locX,&sdiag[sInd[jInd][jy[0]]][0],&sdiag[sInd[jInd][jy[2]]][0],xJ);
       d1I = pow(pow(sdiag[sInd[jInd][jy[0]]][0]-xI[0],2.0) + 
@@ -744,7 +750,13 @@ void VoxelsCA::UpdateVoxels5()
     } // for (int j1...
     jy[0] = std::distance(dnorm,std::min_element(dnorm,dnorm+3));
     jy[2] = std::distance(dnorm,std::max_element(dnorm,dnorm+3));
-    jy[1] = 3 - jy[0] - jy[2];
+    if (jy[0]==jy[2]){
+      jy[0]=0;
+      jy[1]=1;
+      jy[2]=2;
+    } else{
+      jy[1] = 3 - jy[0] - jy[2];
+    }
     projectPointLine(locX,&sdiag[sInd[jInd][jy[0]]][0],&sdiag[sInd[jInd][jy[1]]][0],xI);
     projectPointLine(locX,&sdiag[sInd[jInd][jy[0]]][0],&sdiag[sInd[jInd][jy[2]]][0],xJ);
     d1I = pow(pow(sdiag[sInd[jInd][jy[0]]][0]-xI[0],2.0) + 
@@ -1055,7 +1067,13 @@ void VoxelsCA::UpdateVoxels6()
     } // for (int j1...
     jy[0] = std::distance(dnorm,std::min_element(dnorm,dnorm+3));
     jy[2] = std::distance(dnorm,std::max_element(dnorm,dnorm+3));
-    jy[1] = 3 - jy[0] - jy[2];
+    if (jy[0]==jy[2]){
+      jy[0]=0;
+      jy[1]=1;
+      jy[2]=2;
+    } else{
+      jy[1] = 3 - jy[0] - jy[2];
+    }
     projectPointLine(locX,&sdiag[sInd[jInd][jy[0]]][0],&sdiag[sInd[jInd][jy[1]]][0],xI);
     projectPointLine(locX,&sdiag[sInd[jInd][jy[0]]][0],&sdiag[sInd[jInd][jy[2]]][0],xJ);
     d1I = pow(pow(sdiag[sInd[jInd][jy[0]]][0]-xI[0],2.0) + 
@@ -1419,7 +1437,13 @@ void VoxelsCA::UpdateVoxels7()
 	} // for (int j1...
 	jy[0] = std::distance(dnorm,std::min_element(dnorm,dnorm+3));
 	jy[2] = std::distance(dnorm,std::max_element(dnorm,dnorm+3));
-	jy[1] = 3 - jy[0] - jy[2];
+	if (jy[0]==jy[2]){
+	  jy[0]=0;
+	  jy[1]=1;
+	  jy[2]=2;
+	} else{
+	  jy[1] = 3 - jy[0] - jy[2];
+	}
 	projectPointLine(locX,&sdiag[sInd[jInd][jy[0]]][0],&sdiag[sInd[jInd][jy[1]]][0],xI);
 	projectPointLine(locX,&sdiag[sInd[jInd][jy[0]]][0],&sdiag[sInd[jInd][jy[2]]][0],xJ);
 	d1I = pow(pow(sdiag[sInd[jInd][jy[0]]][0]-xI[0],2.0) + 
@@ -1695,13 +1719,7 @@ void VoxelsCA::UpdateVoxels8()
 	} // if (std::any_of ...  
       } // if (vS[j]==2...      
     } // for (int j...
-    MPI_Allreduce(&xin,&xout,1,MPI_DOUBLE_INT,MPI_MINLOC,MPI_COMM_WORLD);
-    MPI_Bcast(&js,1,MPI_INT,xout.rank,MPI_COMM_WORLD);
-    MPI_Bcast(&j1s,1,MPI_INT,xout.rank,MPI_COMM_WORLD);
-
     if (xout.DtMin>=1e6){break;}
-
-
     // test: make captured grain new grain based on rate
     rX = _xyz->rNmax*exp( - 25*pow( (T[js]-_xyz->tS)/(_xyz->tL-_xyz->tS) ,2.0));
     if (xrand1(g1)< rX){      
@@ -1755,9 +1773,6 @@ void VoxelsCA::UpdateVoxels8()
       CentroidA[3*js+2] = (double(jx[2])+.5)*_xyz->dX[2];
       ExtA[js] = 0.0;    
       */
-
-
-
     } else {
       double xI[3],xJ[3],d1I,dI2,d1J,dJ3,L12,L13,l,Lmud,dnorm[3],xiL;
       int jInd,nvoxproc;
@@ -1803,7 +1818,13 @@ void VoxelsCA::UpdateVoxels8()
       } // for (int j1...
       jy[0] = std::distance(dnorm,std::min_element(dnorm,dnorm+3));
       jy[2] = std::distance(dnorm,std::max_element(dnorm,dnorm+3));
-      jy[1] = 3 - jy[0] - jy[2];
+      if (jy[0]==jy[2]){
+	  jy[0]=0;
+	  jy[1]=1;
+	  jy[2]=2;
+      } else{
+	jy[1] = 3 - jy[0] - jy[2];
+      }
       projectPointLine(locX,&sdiag[sInd[jInd][jy[0]]][0],&sdiag[sInd[jInd][jy[1]]][0],xI);
       projectPointLine(locX,&sdiag[sInd[jInd][jy[0]]][0],&sdiag[sInd[jInd][jy[2]]][0],xJ);
       d1I = pow(pow(sdiag[sInd[jInd][jy[0]]][0]-xI[0],2.0) + 
@@ -1849,8 +1870,7 @@ void VoxelsCA::UpdateVoxels8()
   for (int j=0;j<_part->nprocs;++j){
     i1 = iv[j+1]-iv[j];
     MPI_Bcast(&ExtA[iv[j]],i1,MPI_DOUBLE,j,MPI_COMM_WORLD);  
-  } // for (int j ...
-			 
+  } // for (int j ...			
   // end capture all undercooled liquid voxels by growing grains
   // bring global variables back to local variables
   cc1=0;

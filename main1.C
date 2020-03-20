@@ -62,6 +62,7 @@ int main()
     LX = {.002,.002,.002}; // KT: THIS IS FOR TEST
   } else {
   nX = {128,128,64};
+  //nX = {200,200,300};
   //nX = {64,64,32};
   LX = {.002,.002,.001};
   LX = {nX[0]*1.875e-6,nX[1]*1.875e-6,nX[2]*1.875e-6};
@@ -82,7 +83,7 @@ int main()
   tS = 1693; // K
   dTempM = (tL-tS)*.75; //7.5; // 2.5 // K (mean undercooling for nucleation)
   dTempS = (tL-tS)/3.0; //5.0; // 1.0 // K (standard dev undercooling for nucleation)
-  rNmax = 1e0;//7e14; //7e16; // (m^{-3})  maximum nucleation density for new grains
+  rNmax = -1.05; // (m^{-3})  maximum nucleation density for new grains
   mL = -10.9; // (K / wt%)
   dL = 3e-9; // (m^2/s)
   Gamma = 1e-7;  // (K m)
@@ -105,7 +106,7 @@ int main()
   layerThickness = 25e-6;
   beamSTD = {7.5e-5,7.5e-5,7.5e-5};
   heightBase = layerThickness;
-  patternID = 2; // see TempField.C for description
+  patternID = 1; // see TempField.C for description
   T0targ = 1500;//2000.0; // target peak temperature for one ellipsoid
   beamEta = 1.0;
   Grid g(dX,nX,tL,tS,mL,c0,Gamma,dP,dL,muN,rho,cP,kappa,layerThickness,neighOrder,dTempM,dTempS,rNmax,nDim,neighType,ictrl);
@@ -141,19 +142,19 @@ int main()
     execute simulation */
   cc1=0;
   int outskip=20,indOut,nTmax=TempF.nTTemp[0]*TempF.nTTemp[1]*TempF.nTTemp[2];
-  std::vector<int> filinds,out2(3,0),j123(3,0);
+  std::vector<int> filinds,out2(2,0),j123(3,0);
   std::vector<double> filtime;
   int icheck = 1,ichecktmp,cc2=0, irep=0;
   std::ofstream fplog;
   filbaseOut = "CA3D";
   filLogOut="CA3D.log";
-  out2 = {1,1,1}; // the increment to skip output per direction
+  out2 = {4,1}; // the increment to skip output per direction
   if (part.myid==0){
     fplog.open(filLogOut.c_str());
     fplog << "Time index= ,Total clock time passed(s)"<<std::endl;
   }
-  //while (TempF.tInd<nTmax && icheck!=0){
-  while (TempF.tInd<=nTmax){
+  //while (TempF.tInd<=nTmax){
+  while (TempF.tInd<=44){
     icheck=!std::all_of(vox.vState.begin(),vox.vState.end(),[](int n){return n==3;});
     ichecktmp = icheck;
     MPI_Allreduce(&ichecktmp,&icheck,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
@@ -161,7 +162,7 @@ int main()
     j123[2] = floor(TempF.tInd /(TempF.nTTemp[0]*TempF.nTTemp[1]));
     j123[1] = floor((TempF.tInd - (TempF.nTTemp[0]*TempF.nTTemp[1])*j123[2])/ TempF.nTTemp[0]);
     j123[0] = TempF.tInd - (TempF.nTTemp[0]*TempF.nTTemp[1])*j123[2] - TempF.nTTemp[0]*j123[1];
-    indOut = j123[2] % out2[2] + j123[1] % out2[1] + j123[0] % out2[0];
+    indOut = j123[2] % out2[1] + (TempF.nTTemp[0]*j123[1]+j123[0]) % out2[0];
     if (irep==0){
       irep=1;
       if (indOut==0 || TempF.tInd ==(nTmax-1)){ 
@@ -184,7 +185,7 @@ int main()
 	filout = filbaseOut+"_t"+std::to_string(TempF.tInd)+".csv";
 	vox.UpdateLayer(filout); // WriteCSVData1 called in UpdateLayer
       }
-      vox.UpdateVoxels5();
+      vox.UpdateVoxels8();
       g.UpdateTime2(TempF.DelT);
     }
     if (ictrl==4){
