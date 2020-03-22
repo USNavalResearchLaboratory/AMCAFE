@@ -1719,6 +1719,9 @@ void VoxelsCA::UpdateVoxels8()
 	} // if (std::any_of ...  
       } // if (vS[j]==2...      
     } // for (int j...
+    MPI_Allreduce(&xin,&xout,1,MPI_DOUBLE_INT,MPI_MINLOC,MPI_COMM_WORLD);
+    MPI_Bcast(&js,1,MPI_INT,xout.rank,MPI_COMM_WORLD);
+    MPI_Bcast(&j1s,1,MPI_INT,xout.rank,MPI_COMM_WORLD);
     if (xout.DtMin>=1e6){break;}
     // test: make captured grain new grain based on rate
     rX = _xyz->rNmax*exp( - 25*pow( (T[js]-_xyz->tS)/(_xyz->tL-_xyz->tS) ,2.0));
@@ -1783,7 +1786,7 @@ void VoxelsCA::UpdateVoxels8()
 	if (vS[j]!=2){continue;}
 	ExtA[j]+=vhatvec[j-i1]*xout.DtMin;
 	ExtA[j] = std::max(ExtA[j],0.0);
-      } // for (int j...
+      } // for (int j... 
       MPI_Bcast(&ExtA[js],1,MPI_DOUBLE,xout.rank,MPI_COMM_WORLD);
       i1 = ineighIDA[ineighAptr[js]+j1s];
       vS[i1] = 2;

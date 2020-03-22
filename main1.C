@@ -62,7 +62,6 @@ int main()
     LX = {.002,.002,.002}; // KT: THIS IS FOR TEST
   } else {
   nX = {128,128,64};
-  //nX = {200,200,300};
   //nX = {64,64,32};
   LX = {.002,.002,.001};
   LX = {nX[0]*1.875e-6,nX[1]*1.875e-6,nX[2]*1.875e-6};
@@ -83,7 +82,7 @@ int main()
   tS = 1693; // K
   dTempM = (tL-tS)*.75; //7.5; // 2.5 // K (mean undercooling for nucleation)
   dTempS = (tL-tS)/3.0; //5.0; // 1.0 // K (standard dev undercooling for nucleation)
-  rNmax = -1.05; // (m^{-3})  maximum nucleation density for new grains
+  rNmax = .05; // (m^{-3})  maximum nucleation density for new grains
   mL = -10.9; // (K / wt%)
   dL = 3e-9; // (m^2/s)
   Gamma = 1e-7;  // (K m)
