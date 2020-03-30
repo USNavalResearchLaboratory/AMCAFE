@@ -1,9 +1,9 @@
 // define member functions of VoxelCA
 
-#include "Grid.h"
-#include "BasePlate.h"
-#include "VoxelsCA.h"
-#include "Partition.h"
+//#include "Grid.h"
+//#include "BasePlateval1.h"
+#include "VoxelsCAval1.h"
+//#include "Partition.h"
 #include "iostream"
 #include "fstream"
 #include <math.h>
@@ -1724,7 +1724,8 @@ void VoxelsCA::UpdateVoxels8()
     MPI_Bcast(&j1s,1,MPI_INT,xout.rank,MPI_COMM_WORLD);
     if (xout.DtMin>=1e6){break;}
     // test: make captured grain new grain based on rate
-    rX = _xyz->rNmax*exp( - 25*pow( (T[js]-_xyz->tS)/(_xyz->tL-_xyz->tS) ,2.0));
+    //rX = _xyz->rNmax*exp( - 25*pow( (T[js]-_xyz->tS)/(_xyz->tL-_xyz->tS) ,2.0));
+    rX = _xyz->rNmax;
     if (xrand1(g1)< rX){      
       i1 = ineighIDA[ineighAptr[js]+j1s];
       sa.GenerateSamples(1,sdloc,quatnuc);
@@ -2445,7 +2446,7 @@ void VoxelsCA::WriteToVTU1(const std::string &filename)
       vCD[2] = std::fabs(rRot[0][2]*vBD[0]+rRot[1][2]*vBD[1]+rRot[2][2]*vBD[2]);
       std::sort(vCD,vCD+3);
       std::swap(vCD[0],vCD[1]);
-      vCD[2] = std::min(vCD[2],1.0);
+      vCD[2]=std::min(vCD[2],1.0);
       mxAng = M_PI/4.0;
       red = std::fabs( (mxAng - acos(vCD[2]))/mxAng );
       blue = atan2(vCD[1],vCD[0]);
