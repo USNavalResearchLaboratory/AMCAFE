@@ -29,8 +29,7 @@ int main(int argc, char *argv[])
   int nprocs,myid,ictrl;
   MPI_Comm_size(MPI_COMM_WORLD,&nprocs);
   MPI_Comm_rank(MPI_COMM_WORLD,&myid);
-  int NtM,cc1,nDim;
-  std::vector<int> nXM,nX;
+  int cc1,nDim;
   std::vector<double> dX,dXM,LX;
   double tL,tS,mL,c0,Gamma,dP,dL,dtM,muN,layerThickness,T0,dTempM,dTempS,rNmax;
   std::string filbaseTemp,filbaseOut,filout,neighOrder,neighType,filLogOut;
@@ -38,31 +37,19 @@ int main(int argc, char *argv[])
   double heightBase;
   // schwalbach parameters
   int patternID;
-  double beamVel,beamPower,wEst,cP,rho,kappa,beamEta,rcut,T0targ;
+  double beamVel,beamPower,cP,rho,kappa,beamEta,rcut,T0targ;
   std::vector<double> beamSTD;
   // schwalbach parameters
   bwidth = std::stod(argv[1]);
   rNmax = std::stod(argv[2]);
   ictrl=3;
-  if (ictrl==4){
-    nX = {32,32,32}; // KT: THIS IS FOR TEST
-    LX = {.002,.002,.002}; // KT: THIS IS FOR TEST
-  } else {
   nX = {128,128,64};
   LX = {nX[0]*1.875e-6,nX[1]*1.875e-6,nX[2]*1.875e-6};
-  //nX = {128,32,16};
-  //LX = {.001,.00025,12.5e-5};  
-  }
-  nXM = {20,20,20};
   nDim = nX.size();
   dX.assign(nDim,0.0);
-  dXM.assign(nDim,0.0);
   for (int j=0;j<nDim;++j){
     dX[j] = LX[j]/double(nX[j]);
-    dXM[j] = LX[j]/double(nXM[j]);
   }
-  NtM = 50;
-  dtM = .05; // must set based on moose results
   tL = 1733; // K
   tS = 1693; // K
   dTempM = (tL-tS)*.75; //7.5; // 2.5 // K (mean undercooling for nucleation)
@@ -98,28 +85,12 @@ int main(int argc, char *argv[])
   mu = 1e4/LX[0]/LX[1]/dX[2];// heightBase;//2e13; // 2e11 , 2e14  // rate for nucleation for baseplate 
   BasePlate bp(g,bwidth,beamSTD[1],heightBase,mu, part);
   TempField TempF(g,part,bp);
-  wEst  = pow(8*beamPower/(exp(1.0)*M_PI*rho*cP*(tL-298.0)*beamVel),.5); // see EQ (1) in schwalbach
   T0 = 300.0; // initial temperature in (K)
   int Ntot=part.ncellLoc+ part.nGhost;
-  if (ictrl==4){
-    // this is a test case scenario
-    TempF.InitializeSchwalbach(patternID,beamSTD,beamVel,T0targ,beamEta,LX,T0);
-    //TempF.Test2ComputeTemp(1.02*tL,.97*tL,514880,0.0);
-    TempF.Test2ComputeTemp(0.97*tL,.97*tL,0.0,0.0);
-  } else{
-    //TempF.InitializeSchwalbach(patternID,beamSTD,beamVel,T0targ,beamEta,LX,T0);
-    //TempF.SchwalbachTempCurr();
-    TempF.InitializeAnalytic(patternID,beamSTD,beamVel,LX,T0);
-    TempF.AnalyticTempCurr(g.time,TempF.TempCurr,part.icellidLoc,Ntot);
-  }
+  TempF.InitializeAnalytic(patternID,beamSTD,beamVel,LX,T0);
+  TempF.AnalyticTempCurr(g.time,TempF.TempCurr,part.icellidLoc,Ntot);  
   VoxelsCA vox(g,TempF, part);
-  if (ictrl==4){
-  //vox.InitializeTest1();
-  vox.InitializeTest2();
-  } else{
-    vox.InitializeVoxels(bp);
-  }
-
+  vox.InitializeVoxels(bp);
   /*-----------------------------------------------
     execute simulation */
   cc1=0;
@@ -162,28 +133,16 @@ int main(int argc, char *argv[])
       }
     }
     // update next step for voxels (time is updated in vox.ComputeExtents() )
-    if (ictrl==3){
-      if (fmod(TempF.tInd,TempF.nTTemp[0]*TempF.nTTemp[1])==0){
-	filout = filbaseOut+"_t"+std::to_string(TempF.tInd)+".csv";
-	vox.UpdateLayer(filout); // WriteCSVData1 called in UpdateLayer
-      }
-      vox.UpdateVoxels8();
-      g.UpdateTime2(TempF.DelT);
+    if (fmod(TempF.tInd,TempF.nTTemp[0]*TempF.nTTemp[1])==0){
+      filout = filbaseOut+"_t"+std::to_string(TempF.tInd)+".csv";
+      vox.UpdateLayer(filout); // WriteCSVData1 called in UpdateLayer
     }
-    if (ictrl==4){
-      //std::cout << TempF.tInd<<",00,"<<g.time<<","<<g.time/TempF.DelT<<std::endl;
-      vox.UpdateVoxels4();
-      g.UpdateTime2(TempF.DelT);
-      //TempF.Test2ComputeTemp(1.02*tL,.97*tL,514880,g.time);
-      TempF.Test2ComputeTemp(0.97*tL,.97*tL,0.0,g.time);
-    }
+    vox.UpdateVoxels8();
+    g.UpdateTime2(TempF.DelT);
     // update temperature field
     if (TempF.tInd != int(round(g.time/TempF.DelT))){
       TempF.tInd = int(round(g.time/TempF.DelT));
-      if (ictrl!=4){
-	//TempF.SchwalbachTempCurr();
-	TempF.AnalyticTempCurr(g.time,TempF.TempCurr,part.icellidLoc,Ntot);
-      }
+      TempF.AnalyticTempCurr(g.time,TempF.TempCurr,part.icellidLoc,Ntot);
       irep=0;
     } // if (TempF.tInd !=
     auto texec2 = std::chrono::high_resolution_clock::now();

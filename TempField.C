@@ -85,13 +85,13 @@ void TempField::InitializeAnalytic(int & patternIDIn, std::vector<double> & beam
   a2.resize(6);
   Qp.resize(2);
   for (int j=0;j<3;++j){a1[j] = bmSTD[j];}
-  a1[3] = 1.0e-3/25.0*(bmV-250.0e-3) + 2*bmSTD[0];
+  a1[3] = 2*bmSTD[0];
   a1[4] = a1[1];
   a1[5] = a1[2];
-  a2[0] = 1.02*bmSTD[0];
-  a2[1] = 1.05*bmSTD[1];
-  a2[2] = 1.1*bmSTD[2];
-  a2[3] = (1.0+ (7.0/150.0*(bmV*1e3-250.0)+5.0)/100.0)*a1[3];
+  a2[0] = 1.01*bmSTD[0];
+  a2[1] = 1.02*bmSTD[1];
+  a2[2] = 1.01*bmSTD[2];
+  a2[3] = 1.025*a1[3];
   a2[4] = a2[1];
   a2[5] = a2[2];
   Qp[0] = _xyz->tL;

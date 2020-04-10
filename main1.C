@@ -82,7 +82,7 @@ int main()
   tS = 1693; // K
   dTempM = (tL-tS)*.75; //7.5; // 2.5 // K (mean undercooling for nucleation)
   dTempS = (tL-tS)/3.0; //5.0; // 1.0 // K (standard dev undercooling for nucleation)
-  rNmax = .05; // (m^{-3})  maximum nucleation density for new grains
+  rNmax = -1.0;// .05; // (m^{-3})  maximum nucleation density for new grains
   mL = -10.9; // (K / wt%)
   dL = 3e-9; // (m^2/s)
   Gamma = 1e-7;  // (K m)
@@ -95,7 +95,7 @@ int main()
   rho = 8000.0; // kg /m^3
   cP = 502; // 502.0; // J/kg-K)
   kappa = 18; //18; //18.0; // W/(m-K)
-  beamVel = 250e-3;//250e-3;//250e-3; //70e-3 // m/s
+  beamVel = 500e-3;//250e-3;//250e-3; //70e-3 // m/s
   /*
   layerThickness = 30e-6; // floor(beamSTD[2]/dX[2])*dX[2]; // (layer thickness to be multiple of dX[2])
   beamSTD = {5e-5,5e-5,layerThickness*1.5}; // m
@@ -147,7 +147,7 @@ int main()
   std::ofstream fplog;
   filbaseOut = "CA3D";
   filLogOut="CA3D.log";
-  out2 = {4,1}; // the increment to skip output per direction
+  out2 = {1,1}; // the increment to skip output per direction
   if (part.myid==0){
     fplog.open(filLogOut.c_str());
     fplog << "Time index= ,Total clock time passed(s)"<<std::endl;
