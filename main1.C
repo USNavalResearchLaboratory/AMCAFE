@@ -78,8 +78,8 @@ int main()
   }
   NtM = 50;
   dtM = .05; // must set based on moose results
-  tL = 1733; // K
-  tS = 1693; // K
+  tL = 1620; // K
+  tS = 1531.5; // K
   dTempM = (tL-tS)*.75; //7.5; // 2.5 // K (mean undercooling for nucleation)
   dTempS = (tL-tS)/3.0; //5.0; // 1.0 // K (standard dev undercooling for nucleation)
   rNmax = -1.0;// .05; // (m^{-3})  maximum nucleation density for new grains
@@ -113,7 +113,7 @@ int main()
   //part.PartitionGraph();
   part.PartitionGraph2();
   mu = 1e4/LX[0]/LX[1]/dX[2];// heightBase;//2e13; // 2e11 , 2e14  // rate for nucleation for baseplate 
-  mu = .5*1e4/LX[0]/LX[1]/dX[2];// heightBase;//2e13; // 2e11 , 2e14  // rate for nucleation for baseplate   
+  //mu = .5*1e4/LX[0]/LX[1]/dX[2];// heightBase;//2e13; // 2e11 , 2e14  // rate for nucleation for baseplate   
   BasePlate bp(g,heightBase,mu, part);
   TempField TempF(g,part,bp);
   wEst  = pow(8*beamPower/(exp(1.0)*M_PI*rho*cP*(tL-298.0)*beamVel),.5); // see EQ (1) in schwalbach
@@ -147,13 +147,13 @@ int main()
   std::ofstream fplog;
   filbaseOut = "CA3D";
   filLogOut="CA3D.log";
-  out2 = {1,1}; // the increment to skip output per direction
+  out2 = {4,1}; // the increment to skip output per direction
   if (part.myid==0){
     fplog.open(filLogOut.c_str());
     fplog << "Time index= ,Total clock time passed(s)"<<std::endl;
   }
   //while (TempF.tInd<=nTmax){
-  while (TempF.tInd<=44){
+  while (TempF.tInd<=244){
     icheck=!std::all_of(vox.vState.begin(),vox.vState.end(),[](int n){return n==3;});
     ichecktmp = icheck;
     MPI_Allreduce(&ichecktmp,&icheck,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
@@ -169,7 +169,6 @@ int main()
 	filtime.push_back(g.time);
 	filout = filbaseOut+std::to_string(TempF.tInd);
 	vox.WriteToVTU1(filout);
-	//vox.WriteCSVData(filout);
 	cc1+=1;
 	if (cc1 % 20 || TempF.tInd==(nTmax-1)){
 	  filout=filbaseOut;
@@ -179,33 +178,21 @@ int main()
       }
     }
     // update next step for voxels (time is updated in vox.ComputeExtents() )
-    if (ictrl==3){
-      if (fmod(TempF.tInd,TempF.nTTemp[0]*TempF.nTTemp[1])==0){
-	filout = filbaseOut+"_t"+std::to_string(TempF.tInd)+".csv";
-	vox.UpdateLayer(filout); // WriteCSVData1 called in UpdateLayer
-      }
-      vox.UpdateVoxels8();
-      g.UpdateTime2(TempF.DelT);
+    if (fmod(TempF.tInd,TempF.nTTemp[0]*TempF.nTTemp[1])==0){
+      filout = filbaseOut+"_t"+std::to_string(TempF.tInd)+".csv";
+      vox.UpdateLayer(filout); // WriteCSVData1 called in UpdateLayer
     }
-    if (ictrl==4){
-      //std::cout << TempF.tInd<<",00,"<<g.time<<","<<g.time/TempF.DelT<<std::endl;
-      vox.UpdateVoxels4();
-      g.UpdateTime2(TempF.DelT);
-      //TempF.Test2ComputeTemp(1.02*tL,.97*tL,514880,g.time);
-      TempF.Test2ComputeTemp(0.97*tL,.97*tL,0.0,g.time);
-    }
+    vox.UpdateVoxels8();
+    g.UpdateTime2(TempF.DelT);    
     // update temperature field
     if (TempF.tInd != int(round(g.time/TempF.DelT))){
       TempF.tInd = int(round(g.time/TempF.DelT));
-      if (ictrl!=4){
-	//TempF.SchwalbachTempCurr();
-	TempF.AnalyticTempCurr(g.time,TempF.TempCurr,part.icellidLoc,Ntot);
-      }
+      TempF.AnalyticTempCurr(g.time,TempF.TempCurr,part.icellidLoc,Ntot);
       irep=0;
     } // if (TempF.tInd !=
     auto texec2 = std::chrono::high_resolution_clock::now();
     auto delTexec = std::chrono::duration_cast<std::chrono::seconds>( texec2 - texec1 ).count();
-    if (part.myid==0){std::cout << TempF.tInd<< std::endl;}
+    if (part.myid==0){std::cout << TempF.tInd<<","<<delTexec<< std::endl;}
     if (part.myid==0){fplog << TempF.tInd<<","<<delTexec<<std::endl;}
     } // while
   MPI_Barrier(MPI_COMM_WORLD);

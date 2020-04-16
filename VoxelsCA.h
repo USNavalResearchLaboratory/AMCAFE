@@ -23,6 +23,8 @@ class VoxelsCA
   void SetLiquid2();
   void SetLiquid3();
   void SetLiquid4();
+  void SetLiquid5();
+  void SetLiquid6();
   void ZeroVoxels();
   void ZeroVoxels1();
   void ComputeVoxelCapture();
@@ -48,6 +50,7 @@ class VoxelsCA
   void CheckTimeSkip();
   void WriteToVTU0(const std::string &filname);
   void WriteToVTU1(const std::string &filname);
+  void WriteToVTU2(const std::string &filname);
   void WriteCSVData(const std::string &filname);
   void WriteCSVData1(const std::string &filname);
   void WriteToPVD(const std::string &filname, const std::vector<int> &, const std::vector<double> &);

@@ -82,20 +82,11 @@ void TempField::InitializeAnalytic(int & patternIDIn, std::vector<double> & beam
   bmV = beamVelocityIn;
   patternID = patternIDIn;
   a1.resize(6);
-  a2.resize(6);
   Qp.resize(2);
   for (int j=0;j<3;++j){a1[j] = bmSTD[j];}
-  a1[3] = 1.0e-3/25.0*(bmV-250.0e-3) + 2*bmSTD[0];
+  a1[3] = 2.17*bmSTD[0];
   a1[4] = a1[1];
   a1[5] = a1[2];
-  a2[0] = 1.02*bmSTD[0];
-  a2[1] = 1.05*bmSTD[1];
-  a2[2] = 1.1*bmSTD[2];
-  a2[3] = (1.0+ (7.0/150.0*(bmV*1e3-250.0)+5.0)/100.0)*a1[3];
-  a2[4] = a2[1];
-  a2[5] = a2[2];
-  Qp[0] = _xyz->tL;
-  Qp[1] = pow( pow(a1[3]-a2[3],2.0)/log(_xyz->tS/_xyz->tL),.5);
   T0 = T0In;
   zlaserOff=1.0; // 1.0 (this specifies where laser z value is - see SchwalbachTempCurr)
   if (patternID==0 || patternID==1 || patternID==2 || patternID==3 || patternID==4){
@@ -105,7 +96,8 @@ void TempField::InitializeAnalytic(int & patternIDIn, std::vector<double> & beam
     bmLx={LxIn[0]+1*bmDX[0],LxIn[1]+1*bmDX[1],LxIn[2]};
     if (patternID==1){
       offset={-_xyz->nX[0]*_xyz->dX[0]/2.0,-_xyz->nX[1]*_xyz->dX[1]/2.0,0.0};
-      shiftL={3*bmDX[0],0.0,0.0};
+      shiftL={2.66*bmDX[0],0.0,0.0};
+      bmDX = {DelT*bmV,1.53*bmSTD[1],_xyz->layerT};
       bmLx={LxIn[0]+shiftL[0],LxIn[1],LxIn[2]};
     } // if (patternID==1...
     if (patternID==2){
@@ -126,7 +118,7 @@ void TempField::AnalyticTempCurr(double tcurr,std::vector<double> & TempOut, std
   //computes temp field based on Schwalbach et al
   int j1,j2,j3,iplay;
   double x0,y0,z0,x,y,z,dsq,dsq2,bx,by,xi;
-  std::vector<double> rij1(3),rij2(3),xs1(3),xs2(3);
+  std::vector<double> rij1(3),xs1(3),xs2(3);
   ilaserLoc = _bp->Nzh + (floor( round(tcurr/DelT)/(nTTemp[0]*nTTemp[1]))+1)*_xyz->nZlayer;
   iplay=_xyz->nX[0]*_xyz->nX[1]*ilaserLoc;
   TempOut.assign(Ntot,T0);
@@ -153,64 +145,32 @@ void TempField::AnalyticTempCurr(double tcurr,std::vector<double> & TempOut, std
       rij1[0] = x0-x;
       rij1[1] = y0-y;
       rij1[2] = z0-z;
-      rij2[0] = fabs(rij1[0]);
-      rij2[1] = fabs(rij1[1]);
-      rij2[2] = fabs(rij1[2]);
       if (rij1[0]*pow(-1,(js2+1))  >=0){
-	dsq = pow(pow(rij2[0]/a1[0],2.0)+pow(rij2[1]/a1[1],2.0)+pow(rij2[2]/a1[2],2.0) ,.5);
-	dsq2 = pow(pow(rij2[0]/a2[0],2.0)+pow(rij2[1]/a2[1],2.0)+pow(rij2[2]/a2[2],2.0) ,.5);
-	if (dsq<1.0){TempOut[j]=xi;}
-	if (dsq2>=1.0){TempOut[j]=_xyz->tS;}
-	if (dsq>=1.0 && dsq2<1.0){
-	  bx=rij2[0]/rij2[2];
-	  by=rij2[1]/rij2[2];
-	  xs1[2] = a1[0]*a1[1]*a1[2]/
-	    pow(  pow(bx*a1[1]*a1[2],2.0)+pow(by*a1[0]*a1[2],2.0)+pow(a1[0]*a1[1],2.0) , .5);
-	  xs1[0] = bx*xs1[2];
-	  xs1[1] = by*xs1[2];
-	  xs2[2] = a2[0]*a2[1]*a2[2]/
-	    pow(  pow(bx*a2[1]*a2[2],2.0)+pow(by*a2[0]*a2[2],2.0)+pow(a2[0]*a2[1],2.0) , .5);
-	  xs2[0] = bx*xs2[2];
-	  xs2[1] = by*xs2[2];
-	  bx = pow(pow(xs1[0]-xs2[0],2.0)+pow(xs1[1]-xs2[1],2.0)+pow(xs1[2]-xs2[2],2.0),.5);
-	  by = pow(pow(xs1[0]-rij2[0],2.0)+pow(xs1[1]-rij2[1],2.0)+pow(xs1[2]-rij2[2],2.0),.5);
-	  TempOut[j] = xi - (xi - _xyz->tS)*by/bx;
-	}
+	dsq = pow(rij1[1]/a1[1],2.0)+pow(rij1[2]/a1[2],2.0);
+	if (dsq<1.0 && (fabs(rij1[0])<bmDX[0]) ){
+	  TempOut[j]=xi;
+	} else {
+	  TempOut[j] = _xyz->tS;
+	}	
       } else {
-	dsq = pow(pow(rij2[0]/a1[3],2.0)+pow(rij2[1]/a1[4],2.0)+pow(rij2[2]/a1[5],2.0) ,.5);
-	dsq2 = pow(pow(rij2[0]/a2[3],2.0)+pow(rij2[1]/a2[4],2.0)+pow(rij2[2]/a2[5],2.0) ,.5);
-	if (dsq<1.0){TempOut[j]=xi;}
-	if (dsq2>=1.0){TempOut[j]=_xyz->tS;}
-	if (dsq>=1.0 && dsq2<1.0){
-	  bx=rij2[0]/rij2[2];
-	  by=rij2[1]/rij2[2];
-	  xs1[2] = a1[3]*a1[4]*a1[5]/
-	    pow(  pow(bx*a1[4]*a1[5],2.0)+pow(by*a1[3]*a1[5],2.0)+pow(a1[3]*a1[4],2.0) , .5);
-	  xs1[0] = bx*xs1[2];
-	  xs1[1] = by*xs1[2];
-	  xs2[2] = a2[3]*a2[4]*a2[5]/
-	    pow(  pow(bx*a2[4]*a2[5],2.0)+pow(by*a2[3]*a2[5],2.0)+pow(a2[3]*a2[4],2.0) , .5);
-	  xs2[0] = bx*xs2[2];
-	  xs2[1] = by*xs2[2];
-	  bx = pow(xs1[0]-xs2[0],2.0)+pow(xs1[1]-xs2[1],2.0)+pow(xs1[2]-xs2[2],2.0);
-	  by = pow(xs1[0]-rij2[0],2.0)+pow(xs1[1]-rij2[1],2.0)+pow(xs1[2]-rij2[2],2.0);
-	  TempOut[j] = xi - (xi - _xyz->tS)*by/bx;
+	dsq = pow(rij1[0]/a1[3],2.0)+pow(rij1[1]/a1[4],2.0)+pow(rij1[2]/a1[5],2.0);
+	if (dsq<1.0){
+	  TempOut[j]=xi;
+	} else {
+	  TempOut[j] = _xyz->tS;
 	}
       } // if (rij1[0]>0
     } // for (int j...
   } // if (patternID==1 ...
   if (patternID==2){
     int js0,js1, js2;
-    std::vector<double> a1m(6),a2m(6);
+    std::vector<double> a1m(6);
     // x,y,z spatial location of source
     z = (floor((tcurr/DelT+DelT*1e-6)/(nTTemp[0]*nTTemp[1]))+zlaserOff)*bmDX[2] + _bp->height -
       ceil(offset[2]/_xyz->dX[2])*_xyz->dX[2];
     js1 = fmod( round(tcurr/DelT),nTTemp[0]*nTTemp[1]);
     js0 = fmod( floor( round(tcurr/DelT)/(nTTemp[0]*nTTemp[1])),2);
-    for (int j=0;j<6;++j){
-      a1m[j]=a1[j];
-      a2m[j]=a2[j];
-    }
+    for (int j=0;j<6;++j){a1m[j]=a1[j];}
     if (js0==0){
       y = floor(fmod(round(tcurr/DelT),(nTTemp[0]*nTTemp[1]))/nTTemp[0])*bmDX[1]-offset[1];;
       js2 = fmod(floor(js1/nTTemp[0])+1,2);
@@ -228,10 +188,6 @@ void TempField::AnalyticTempCurr(double tcurr,std::vector<double> & TempOut, std
       a1m[1] = a1[0];
       a1m[3] = a1[4];
       a1m[4] = a1[3];
-      a2m[0] = a2[1];
-      a2m[1] = a2[0];
-      a2m[3] = a2[4];
-      a2m[4] = a2[3];
     }
     for (int j=0;j<Ntot;++j){
       j3 = floor(icellid[j]/(_xyz->nX[0]*_xyz->nX[1]));
@@ -244,48 +200,19 @@ void TempField::AnalyticTempCurr(double tcurr,std::vector<double> & TempOut, std
       rij1[0] = x0-x;
       rij1[1] = y0-y;
       rij1[2] = z0-z;
-      rij2[0] = fabs(rij1[0]);
-      rij2[1] = fabs(rij1[1]);
-      rij2[2] = fabs(rij1[2]);
       if (rij1[js0]*pow(-1,(js2+1))  >=0){
-	dsq = pow(pow(rij2[0]/a1m[0],2.0)+pow(rij2[1]/a1m[1],2.0)+pow(rij2[2]/a1m[2],2.0) ,.5);
-	dsq2 = pow(pow(rij2[0]/a2m[0],2.0)+pow(rij2[1]/a2m[1],2.0)+pow(rij2[2]/a2m[2],2.0) ,.5);
-	if (dsq<1.0){TempOut[j]=xi;}
-	if (dsq2>=1.0){TempOut[j]=_xyz->tS;}
-	if (dsq>=1.0 && dsq2<1.0){
-	  bx=rij2[0]/rij2[2];
-	  by=rij2[1]/rij2[2];
-	  xs1[2] = a1m[0]*a1m[1]*a1m[2]/
-	    pow(  pow(bx*a1m[1]*a1m[2],2.0)+pow(by*a1m[0]*a1m[2],2.0)+pow(a1m[0]*a1m[1],2.0) , .5);
-	  xs1[0] = bx*xs1[2];
-	  xs1[1] = by*xs1[2];
-	  xs2[2] = a2m[0]*a2m[1]*a2m[2]/
-	    pow(  pow(bx*a2m[1]*a2m[2],2.0)+pow(by*a2m[0]*a2m[2],2.0)+pow(a2m[0]*a2m[1],2.0) , .5);
-	  xs2[0] = bx*xs2[2];
-	  xs2[1] = by*xs2[2];
-	  bx = pow(pow(xs1[0]-xs2[0],2.0)+pow(xs1[1]-xs2[1],2.0)+pow(xs1[2]-xs2[2],2.0),.5);
-	  by = pow(pow(xs1[0]-rij2[0],2.0)+pow(xs1[1]-rij2[1],2.0)+pow(xs1[2]-rij2[2],2.0),.5);
-	  TempOut[j] = xi - (xi - _xyz->tS)*by/bx;
+	dsq = pow(rij1[1]/a1m[1],2.0)+pow(rij1[2]/a1m[2],2.0);
+	if (dsq<1.0 && fabs(rij1[0])<bmDX[0]){
+	  TempOut[j]=xi;
+	} else {
+	  TempOut[j]=_xyz->tS;
 	}
       } else {
-	dsq = pow(pow(rij2[0]/a1m[3],2.0)+pow(rij2[1]/a1m[4],2.0)+pow(rij2[2]/a1m[5],2.0) ,.5);
-	dsq2 = pow(pow(rij2[0]/a2m[3],2.0)+pow(rij2[1]/a2m[4],2.0)+pow(rij2[2]/a2m[5],2.0) ,.5);
-	if (dsq<1.0){TempOut[j]=xi;}
-	if (dsq2>=1.0){TempOut[j]=_xyz->tS;}
-	if (dsq>=1.0 && dsq2<1.0){
-	  bx=rij2[0]/rij2[2];
-	  by=rij2[1]/rij2[2];
-	  xs1[2] = a1m[3]*a1m[4]*a1m[5]/
-	    pow(  pow(bx*a1m[4]*a1m[5],2.0)+pow(by*a1m[3]*a1m[5],2.0)+pow(a1m[3]*a1m[4],2.0) , .5);
-	  xs1[0] = bx*xs1[2];
-	  xs1[1] = by*xs1[2];
-	  xs2[2] = a2m[3]*a2m[4]*a2m[5]/
-	    pow(  pow(bx*a2m[4]*a2m[5],2.0)+pow(by*a2m[3]*a2m[5],2.0)+pow(a2m[3]*a2m[4],2.0) , .5);
-	  xs2[0] = bx*xs2[2];
-	  xs2[1] = by*xs2[2];
-	  bx = pow(xs1[0]-xs2[0],2.0)+pow(xs1[1]-xs2[1],2.0)+pow(xs1[2]-xs2[2],2.0);
-	  by = pow(xs1[0]-rij2[0],2.0)+pow(xs1[1]-rij2[1],2.0)+pow(xs1[2]-rij2[2],2.0);
-	  TempOut[j] = xi - (xi - _xyz->tS)*by/bx;
+	dsq = pow(rij1[0]/a1m[3],2.0)+pow(rij1[1]/a1m[4],2.0)+pow(rij1[2]/a1m[5],2.0);
+	if (dsq<1.0){
+	  TempOut[j]=xi;
+	} else {
+	  TempOut[j]=_xyz->tS;
 	}
       } // if (rij1[0]>0
     } // for (int j...

@@ -30,9 +30,10 @@ int main(int argc, char *argv[])
   MPI_Comm_size(MPI_COMM_WORLD,&nprocs);
   MPI_Comm_rank(MPI_COMM_WORLD,&myid);
   int cc1,nDim;
+  std::vector<int> nX;
   std::vector<double> dX,dXM,LX;
   double tL,tS,mL,c0,Gamma,dP,dL,dtM,muN,layerThickness,T0,dTempM,dTempS,rNmax;
-  std::string filbaseTemp,filbaseOut,filout,neighOrder,neighType,filLogOut;
+  std::string filbaseTemp,filbaseOut,filout,neighOrder,neighType,filLogOut,filext;
   double mu,bwidth; //2e11;//5e9 // rate for baseplate voronoi;
   double heightBase;
   // schwalbach parameters
@@ -40,8 +41,9 @@ int main(int argc, char *argv[])
   double beamVel,beamPower,cP,rho,kappa,beamEta,rcut,T0targ;
   std::vector<double> beamSTD;
   // schwalbach parameters
-  bwidth = std::stod(argv[1]);
-  rNmax = std::stod(argv[2]);
+  filext=argv[1];
+  bwidth = std::stod(argv[2]);
+  rNmax = std::stod(argv[3]);
   ictrl=3;
   nX = {128,128,64};
   LX = {nX[0]*1.875e-6,nX[1]*1.875e-6,nX[2]*1.875e-6};
@@ -50,8 +52,8 @@ int main(int argc, char *argv[])
   for (int j=0;j<nDim;++j){
     dX[j] = LX[j]/double(nX[j]);
   }
-  tL = 1733; // K
-  tS = 1693; // K
+  tL = 1620; // K
+  tS = 1531.5; // K
   dTempM = (tL-tS)*.75; //7.5; // 2.5 // K (mean undercooling for nucleation)
   dTempS = (tL-tS)/3.0; //5.0; // 1.0 // K (standard dev undercooling for nucleation)
   mL = -10.9; // (K / wt%)
@@ -65,7 +67,7 @@ int main(int argc, char *argv[])
   rho = 8000.0; // kg /m^3
   cP = 502; // 502.0; // J/kg-K)
   kappa = 18; //18; //18.0; // W/(m-K)
-  beamVel = 250e-3;//250e-3;//250e-3; //70e-3 // m/s
+  beamVel = 500e-3;//250e-3;//250e-3; //70e-3 // m/s
   /*
   layerThickness = 30e-6; // floor(beamSTD[2]/dX[2])*dX[2]; // (layer thickness to be multiple of dX[2])
   beamSTD = {5e-5,5e-5,layerThickness*1.5}; // m
@@ -99,8 +101,8 @@ int main(int argc, char *argv[])
   std::vector<double> filtime;
   int icheck = 1,ichecktmp,cc2=0, irep=0;
   std::ofstream fplog;
-  filbaseOut = "CA3D";
-  filLogOut="CA3D.log";
+  filbaseOut = "CA3Dval1_"+filext+"_";
+  filLogOut="CA3Dval1_"+filext+"_.log";
   out2 = {1,1}; // the increment to skip output per direction
   if (part.myid==0){
     fplog.open(filLogOut.c_str());
@@ -116,6 +118,7 @@ int main(int argc, char *argv[])
     j123[0] = TempF.tInd - (TempF.nTTemp[0]*TempF.nTTemp[1])*j123[2] - TempF.nTTemp[0]*j123[1];
     //indOut = j123[2] % out2[1] + (TempF.nTTemp[0]*j123[1]+j123[0]) % out2[0];
     indOut = (TempF.nTTemp[0]*TempF.nTTemp[1]*j123[2]+TempF.nTTemp[0]*j123[1]+j123[0]) % out2[0];
+    //TempF.ComputeStartTime();
     if (irep==0){
       irep=1;
       if (indOut==0 || TempF.tInd ==(nTmax-1)){ 
@@ -123,7 +126,6 @@ int main(int argc, char *argv[])
 	filtime.push_back(g.time);
 	filout = filbaseOut+std::to_string(TempF.tInd);
 	vox.WriteToVTU1(filout);
-	//vox.WriteCSVData(filout);
 	cc1+=1;
 	if (cc1 % 20 || TempF.tInd==(nTmax-1)){
 	  filout=filbaseOut;
