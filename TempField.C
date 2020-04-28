@@ -98,7 +98,7 @@ void TempField::InitializeAnalytic(int & patternIDIn, std::vector<double> & beam
       offset={0.0,0.0,0.0};
       shiftL={2.66*bmDX[0],0.0,0.0};
       bmDX = {DelT*bmV,1.53*bmSTD[1],_xyz->layerT};
-      bmLx={LxIn[0]+shiftL[0],LxIn[1],LxIn[2]};
+      bmLx={LxIn[0]+shiftL[0],LxIn[1]+bmDX[1],LxIn[2]};
     } // if (patternID==1...
     if (patternID==2){
       // scan is back and forth in x then back and forth in y
@@ -146,6 +146,21 @@ void TempField::AnalyticTempCurr(double tcurr,std::vector<double> & TempOut, std
       rij1[1] = y0-y;
       rij1[2] = z0-z;
       if (rij1[0]*pow(-1,(js2+1))  >=0){
+	dsq = pow(rij1[0]/a1[0],2.0)+pow(rij1[1]/a1[1],2.0)+pow(rij1[2]/a1[2],2.0);
+	if (dsq<1.0 ){
+	TempOut[j]=xi;
+	} else {
+	  TempOut[j] = _xyz->tS;
+	}	
+      } else {
+	dsq = pow(rij1[0]/a1[3],2.0)+pow(rij1[1]/a1[4],2.0)+pow(rij1[2]/a1[5],2.0);
+	if (dsq<1.0){
+	  TempOut[j]=xi;
+	} else {
+	  TempOut[j] = _xyz->tS;
+	}
+
+	/*
 	dsq = pow(rij1[1]/a1[1],2.0)+pow(rij1[2]/a1[2],2.0);
 	if (dsq<1.0 && (fabs(rij1[0])<bmDX[0]) ){
 	TempOut[j]=xi;
@@ -159,6 +174,7 @@ void TempField::AnalyticTempCurr(double tcurr,std::vector<double> & TempOut, std
 	} else {
 	  TempOut[j] = _xyz->tS;
 	}
+	*/
       } // if (rij1[0]>0
     } // for (int j...
   } // if (patternID==1 ...

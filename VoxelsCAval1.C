@@ -2381,10 +2381,14 @@ void VoxelsCA::ConvertSolid1(const int &iswitch)
   } // if (iswitch==0)
 }; // ConvertSolid1
 
-void VoxelsCA::UpdateLayer(std::string &filCSV){
+void VoxelsCA::UpdateLayer(std::string &filCSV, double &bwIn){
   /*
     Function adds powder to layer by making every voxel in layer a unique grain.
-    It is called at the start of a new layer
+    It is called at the start of a new layer. This differs from VoxelsCA.C because
+    the new powder particle crystallographic orientations are limited to 
+    <0 0 1> pointing in build direction in the bands and <1 0 1> pointing in 
+    build direction between the bands
+    
     
   */
 
@@ -2421,6 +2425,9 @@ void VoxelsCA::UpdateLayer(std::string &filCSV){
   }
   // create new grains for each voxel in layer
   WriteCSVData1(filCSV);
+  std::vector<std::vector<double> > axl,rRot(3,std::vector<double>(3,0));
+  std::vector<double> axr(3,0),ax(3,0),axg(3,0),q0(4,0),qr(4,0),q2(4,0),tmp(3,0);
+  double eta,y,omega,th2,theta;
   nVlayer = _xyz->nX[0]*_xyz->nX[1]*_xyz->nZlayer;
   std::default_random_engine gen1(3134525);
   unsigned int sdloc;
@@ -2450,7 +2457,96 @@ void VoxelsCA::UpdateLayer(std::string &filCSV){
       } // if (j<Ntot)
     } // if (j3>=iz1 && j3<_temp->ilaserLoc ...
   } // for (int j...
-  nGrain += _xyz->nX[0]*_xyz->nX[1]*_xyz->nZlayer;
+  int jvox1=jvox0 + nVlayer,ig1;
+  for (int j=jvox0;j<jvox1;++j){
+    j3 = floor(j/(_xyz->nX[0]*_xyz->nX[1]));
+    j2 = floor( (j- _xyz->nX[0]*_xyz->nX[1]*j3)/_xyz->nX[0]);
+    j1 = j - _xyz->nX[0]*_xyz->nX[1]*j3 - _xyz->nX[0]*j2;
+    ig1 = nGrain + j-jvox0+1;
+    omega = cTheta[4*(ig1-1)];
+    ax[0]=cTheta[4*(ig1-1)+1];
+    ax[1]=cTheta[4*(ig1-1)+2];
+    ax[2]=cTheta[4*(ig1-1)+3];
+    rRot[0][0] = cos(omega) + pow(ax[0],2.0)*(1-cos(omega));
+    rRot[0][1] = ax[0]*ax[1]*(1-cos(omega)) - ax[2]*sin(omega);
+    rRot[0][2] = ax[0]*ax[2]*(1-cos(omega)) + ax[1]*sin(omega);
+    rRot[1][0] = ax[0]*ax[1]*(1-cos(omega)) + ax[2]*sin(omega);
+    rRot[1][1] = cos(omega) + pow(ax[1],2.0)*(1-cos(omega));
+    rRot[1][2] = ax[1]*ax[2]*(1-cos(omega)) - ax[0]*sin(omega);
+    rRot[2][0] = ax[2]*ax[0]*(1-cos(omega)) - ax[1]*sin(omega);
+    rRot[2][1] = ax[2]*ax[1]*(1-cos(omega)) + ax[0]*sin(omega);
+    rRot[2][2] = cos(omega) + pow(ax[2],2.0)*(1-cos(omega));
+    // find out if within a band
+    y = _xyz->dX[1]*j2;
+    eta = round( y / _temp->bmDX[1]);
+    if ( std::fabs(eta*_temp->bmDX[1] - y)<=bwIn/2.0){
+      axl.assign(6,std::vector<double>(3,0));
+      axl[0] = {1,0,0};
+      axl[1] = {-1,0,0};
+      axl[2] = {0,1,0};
+      axl[3] = {0,-1,0};
+      axl[4] = {0,0,1};
+      axl[5] = {0,0,-1};
+    } else {
+      axl.assign(12,std::vector<double>(3,0));
+      axl[0] = {1/pow(2,.5),1/pow(2,.5),0};
+      axl[1] = {-1/pow(2,.5),1/pow(2,.5),0};
+      axl[2] = {1/pow(2,.5),-1/pow(2,.5),0};
+      axl[3] = {-1/pow(2,.5),-1/pow(2,.5),0};
+      axl[4] = {1/pow(2,.5),0,1/pow(2,.5)};
+      axl[5] = {-1/pow(2,.5),0,1/pow(2,.5)};
+      axl[6] = {1/pow(2,.5),0,-1/pow(2,.5)};
+      axl[7] = {-1/pow(2,.5),0,-1/pow(2,.5)};
+      axl[8] = {0,1/pow(2,.5),1/pow(2,.5)};
+      axl[9] = {0,-1/pow(2,.5),1/pow(2,.5)};
+      axl[10] = {0,1/pow(2,.5),-1/pow(2,.5)};
+      axl[11] = {0,-1/pow(2,.5),-1/pow(2,.5)};
+    }
+    theta = 1000;
+    for (int jr=0;jr<axl.size();++jr){
+      axg[0] = rRot[0][0]*axl[jr][0]+rRot[1][0]*axl[jr][1]+rRot[2][0]*axl[jr][2];
+      axg[1] = rRot[0][1]*axl[jr][0]+rRot[1][1]*axl[jr][1]+rRot[2][1]*axl[jr][2];
+      axg[2] = rRot[0][2]*axl[jr][0]+rRot[1][2]*axl[jr][1]+rRot[2][2]*axl[jr][2];
+      th2 = acos( axg[2]);
+      if (th2<theta){
+	theta = th2;
+	axr[0] = axg[1]/pow(pow(axg[0],2.0)+pow(axg[1],2.0),.5);
+	axr[1] = -axg[0]/pow(pow(axg[0],2.0)+pow(axg[1],2.0),.5);
+	axr[2] = 0.0;
+      }
+    }
+    // convert axis angle to quat 
+    q0[0] = cos(omega/2.0);
+    q0[1] = -ax[0]*sin(omega/2.0);
+    q0[2] = -ax[1]*sin(omega/2.0);
+    q0[3] = -ax[2]*sin(omega/2.0);
+    qr[0] = cos(theta/2.0);
+    qr[1] = axr[0]*sin(theta/2.0);
+    qr[2] = axr[1]*sin(theta/2.0);
+    qr[3] = axr[2]*sin(theta/2.0);
+    // multiple 2 quats and then convert back to axis-angle 
+    tmp[0] = qr[2]*q0[3]-q0[2]*qr[3];
+    tmp[1] = qr[3]*q0[1]-q0[3]*qr[1];
+    tmp[2] = qr[1]*q0[2]-q0[1]*qr[2];
+    q2[0] = qr[0]*q0[0] - (qr[1]*q0[1]+qr[2]*q0[2]+qr[3]*q0[3]);
+    q2[1] =  (q0[0]*qr[1] + qr[0]*q0[1] + tmp[0]);
+    q2[2] =  (q0[0]*qr[2] + qr[0]*q0[2] + tmp[1]);
+    q2[3] =  (q0[0]*qr[3] + qr[0]*q0[3] + tmp[2]);
+    omega = 2*acos(q2[0]);
+    th2 = 1.0 /
+      pow( pow(q2[1],2.0)+pow(q2[2],2.0)+pow(q2[3],2.0),.5);
+    ax[0] = q2[1]*th2;
+    ax[1] = q2[2]*th2;
+    ax[2] = q2[3]*th2;
+    cTheta[4*(ig1-1)]=omega;
+    cTheta[4*(ig1-1)+1]=ax[0];
+    cTheta[4*(ig1-1)+2]=ax[1];
+    cTheta[4*(ig1-1)+3]=ax[2];     
+  } // for (int j=jvox0...
+
+
+
+  nGrain += nVlayer;
   
   // assign appropriate vState (including zeroing states above ilaserLoc
   iz1 = _xyz->nX[0]*_xyz->nX[1]*_temp->ilaserLoc;
@@ -2773,14 +2869,21 @@ void VoxelsCA::WriteToVTU1(const std::string &filename)
   int Offset=0, nC=_part->ncellLoc, nP=_part->npointLoc,j1,j2,j3,cell_offsets;
   unsigned char cell_type;
   std::vector< float> TempOut(nC,0);
-  float IPFmapBD[3*nC];
-  double vBD[3]={0.0,0.0,1.0},omega,ax[3],vCD[3],mxAng,blue,green,red,rRot[3][3],mscale;
+  float IPFmapBD[3*nC], IPFmapx[3*nC], IPFmapy[3*nC];
+  double vBD[3]={0.0,0.0,1.0},omega,ax[3],vCD[3],mxAng,blue,green,red,rRot[3][3],mscale,
+    vX[3]={1.0,0.0,0.0},vY[3]={0.0,1.0,0.0};
   for (int j=0;j<nC;++j){
     TempOut[j] = _temp->TempCurr[j];
     if (gID[j]<1){
       IPFmapBD[3*j] = 0.0;
       IPFmapBD[3*j+1] = 0.0;
       IPFmapBD[3*j+2] = 0.0;
+      IPFmapx[3*j] = 0.0;
+      IPFmapx[3*j+1] = 0.0;
+      IPFmapx[3*j+2] = 0.0;
+      IPFmapy[3*j] = 0.0;
+      IPFmapy[3*j+1] = 0.0;
+      IPFmapy[3*j+2] = 0.0;
     } else {
       omega = cTheta[4*(gID[j]-1)];
       ax[0]= cTheta[4*(gID[j]-1)+1];
@@ -2812,6 +2915,40 @@ void VoxelsCA::WriteToVTU1(const std::string &filename)
       IPFmapBD[3*j] = red/mscale;
       IPFmapBD[3*j+1] = green/mscale;
       IPFmapBD[3*j+2] = blue/mscale;
+      // x dir
+      vCD[0] = std::fabs(rRot[0][0]*vX[0]+rRot[1][0]*vX[1]+rRot[2][0]*vX[2]);
+      vCD[1] = std::fabs(rRot[0][1]*vX[0]+rRot[1][1]*vX[1]+rRot[2][1]*vX[2]);
+      vCD[2] = std::fabs(rRot[0][2]*vX[0]+rRot[1][2]*vX[1]+rRot[2][2]*vX[2]);
+      std::sort(vCD,vCD+3);
+      std::swap(vCD[0],vCD[1]);
+      vCD[2]=std::min(vCD[2],1.0);
+      mxAng = M_PI/4.0;
+      red = std::fabs( (mxAng - acos(vCD[2]))/mxAng );
+      blue = atan2(vCD[1],vCD[0]);
+      green = mxAng - blue;
+      blue *= (1-red)/mxAng;
+      green *= (1-red)/mxAng;
+      mscale = std::max(red,std::max(green,blue));
+      IPFmapx[3*j] = red/mscale;
+      IPFmapx[3*j+1] = green/mscale;
+      IPFmapx[3*j+2] = blue/mscale;
+      // y dir
+      vCD[0] = std::fabs(rRot[0][0]*vY[0]+rRot[1][0]*vY[1]+rRot[2][0]*vY[2]);
+      vCD[1] = std::fabs(rRot[0][1]*vY[0]+rRot[1][1]*vY[1]+rRot[2][1]*vY[2]);
+      vCD[2] = std::fabs(rRot[0][2]*vY[0]+rRot[1][2]*vY[1]+rRot[2][2]*vY[2]);
+      std::sort(vCD,vCD+3);
+      std::swap(vCD[0],vCD[1]);
+      vCD[2]=std::min(vCD[2],1.0);
+      mxAng = M_PI/4.0;
+      red = std::fabs( (mxAng - acos(vCD[2]))/mxAng );
+      blue = atan2(vCD[1],vCD[0]);
+      green = mxAng - blue;
+      blue *= (1-red)/mxAng;
+      green *= (1-red)/mxAng;
+      mscale = std::max(red,std::max(green,blue));
+      IPFmapy[3*j] = red/mscale;
+      IPFmapy[3*j+1] = green/mscale;
+      IPFmapy[3*j+2] = blue/mscale;
     }
   }
   if (_xyz->nnodePerCell==4){cell_type=9;}
@@ -2856,6 +2993,10 @@ void VoxelsCA::WriteToVTU1(const std::string &filename)
     Offset += nC * sizeof (int) + sizeof (int);
     fp << "        <DataArray type='Float32' Name='IPFz' NumberOfComponents='3' format='appended' offset='" << Offset << "'/>" << std::endl;
     Offset += 3*nC * sizeof (float) + sizeof (int);
+    fp << "        <DataArray type='Float32' Name='IPFx' NumberOfComponents='3' format='appended' offset='" << Offset << "'/>" << std::endl;
+    Offset += 3*nC * sizeof (float) + sizeof (int);
+    fp << "        <DataArray type='Float32' Name='IPFy' NumberOfComponents='3' format='appended' offset='" << Offset << "'/>" << std::endl;
+    Offset += 3*nC * sizeof (float) + sizeof (int);
     fp << "        <DataArray type='Float32' Name='Temperature' NumberOfComponents='1' format='appended' offset='" << Offset << "'/>" << std::endl;
     Offset += nC * sizeof (float) + sizeof (int);
     fp << "      </CellData>" << std::endl;
@@ -2875,7 +3016,7 @@ void VoxelsCA::WriteToVTU1(const std::string &filename)
     if (_part->myid != rank) continue;
     fp.open(vtkFilename.c_str(), std::fstream::app);
     int Scalar = nP * sizeof (float), Vector = 3 * Scalar, Cells = nC * sizeof(int), 
-      CellsTH=4*nC*sizeof(float), CellsTemp=nC*sizeof(float);
+      CellsTH=3*nC*sizeof(float), CellsTemp=nC*sizeof(float);
     int CellChars = nC * sizeof(unsigned char), Conn = _part->iconnectivityLoc.size() * sizeof(int);
     fp.write(reinterpret_cast<const char *>(&Vector), 4);
     for (int j=0;j<nP;j++) {
@@ -2908,6 +3049,10 @@ void VoxelsCA::WriteToVTU1(const std::string &filename)
     for (int i=0;i<nC;i++) fp.write(reinterpret_cast<const char *>(&gID[i]), sizeof (int));
     fp.write(reinterpret_cast<const char *>(&CellsTH), 4);
     for (int i=0;i<3*nC;i++) fp.write(reinterpret_cast<const char *>(&IPFmapBD[i]), sizeof (float));
+    fp.write(reinterpret_cast<const char *>(&CellsTH), 4);
+    for (int i=0;i<3*nC;i++) fp.write(reinterpret_cast<const char *>(&IPFmapx[i]), sizeof (float));
+    fp.write(reinterpret_cast<const char *>(&CellsTH), 4);
+    for (int i=0;i<3*nC;i++) fp.write(reinterpret_cast<const char *>(&IPFmapy[i]), sizeof (float));
     fp.write(reinterpret_cast<const char *>(&CellsTemp), 4);
     for (int i=0;i<nC;i++) fp.write(reinterpret_cast<const char *>(&TempOut[i]), sizeof (float));
     fp.close();

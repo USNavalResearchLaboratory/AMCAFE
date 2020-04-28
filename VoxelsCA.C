@@ -2790,14 +2790,21 @@ void VoxelsCA::WriteToVTU1(const std::string &filename)
   int Offset=0, nC=_part->ncellLoc, nP=_part->npointLoc,j1,j2,j3,cell_offsets;
   unsigned char cell_type;
   std::vector< float> TempOut(nC,0);
-  float IPFmapBD[3*nC];
-  double vBD[3]={0.0,0.0,1.0},omega,ax[3],vCD[3],mxAng,blue,green,red,rRot[3][3],mscale;
+  float IPFmapBD[3*nC], IPFmapx[3*nC], IPFmapy[3*nC];
+  double vBD[3]={0.0,0.0,1.0},omega,ax[3],vCD[3],mxAng,blue,green,red,rRot[3][3],mscale,
+    vX[3]={1.0,0.0,0.0},vY[3]={0.0,1.0,0.0};
   for (int j=0;j<nC;++j){
     TempOut[j] = _temp->TempCurr[j];
     if (gID[j]<1){
       IPFmapBD[3*j] = 0.0;
       IPFmapBD[3*j+1] = 0.0;
       IPFmapBD[3*j+2] = 0.0;
+      IPFmapx[3*j] = 0.0;
+      IPFmapx[3*j+1] = 0.0;
+      IPFmapx[3*j+2] = 0.0;
+      IPFmapy[3*j] = 0.0;
+      IPFmapy[3*j+1] = 0.0;
+      IPFmapy[3*j+2] = 0.0;
     } else {
       omega = cTheta[4*(gID[j]-1)];
       ax[0]= cTheta[4*(gID[j]-1)+1];
@@ -2829,6 +2836,40 @@ void VoxelsCA::WriteToVTU1(const std::string &filename)
       IPFmapBD[3*j] = red/mscale;
       IPFmapBD[3*j+1] = green/mscale;
       IPFmapBD[3*j+2] = blue/mscale;
+      // x dir
+      vCD[0] = std::fabs(rRot[0][0]*vX[0]+rRot[1][0]*vX[1]+rRot[2][0]*vX[2]);
+      vCD[1] = std::fabs(rRot[0][1]*vX[0]+rRot[1][1]*vX[1]+rRot[2][1]*vX[2]);
+      vCD[2] = std::fabs(rRot[0][2]*vX[0]+rRot[1][2]*vX[1]+rRot[2][2]*vX[2]);
+      std::sort(vCD,vCD+3);
+      std::swap(vCD[0],vCD[1]);
+      vCD[2]=std::min(vCD[2],1.0);
+      mxAng = M_PI/4.0;
+      red = std::fabs( (mxAng - acos(vCD[2]))/mxAng );
+      blue = atan2(vCD[1],vCD[0]);
+      green = mxAng - blue;
+      blue *= (1-red)/mxAng;
+      green *= (1-red)/mxAng;
+      mscale = std::max(red,std::max(green,blue));
+      IPFmapx[3*j] = red/mscale;
+      IPFmapx[3*j+1] = green/mscale;
+      IPFmapx[3*j+2] = blue/mscale;
+      // y dir 
+      vCD[0] = std::fabs(rRot[0][0]*vY[0]+rRot[1][0]*vY[1]+rRot[2][0]*vY[2]);
+      vCD[1] = std::fabs(rRot[0][1]*vY[0]+rRot[1][1]*vY[1]+rRot[2][1]*vY[2]);
+      vCD[2] = std::fabs(rRot[0][2]*vY[0]+rRot[1][2]*vY[1]+rRot[2][2]*vY[2]);
+      std::sort(vCD,vCD+3);
+      std::swap(vCD[0],vCD[1]);
+      vCD[2]=std::min(vCD[2],1.0);
+      mxAng = M_PI/4.0;
+      red = std::fabs( (mxAng - acos(vCD[2]))/mxAng );
+      blue = atan2(vCD[1],vCD[0]);
+      green = mxAng - blue;
+      blue *= (1-red)/mxAng;
+      green *= (1-red)/mxAng;
+      mscale = std::max(red,std::max(green,blue));
+      IPFmapy[3*j] = red/mscale;
+      IPFmapy[3*j+1] = green/mscale;
+      IPFmapy[3*j+2] = blue/mscale;
     }
   }
   if (_xyz->nnodePerCell==4){cell_type=9;}
@@ -2873,6 +2914,10 @@ void VoxelsCA::WriteToVTU1(const std::string &filename)
     Offset += nC * sizeof (int) + sizeof (int);
     fp << "        <DataArray type='Float32' Name='IPFz' NumberOfComponents='3' format='appended' offset='" << Offset << "'/>" << std::endl;
     Offset += 3*nC * sizeof (float) + sizeof (int);
+    fp << "        <DataArray type='Float32' Name='IPFx' NumberOfComponents='3' format='appended' offset='" << Offset << "'/>" << std::endl;
+    Offset += 3*nC * sizeof (float) + sizeof (int);
+    fp << "        <DataArray type='Float32' Name='IPFy' NumberOfComponents='3' format='appended' offset='" << Offset << "'/>" << std::endl;
+    Offset += 3*nC * sizeof (float) + sizeof (int);
     fp << "        <DataArray type='Float32' Name='Temperature' NumberOfComponents='1' format='appended' offset='" << Offset << "'/>" << std::endl;
     Offset += nC * sizeof (float) + sizeof (int);
     fp << "      </CellData>" << std::endl;
@@ -2892,7 +2937,7 @@ void VoxelsCA::WriteToVTU1(const std::string &filename)
     if (_part->myid != rank) continue;
     fp.open(vtkFilename.c_str(), std::fstream::app);
     int Scalar = nP * sizeof (float), Vector = 3 * Scalar, Cells = nC * sizeof(int), 
-      CellsTH=4*nC*sizeof(float), CellsTemp=nC*sizeof(float);
+      CellsTH=3*nC*sizeof(float), CellsTemp=nC*sizeof(float);
     int CellChars = nC * sizeof(unsigned char), Conn = _part->iconnectivityLoc.size() * sizeof(int);
     fp.write(reinterpret_cast<const char *>(&Vector), 4);
     for (int j=0;j<nP;j++) {
@@ -2925,6 +2970,10 @@ void VoxelsCA::WriteToVTU1(const std::string &filename)
     for (int i=0;i<nC;i++) fp.write(reinterpret_cast<const char *>(&gID[i]), sizeof (int));
     fp.write(reinterpret_cast<const char *>(&CellsTH), 4);
     for (int i=0;i<3*nC;i++) fp.write(reinterpret_cast<const char *>(&IPFmapBD[i]), sizeof (float));
+    fp.write(reinterpret_cast<const char *>(&CellsTH), 4);
+    for (int i=0;i<3*nC;i++) fp.write(reinterpret_cast<const char *>(&IPFmapx[i]), sizeof (float));
+    fp.write(reinterpret_cast<const char *>(&CellsTH), 4);
+    for (int i=0;i<3*nC;i++) fp.write(reinterpret_cast<const char *>(&IPFmapy[i]), sizeof (float));
     fp.write(reinterpret_cast<const char *>(&CellsTemp), 4);
     for (int i=0;i<nC;i++) fp.write(reinterpret_cast<const char *>(&TempOut[i]), sizeof (float));
     fp.close();

@@ -137,7 +137,7 @@ int main(int argc, char *argv[])
     // update next step for voxels (time is updated in vox.ComputeExtents() )
     if (fmod(TempF.tInd,TempF.nTTemp[0]*TempF.nTTemp[1])==0){
       filout = filbaseOut+"_t"+std::to_string(TempF.tInd)+".csv";
-      vox.UpdateLayer(filout); // WriteCSVData1 called in UpdateLayer
+      vox.UpdateLayer(filout,bwidth); // WriteCSVData1 called in UpdateLayer
     }
     vox.UpdateVoxels8();
     g.UpdateTime2(TempF.DelT);
