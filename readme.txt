@@ -1,3 +1,22 @@
+20200526:
+note that in the makefile in this repository there are links to 
+compiler wrapping MPI libraries in a petsc directory and a link to 
+metis library. I've typically compiled these libraries by downloading 
+petsc zip file, going to directory, and doing the following command (or at least some minor
+variation- you can go to the petsc website to see):
+
+./configure --with-cc=gcc --with-cxx=g++ --with-debugging=0 COPTFLAGS='-O3 -march=native -mtune=native' 
+CXXOPTFLAGS='-O3 -march=native -mtune=native' FOPTFLAGS='-O3 -march=native -mtune=native'
+ --download-mpich --download-metis
+
+That being said, on HPC it probably is better to use an intel compiler rather than GNU and to
+use any MPI library that is compiled already on the system by system administrators. That is likely
+to be more optimized. In that case, you must find the compiler that is wrapped around an mpi library.
+An example of me doing this is with the HPC system ONYX which is a cray system.
+
+
+
+
 This is a git repository for the 3D cafeMPI code. Please refer to the 
 comments in the commits to know about the details of each version of the
 code. This repository is likely to be cloned by my various machines, such as
@@ -17,8 +36,13 @@ this is done in ghidorah at:
 /Users/kteferra/Documents/research/projects/AMICME/codes/CA/cafeMPI3D/neocortex
 
 
+
 I'm doing most/all of the editing in neocortex so i created a branch for neocortex that 
 has the evolution of the code (commits), certainly as of 20191007
+
+-- below is old because i dont push fromo neocortex to anything any more. instead i use
+neocortex as the main repository and i pull from other places (i.e., ghidorah) that i set 
+up as clones.---
 
 When i push updates from neocortex to godzilla2:
 1) make sure godzilla2 is mounted (see line "sudo mount ..." in ~/.bashrc,

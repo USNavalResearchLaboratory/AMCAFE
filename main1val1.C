@@ -46,6 +46,7 @@ int main(int argc, char *argv[])
   rNmax = std::stod(argv[3]);
   ictrl=3;
   nX = {128,128,64};
+  nX = {200,200,300};
   LX = {nX[0]*1.875e-6,nX[1]*1.875e-6,nX[2]*1.875e-6};
   nDim = nX.size();
   dX.assign(nDim,0.0);
@@ -75,7 +76,8 @@ int main(int argc, char *argv[])
   patternID = 1; // see TempField.C for description
   */
   layerThickness = 25e-6;
-  beamSTD = {7.5e-5,7.5e-5,7.5e-5};
+  beamSTD = {7.5e-5,8.25e-5,7.5e-5};
+  double bhatch=1.53*75e-6;
   heightBase = layerThickness;
   patternID = 1; // see TempField.C for description
   T0targ = 1500;//2000.0; // target peak temperature for one ellipsoid
@@ -85,7 +87,7 @@ int main(int argc, char *argv[])
   //part.PartitionGraph();
   part.PartitionGraph2();
   mu = 1e4/LX[0]/LX[1]/dX[2];// heightBase;//2e13; // 2e11 , 2e14  // rate for nucleation for baseplate 
-  BasePlate bp(g,bwidth,beamSTD[1],heightBase,mu, part);
+  BasePlate bp(g,bwidth,bhatch,heightBase,mu, part);
   TempField TempF(g,part,bp);
   T0 = 300.0; // initial temperature in (K)
   int Ntot=part.ncellLoc+ part.nGhost;
@@ -139,7 +141,7 @@ int main(int argc, char *argv[])
       filout = filbaseOut+"_t"+std::to_string(TempF.tInd)+".csv";
       vox.UpdateLayer(filout,bwidth); // WriteCSVData1 called in UpdateLayer
     }
-    vox.UpdateVoxels8();
+    //vox.UpdateVoxels8();
     g.UpdateTime2(TempF.DelT);
     // update temperature field
     if (TempF.tInd != int(round(g.time/TempF.DelT))){

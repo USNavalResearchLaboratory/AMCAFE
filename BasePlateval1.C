@@ -14,7 +14,7 @@
 
 
 // constructor
-BasePlate::BasePlate(const Grid & g, const double & bwIn, const double & bstdIn, const double & hIn,const double & muIn, Partition & part)
+BasePlate::BasePlate(const Grid & g, const double & bwIn, const double & bhatch, const double & hIn,const double & muIn, Partition & part)
 {
   _xyz = &g;
   _part = &part;
@@ -23,7 +23,7 @@ BasePlate::BasePlate(const Grid & g, const double & bwIn, const double & bstdIn,
   Nzh = ceil(hIn/_xyz->dX[2]);
   height = Nzh*(_xyz->dX[2]);
   bwidth=bwIn;
-  bInc = 1.53*bstdIn;
+  bInc = bhatch;
   // if you want seed to be different every time program runs
   //seed = std::chrono::system_clock::now().time_since_epoch().count();
   seed = 1234567;
