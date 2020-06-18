@@ -62,7 +62,7 @@ int main()
     LX = {.002,.002,.002}; // KT: THIS IS FOR TEST
   } else {
   nX = {128,128,64};
-  nX = {200,200,300};
+  //nX = {200,200,300};
   //nX = {64,64,32};
   LX = {nX[0]*1.875e-6,nX[1]*1.875e-6,nX[2]*1.875e-6};
   //nX = {128,32,16};
@@ -140,7 +140,10 @@ int main()
   /*-----------------------------------------------
     execute simulation */
   cc1=0;
-  int outskip=20,indOut,nTmax=TempF.nTTemp[0]*TempF.nTTemp[1]*TempF.nTTemp[2];
+  int outskip=20,indOut,nTmax=TempF.nTTemp[0]*TempF.nTTemp[1]*TempF.nTTemp[2],
+    nFils;
+  double filSize=(nX[0]*nX[1]*nX[2]*4*(9+3+3+8)+12)/1e9;
+  nFils = int(ceil(filSize/1.5 ));
   std::vector<int> filinds,out2(2,0),j123(3,0);
   std::vector<double> filtime;
   int icheck = 1,ichecktmp,cc2=0, irep=0;
@@ -161,19 +164,24 @@ int main()
     j123[2] = floor(TempF.tInd /(TempF.nTTemp[0]*TempF.nTTemp[1]));
     j123[1] = floor((TempF.tInd - (TempF.nTTemp[0]*TempF.nTTemp[1])*j123[2])/ TempF.nTTemp[0]);
     j123[0] = TempF.tInd - (TempF.nTTemp[0]*TempF.nTTemp[1])*j123[2] - TempF.nTTemp[0]*j123[1];
-    indOut = j123[2] % out2[1] + (TempF.nTTemp[0]*j123[1]+j123[0]) % out2[0];
+    //indOut = j123[2] % out2[1] + (TempF.nTTemp[0]*j123[1]+j123[0]) % out2[0];
+    indOut = (TempF.nTTemp[0]*TempF.nTTemp[1]*j123[2]+TempF.nTTemp[0]*j123[1]+j123[0]) % out2[0];
     if (irep==0){
       irep=1;
       if (indOut==0 || TempF.tInd ==(nTmax-1)){ 
 	filinds.push_back(TempF.tInd);
 	filtime.push_back(g.time);
 	filout = filbaseOut+std::to_string(TempF.tInd);
-	vox.WriteToVTU1(filout);
 	cc1+=1;
-	if (cc1 % 20 || TempF.tInd==(nTmax-1)){
-	  filout=filbaseOut;
-	  vox.WriteToPVD(filout,filinds,filtime);
-	} // if (cc1
+	if (nFils==1){
+	  vox.WriteToVTU1(filout);
+	  if (cc1 % 20 || TempF.tInd==(nTmax-1)){
+	    filout=filbaseOut;
+	    vox.WriteToPVD(filout,filinds,filtime);
+	  } // if (cc1
+	} else {
+	  vox.WriteToPVTU1(filout,nFils);
+	}
 	MPI_Barrier(MPI_COMM_WORLD);
       }
     }

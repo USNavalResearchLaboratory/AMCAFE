@@ -6,6 +6,7 @@
 #include "Partition.h"
 #include "iostream"
 #include "fstream"
+#include "sstream"
 #include <math.h>
 #include <algorithm>
 #include <random>
@@ -3143,6 +3144,281 @@ void VoxelsCA::WriteToVTU2(const std::string &filename)
   }
   MPI_Barrier(MPI_COMM_WORLD);  
 } // end WriteToVTU2
+
+void VoxelsCA::WriteToPVTU1(const std::string &filename, int &nFile)
+{
+  /* 
+     writes gID, vState, IPFx,IPFy,IPFz per voxel
+     - if vtu file > 2G then need to break up into smaller files
+       for paraview to read. This function is for that case. it
+       produces the same data output as writeToVTU1.
+   */
+  int Offset=0, nC=_part->ncellLoc, nP=_part->npointLoc,j1,j2,j3,cell_offsets,rank;
+  unsigned char cell_type;
+  std::vector< float> TempOut(nC,0);
+  float IPFmapBD[3*nC], IPFmapx[3*nC], IPFmapy[3*nC];
+  double vBD[3]={0.0,0.0,1.0},omega,ax[3],vCD[3],mxAng,blue,green,red,rRot[3][3],mscale,
+    vX[3]={1.0,0.0,0.0},vY[3]={0.0,1.0,0.0};
+  for (int j=0;j<nC;++j){
+    TempOut[j] = _temp->TempCurr[j];
+    if (gID[j]<1){
+      IPFmapBD[3*j] = 0.0;
+      IPFmapBD[3*j+1] = 0.0;
+      IPFmapBD[3*j+2] = 0.0;
+      IPFmapx[3*j] = 0.0;
+      IPFmapx[3*j+1] = 0.0;
+      IPFmapx[3*j+2] = 0.0;
+      IPFmapy[3*j] = 0.0;
+      IPFmapy[3*j+1] = 0.0;
+      IPFmapy[3*j+2] = 0.0;
+    } else {
+      omega = cTheta[4*(gID[j]-1)];
+      ax[0]= cTheta[4*(gID[j]-1)+1];
+      ax[1]= cTheta[4*(gID[j]-1)+2];
+      ax[2]= cTheta[4*(gID[j]-1)+3];
+      // matrix is local->global; need to multiply by transpose for global->local            
+      rRot[0][0] = cos(omega) + pow(ax[0],2.0)*(1-cos(omega));
+      rRot[0][1] = ax[0]*ax[1]*(1-cos(omega)) - ax[2]*sin(omega);
+      rRot[0][2] = ax[0]*ax[2]*(1-cos(omega)) + ax[1]*sin(omega);
+      rRot[1][0] = ax[0]*ax[1]*(1-cos(omega)) + ax[2]*sin(omega);
+      rRot[1][1] = cos(omega) + pow(ax[1],2.0)*(1-cos(omega));
+      rRot[1][2] = ax[1]*ax[2]*(1-cos(omega)) - ax[0]*sin(omega);
+      rRot[2][0] = ax[2]*ax[0]*(1-cos(omega)) - ax[1]*sin(omega);
+      rRot[2][1] = ax[2]*ax[1]*(1-cos(omega)) + ax[0]*sin(omega);
+      rRot[2][2] = cos(omega) + pow(ax[2],2.0)*(1-cos(omega));
+      vCD[0] = std::fabs(rRot[0][0]*vBD[0]+rRot[1][0]*vBD[1]+rRot[2][0]*vBD[2]);
+      vCD[1] = std::fabs(rRot[0][1]*vBD[0]+rRot[1][1]*vBD[1]+rRot[2][1]*vBD[2]);
+      vCD[2] = std::fabs(rRot[0][2]*vBD[0]+rRot[1][2]*vBD[1]+rRot[2][2]*vBD[2]);
+      std::sort(vCD,vCD+3);
+      std::swap(vCD[0],vCD[1]);
+      vCD[2] = std::min(vCD[2],1.0);
+      mxAng = M_PI/4.0;
+      red = std::fabs( (mxAng - acos(vCD[2]))/mxAng );
+      blue = atan2(vCD[1],vCD[0]);
+      green = mxAng - blue;
+      blue *= (1-red)/mxAng;
+      green *= (1-red)/mxAng;
+      mscale = std::max(red,std::max(green,blue));
+      IPFmapBD[3*j] = red/mscale;
+      IPFmapBD[3*j+1] = green/mscale;
+      IPFmapBD[3*j+2] = blue/mscale;
+      // x dir
+      vCD[0] = std::fabs(rRot[0][0]*vX[0]+rRot[1][0]*vX[1]+rRot[2][0]*vX[2]);
+      vCD[1] = std::fabs(rRot[0][1]*vX[0]+rRot[1][1]*vX[1]+rRot[2][1]*vX[2]);
+      vCD[2] = std::fabs(rRot[0][2]*vX[0]+rRot[1][2]*vX[1]+rRot[2][2]*vX[2]);
+      std::sort(vCD,vCD+3);
+      std::swap(vCD[0],vCD[1]);
+      vCD[2]=std::min(vCD[2],1.0);
+      mxAng = M_PI/4.0;
+      red = std::fabs( (mxAng - acos(vCD[2]))/mxAng );
+      blue = atan2(vCD[1],vCD[0]);
+      green = mxAng - blue;
+      blue *= (1-red)/mxAng;
+      green *= (1-red)/mxAng;
+      mscale = std::max(red,std::max(green,blue));
+      IPFmapx[3*j] = red/mscale;
+      IPFmapx[3*j+1] = green/mscale;
+      IPFmapx[3*j+2] = blue/mscale;
+      // y dir 
+      vCD[0] = std::fabs(rRot[0][0]*vY[0]+rRot[1][0]*vY[1]+rRot[2][0]*vY[2]);
+      vCD[1] = std::fabs(rRot[0][1]*vY[0]+rRot[1][1]*vY[1]+rRot[2][1]*vY[2]);
+      vCD[2] = std::fabs(rRot[0][2]*vY[0]+rRot[1][2]*vY[1]+rRot[2][2]*vY[2]);
+      std::sort(vCD,vCD+3);
+      std::swap(vCD[0],vCD[1]);
+      vCD[2]=std::min(vCD[2],1.0);
+      mxAng = M_PI/4.0;
+      red = std::fabs( (mxAng - acos(vCD[2]))/mxAng );
+      blue = atan2(vCD[1],vCD[0]);
+      green = mxAng - blue;
+      blue *= (1-red)/mxAng;
+      green *= (1-red)/mxAng;
+      mscale = std::max(red,std::max(green,blue));
+      IPFmapy[3*j] = red/mscale;
+      IPFmapy[3*j+1] = green/mscale;
+      IPFmapy[3*j+2] = blue/mscale;
+    }
+  }
+  if (_xyz->nnodePerCell==4){cell_type=9;}
+  if (_xyz->nnodePerCell==8){cell_type=12;}
+  std::string vtuf,pvtuFilename = filename + ".pvtu";
+  std::ofstream fp[nFile],f0;
+  std::vector<std::string> vtuFilenames(nFile);
+  for (int f = 0; f < nFile; f++) {
+    std::stringstream ftmp;
+    ftmp << filename << "_f" << f << ".vtu";
+    ftmp >> vtuf;
+    vtuFilenames[f] = vtuf;
+  }  
+  
+  
+  if (_part->myid == 0 ) {
+    f0.open(pvtuFilename.c_str());
+    f0 << "<?xml version='1.0'?>" << std::endl;
+    f0 << "<VTKFile type='PUnstructuredGrid' version='0.1' byte_order='LittleEndian'>" << std::endl;
+    f0 << "  <PUnstructuredGrid GhostLevel='0'>" << std::endl;
+    f0 << "      <PPoints>" << std::endl;
+    f0 << "        <PDataArray type='Float32' Name='Position' NumberOfComponents='3'/>" << std::endl;
+    f0 << "      </PPoints>" << std::endl;
+    f0 << "      <PCells>" << std::endl;
+    f0 << "        <PDataArray type='Int32' Name='connectivity' NumberOfComponents='1'/>" << std::endl;
+    f0 << "        <PDataArray type='Int32' Name='offsets' NumberOfComponents='1'/>" << std::endl;
+    f0 << "        <PDataArray type='UInt8' Name='types' NumberOfComponents='1'/>" << std::endl;
+    f0 << "      </PCells>" << std::endl;
+    f0 << "      <PPointData>" << std::endl;
+    f0 << "      </PPointData>" << std::endl;
+    f0 << "      <PCellData>" << std::endl;
+    f0 << "        <PDataArray type='Int32' Name='vState' NumberOfComponents='1'/>" << std::endl;
+    f0 << "        <PDataArray type='Int32' Name='gID' NumberOfComponents='1'/>" << std::endl;
+    f0 << "        <PDataArray type='Float32' Name='IPFz' NumberOfComponents='3'/>" << std::endl;
+    f0 << "        <PDataArray type='Float32' Name='IPFx' NumberOfComponents='3'/>" << std::endl;
+    f0 << "        <PDataArray type='Float32' Name='IPFy' NumberOfComponents='3'/>" << std::endl;
+    f0 << "        <PDataArray type='Float32' Name='Temperature' NumberOfComponents='1'/>" << std::endl;
+    f0 << "      </PCellData>" << std::endl;
+    for (int f=0; f<nFile; ++f) {
+      f0 << "    <Piece Source='" << vtuFilenames[f] << "'/>" << std::endl;
+    }
+    f0 << "  </PUnstructuredGrid>" << std::endl;
+    f0 << "</VTKFile>" << std::endl;
+    f0.close();
+  } // if (_part->myid==0 ...
+
+  if (_part->myid == 0) {
+    for (int f = 0; f < nFile; f++) {
+      vtuf = vtuFilenames[f];
+      fp[f].open(vtuf.c_str());
+      fp[f] << "<?xml version='1.0'?>" << std::endl;
+      fp[f] << "<VTKFile type='UnstructuredGrid' version='0.1' byte_order='LittleEndian'>" << std::endl;
+      fp[f] << "  <UnstructuredGrid>" << std::endl;
+      fp[f] << "    <FieldData>" << std::endl;
+      fp[f] << "      <DataArray type='Int32' Name='time_step' NumberOfTuples='1' format='ascii'>" << std::endl;
+      fp[f] << "        " << _xyz->tInd << std::endl;
+      fp[f] << "      </DataArray>" << std::endl;
+      fp[f] << "    </FieldData>" << std::endl;
+      fp[f].close();
+    } // for (int f ...
+  } // if (_part->myid...
+
+
+  int nPIncr = int(_part->nprocs/nFile);
+  for (int f = 0; f < nFile; f++) {
+    Offset = 0;
+    vtuf = vtuFilenames[f];
+    for (int j = 0; j < nPIncr; j++) {
+      rank = f*nPIncr + j;
+      if (rank>=_part->nprocs) break;
+      int OffsetP=Offset;
+      MPI_Allreduce(&OffsetP,&Offset,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
+    if (_part->myid != rank) { Offset=0; continue; }
+    fp[f].open(vtuf.c_str(), std::fstream::app);
+    fp[f] << "    <Piece NumberOfPoints='" << nP << "' NumberOfCells='" << nC << "'>" << std::endl;
+    fp[f] << "      <Points>" << std::endl;
+    fp[f] << "        <DataArray type='Float32' Name='Position' NumberOfComponents='3' format='appended' offset='" << Offset << "'/>" << std::endl;
+    fp[f] << "      </Points>" << std::endl;
+    Offset += 3 * nP * sizeof(float) + sizeof(int);
+    fp[f] << "      <Cells>" << std::endl;
+    fp[f] << "        <DataArray type='Int32' Name='connectivity' NumberOfComponents='1' format='appended' offset='" << Offset << "'/>" << std::endl;
+    Offset += _part->iconnectivityLoc.size() * sizeof (int) + sizeof(int);
+    fp[f] << "        <DataArray type='Int32' Name='offsets' NumberOfComponents='1' format='appended' offset='" << Offset << "'/>" << std::endl;
+    Offset += nC * sizeof (int) + sizeof(int);
+    fp[f] << "        <DataArray type='UInt8' Name='types' NumberOfComponents='1' format='appended' offset='" << Offset << "'/>" << std::endl;
+    Offset += nC * sizeof (unsigned char) + sizeof(int);
+    fp[f] << "      </Cells>" << std::endl;
+    fp[f] << "      <PointData>" << std::endl;
+    fp[f] << "      </PointData>" << std::endl;
+    fp[f] << "      <CellData>" << std::endl;
+    fp[f] << "        <DataArray type='Int32' Name='vState' NumberOfComponents='1' format='appended' offset='" << Offset << "'/>" << std::endl;
+    Offset += nC * sizeof (int) + sizeof (int);
+    fp[f] << "        <DataArray type='Int32' Name='gID' NumberOfComponents='1' format='appended' offset='" << Offset << "'/>" << std::endl;
+    Offset += nC * sizeof (int) + sizeof (int);
+    fp[f] << "        <DataArray type='Float32' Name='IPFz' NumberOfComponents='3' format='appended' offset='" << Offset << "'/>" << std::endl;
+    Offset += 3*nC * sizeof (float) + sizeof (int);
+    fp[f] << "        <DataArray type='Float32' Name='IPFx' NumberOfComponents='3' format='appended' offset='" << Offset << "'/>" << std::endl;
+    Offset += 3*nC * sizeof (float) + sizeof (int);
+    fp[f] << "        <DataArray type='Float32' Name='IPFy' NumberOfComponents='3' format='appended' offset='" << Offset << "'/>" << std::endl;
+    Offset += 3*nC * sizeof (float) + sizeof (int);
+    fp[f] << "        <DataArray type='Float32' Name='Temperature' NumberOfComponents='1' format='appended' offset='" << Offset << "'/>" << std::endl;
+    Offset += nC * sizeof (float) + sizeof (int);
+    fp[f] << "      </CellData>" << std::endl;
+    fp[f] << "    </Piece>" << std::endl;
+    fp[f].close();
+    } // for (int j ..
+  } // for (int f ...
+  MPI_Barrier(MPI_COMM_WORLD);
+  if (_part->myid == 0) {
+    for (int f=0;f<nFile;++f){
+      vtuf = vtuFilenames[f];
+      fp[f].open(vtuf.c_str(), std::fstream::app);
+      fp[f] << "  </UnstructuredGrid>" << std::endl;
+      fp[f] << "  <AppendedData encoding='raw'>" << std::endl;
+      fp[f] << "_";
+      fp[f].close();
+    }
+  }
+  for (int f = 0; f < nFile; f++) {
+    Offset = 0;
+    vtuf = vtuFilenames[f];
+    for (int jf = 0; jf < nPIncr; jf++) {
+      rank = f*nPIncr + jf;
+      if (rank>=_part->nprocs) break;
+      MPI_Barrier(MPI_COMM_WORLD);
+      if (_part->myid != rank) continue;
+      fp[f].open(vtuf.c_str(), std::fstream::app);
+      int Scalar = nP * sizeof (float), Vector = 3 * Scalar, Cells = nC * sizeof(int), 
+	CellsTH=3*nC*sizeof(float), CellsTemp=nC*sizeof(float);
+      int CellChars = nC * sizeof(unsigned char), Conn = _part->iconnectivityLoc.size() * sizeof(int);
+      fp[f].write(reinterpret_cast<const char *>(&Vector), 4);
+      for (int j=0;j<nP;j++) {
+	j3 = floor(_part->ipointidLoc[j]/( (_xyz->nX[0]+1)*(_xyz->nX[1]+1)));
+	j2 = floor( (_part->ipointidLoc[j] - (_xyz->nX[0]+1)*(_xyz->nX[1]+1)*j3)/(_xyz->nX[0]+1));
+	j1 = _part->ipointidLoc[j] - (_xyz->nX[0]+1)*(_xyz->nX[1]+1)*j3 - (_xyz->nX[0]+1)*j2;
+	float x = j1*_xyz->dX[0], y = j2*_xyz->dX[1], z = j3*_xyz->dX[2];
+	fp[f].write(reinterpret_cast<const char *>(&x), sizeof(float));
+	fp[f].write(reinterpret_cast<const char *>(&y), sizeof(float));
+	fp[f].write(reinterpret_cast<const char *>(&z), sizeof(float));
+      }
+      fp[f].write(reinterpret_cast<const char *>(&Conn), 4);
+      for (int i=0;i<nC;++i) {
+	for (int j=0;j<_xyz->nnodePerCell;++j) {
+	  j1 = _part->iconnectivityLoc[_xyz->nnodePerCell*i+j];
+	  fp[f].write(reinterpret_cast<const char *>(&j1), sizeof(int));
+	}
+      }
+      fp[f].write(reinterpret_cast<const char *>(&Cells), 4);
+      cell_offsets = 0;
+      for (int i=0;i<nC;i++) {
+	cell_offsets += _xyz->nnodePerCell;
+	fp[f].write(reinterpret_cast<const char *>(&cell_offsets), sizeof(int));
+      }
+      fp[f].write(reinterpret_cast<const char *>(&CellChars), 4);    
+      for (int i=0;i<nC;i++) fp[f].write(reinterpret_cast<const char *>(&cell_type), sizeof (unsigned char));
+      fp[f].write(reinterpret_cast<const char *>(&Cells), 4);
+      for (int i=0;i<nC;i++) fp[f].write(reinterpret_cast<const char *>(&vState[i]), sizeof (int));
+      fp[f].write(reinterpret_cast<const char *>(&Cells), 4);
+      for (int i=0;i<nC;i++) fp[f].write(reinterpret_cast<const char *>(&gID[i]), sizeof (int));
+      fp[f].write(reinterpret_cast<const char *>(&CellsTH), 4);
+      for (int i=0;i<3*nC;i++) fp[f].write(reinterpret_cast<const char *>(&IPFmapBD[i]), sizeof (float));
+      fp[f].write(reinterpret_cast<const char *>(&CellsTH), 4);
+      for (int i=0;i<3*nC;i++) fp[f].write(reinterpret_cast<const char *>(&IPFmapx[i]), sizeof (float));
+      fp[f].write(reinterpret_cast<const char *>(&CellsTH), 4);
+      for (int i=0;i<3*nC;i++) fp[f].write(reinterpret_cast<const char *>(&IPFmapy[i]), sizeof (float));
+      fp[f].write(reinterpret_cast<const char *>(&CellsTemp), 4);
+      for (int i=0;i<nC;i++) fp[f].write(reinterpret_cast<const char *>(&TempOut[i]), sizeof (float));
+      fp[f].close();
+    } // for (int jf ...
+  } // for (int f ...
+  MPI_Barrier(MPI_COMM_WORLD);
+  if (_part->myid == 0) {
+    for (int f=0;f<nFile;++f){
+      vtuf = vtuFilenames[f];
+      fp[f].open(vtuf.c_str(), std::fstream::app);
+      fp[f] << "  </AppendedData>" << std::endl;
+      fp[f] << "</VTKFile>" << std::endl;
+      fp[f].close();
+    }
+  }
+  MPI_Barrier(MPI_COMM_WORLD);  
+} // end WriteToPVTU1
+
 
 void VoxelsCA::WriteToVTU0(const std::string &filename)
 {

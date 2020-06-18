@@ -98,8 +98,11 @@ int main(int argc, char *argv[])
   /*-----------------------------------------------
     execute simulation */
   cc1=0;
-  int outskip=20,indOut,nTmax=TempF.nTTemp[0]*TempF.nTTemp[1]*TempF.nTTemp[2];
+  int outskip=20,indOut,nTmax=TempF.nTTemp[0]*TempF.nTTemp[1]*TempF.nTTemp[2],
+    nFils;
   std::vector<int> filinds,out2(2,0),j123(3,0);
+  double filSize=(nX[0]*nX[1]*nX[2]*4*(9+3+3+8)+12)/1e9;
+  nFils = int(ceil(filSize/1.5 ));
   std::vector<double> filtime;
   int icheck = 1,ichecktmp,cc2=0, irep=0;
   std::ofstream fplog;
@@ -127,12 +130,16 @@ int main(int argc, char *argv[])
 	filinds.push_back(TempF.tInd);
 	filtime.push_back(g.time);
 	filout = filbaseOut+std::to_string(TempF.tInd);
-	vox.WriteToVTU1(filout);
 	cc1+=1;
-	if (cc1 % 20 || TempF.tInd==(nTmax-1)){
-	  filout=filbaseOut;
-	  vox.WriteToPVD(filout,filinds,filtime);
-	} // if (cc1
+        if (nFils==1){
+          vox.WriteToVTU1(filout);
+	  if (cc1 % 20 || TempF.tInd==(nTmax-1)){
+	    filout=filbaseOut;
+	    vox.WriteToPVD(filout,filinds,filtime);
+	  } // if (cc1
+        } else {
+          vox.WriteToPVTU1(filout,nFils);
+        }
 	MPI_Barrier(MPI_COMM_WORLD);
       }
     }
