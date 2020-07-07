@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
   int outskip=20,indOut,nTmax=TempF.nTTemp[0]*TempF.nTTemp[1]*TempF.nTTemp[2],
     nFils;
   std::vector<int> filinds,out2(2,0),j123(3,0);
-  double filSize=(nX[0]*nX[1]*nX[2]*4*(9+3+3+8)+12)/1e9;
+  double filSize=(nX[0]/1e2*nX[1]/1e2*nX[2]/1e2*4*(9+3+3+8)+12)/1e3;
   nFils = int(ceil(filSize/1.5 ));
   std::vector<double> filtime;
   int icheck = 1,ichecktmp,cc2=0, irep=0;

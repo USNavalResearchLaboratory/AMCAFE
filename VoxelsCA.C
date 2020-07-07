@@ -1661,7 +1661,7 @@ void VoxelsCA::UpdateVoxels8()
   // capture all undercooled liquid voxels by growing grains
   int js=0,j1s=0,jx[3],jy[3],countS=Na;
   double velX,velY,omega,ax[3],
-    dlocX[3],locX[3],dr,vhat,tmelt=_xyz->tL,
+    dlocX[3],locX[3],dr,vhat,tmelt=_xyz->tL,ph,th,
     timeUntil,dnx[3],tinc=0.0;
   std::vector<int> vSneigh(26,0),jTs(_part->nprocs,0),j1Ts(_part->nprocs,0);
   std::vector<double> Tneigh(26,0.0),DtT(_part->nprocs,0.0);
@@ -1704,12 +1704,16 @@ void VoxelsCA::UpdateVoxels8()
 	    dnx[0] = (double(jx[0])+.5)*_xyz->dX[0] - CentroidA[3*j];
 	    dnx[1] = (double(jx[1])+.5)*_xyz->dX[1] - CentroidA[3*j+1];
 	    dnx[2] = (double(jx[2])+.5)*_xyz->dX[2] - CentroidA[3*j+2];
+            th = atan2(std::fabs(dnx[1]),std::fabs(dnx[0]));
+            th > M_PI/4.0 ? th= M_PI/2.0 - th: th ;
+            ph = atan2(pow(pow(dnx[0],2.0)+pow(dnx[1],2.0),.5),std::fabs(dnx[2]));
+            ph < M_PI/4.0 ? ph = M_PI/2.0 - ph: ph ;
 	    // matrix is local->global; need to multiply by transpose for global->local            
 	    // put into 1st quadrant b/c of symmetry     
 	    dlocX[0] = std::fabs(rRot[0][0]*dnx[0]+rRot[1][0]*dnx[1]+rRot[2][0]*dnx[2]);
 	    dlocX[1] = std::fabs(rRot[0][1]*dnx[0]+rRot[1][1]*dnx[1]+rRot[2][1]*dnx[2]);
 	    dlocX[2] = std::fabs(rRot[0][2]*dnx[0]+rRot[1][2]*dnx[1]+rRot[2][2]*dnx[2]);
-	    dr = dlocX[0]+dlocX[1]+dlocX[2] - ExtA[j];
+	    dr = pow(cos(th)*sin(ph),.5)*(dlocX[0]+dlocX[1]+dlocX[2]) - ExtA[j];
 	    timeUntil = dr/vhatvec[j-i1];
 	    if (timeUntil < xin.DtMin){
 	      xin.DtMin = timeUntil;
@@ -1812,8 +1816,12 @@ void VoxelsCA::UpdateVoxels8()
       locX[0] = rRot[0][0]*dnx[0]+rRot[1][0]*dnx[1]+rRot[2][0]*dnx[2];
       locX[1] = rRot[0][1]*dnx[0]+rRot[1][1]*dnx[1]+rRot[2][1]*dnx[2];
       locX[2] = rRot[0][2]*dnx[0]+rRot[1][2]*dnx[1]+rRot[2][2]*dnx[2];
+      th = atan2(std::fabs(dnx[1]),std::fabs(dnx[0]));
+      th > M_PI/4.0 ? th= M_PI/2.0 - th: th;
+      ph = atan2(pow(pow(dnx[0],2.0)+pow(dnx[1],2.0),.5),std::fabs(dnx[2]));
+      ph < M_PI/4.0 ? ph = M_PI/2.0 - ph: ph ;
       // signbit returns 0 if positive and 1 if negative
-      dr = ExtA[js];
+      dr = std::fabs(locX[0])+ std::fabs(locX[1])+ std::fabs(locX[2]);
       for (int j1=0;j1<6;++j1){sdiag[j1]={sdiag0[j1][0]*dr,sdiag0[j1][1]*dr,sdiag0[j1][2]*dr};}
       jInd = 4*std::signbit(locX[2])+ 2*std::signbit(locX[1])+ std::signbit(locX[0]);
       for (int j1=0;j1<3;++j1){ 
@@ -1851,7 +1859,7 @@ void VoxelsCA::UpdateVoxels8()
       //xiL = .4 + .13*(l/_xyz->dX[0]-1.0);
       //xiL = .25 + .75*(l/_xyz->dX[0]-1.0);
       xiL = 1.0;
-      ExtA[i1] = Lmud*xiL;
+      ExtA[i1] = pow(cos(th)*sin(ph),.5)*Lmud*xiL;
       /*
 	dnx[0] = sdiag[sInd[jInd][jy[0]]][0] - (2-xiL)*Lmud*sdiag0[sInd[jInd][jy[0]]][0];
 	dnx[1] = sdiag[sInd[jInd][jy[0]]][1] - (2-xiL)*Lmud*sdiag0[sInd[jInd][jy[0]]][1];

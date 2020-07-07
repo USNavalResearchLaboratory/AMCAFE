@@ -24,7 +24,6 @@ int main()
   /*-----------------------------------------------
     initialization step */
   auto texec1 = std::chrono::high_resolution_clock::now();
-
   MPI_Init(NULL,NULL);
   int nprocs,myid,ictrl;
   MPI_Comm_size(MPI_COMM_WORLD,&nprocs);
@@ -142,7 +141,7 @@ int main()
   cc1=0;
   int outskip=20,indOut,nTmax=TempF.nTTemp[0]*TempF.nTTemp[1]*TempF.nTTemp[2],
     nFils;
-  double filSize=(nX[0]*nX[1]*nX[2]*4*(9+3+3+8)+12)/1e9;
+  double filSize=(nX[0]/1e2*nX[1]/1e2*nX[2]/1e2*4*(9+3+3+8)+12)/1e3;
   nFils = int(ceil(filSize/1.5 ));
   std::vector<int> filinds,out2(2,0),j123(3,0);
   std::vector<double> filtime;
