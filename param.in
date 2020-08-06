@@ -1,0 +1,16 @@
+# this is test param file
+# Format is "keyword data". you must have a space between keyword and data 
+dx 1.875e-6 # voxel spacing in meters
+bmV 500e-3 # laser velocity in m/s
+bmP 175.0  # beam power W
+nX 128 128 64 # number of voxels in x,y,z
+r .002 # nucleation rate
+lT 25e-6 # layer thickness in meters
+tL 1620 # liquidus temperature (K)
+tS 1531.5 # solidification temperature (K)
+meltparam 7.5e-5 16.275e-5 7.5e-5 7.5e-5 # beam dimensions a,b,c,d
+bhatch 11.475e-5
+patternID 1 # patternID can be 1 or 4 see notes
+outint 10 # the interval of time steps to print out vtu files
+# make sure file ends with a space or new line otherwise read error   
+

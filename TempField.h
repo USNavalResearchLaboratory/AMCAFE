@@ -19,8 +19,8 @@ class TempField
   void InitializeSchwalbach(int & patternId, std::vector<double> & beamSTD, 
 			    double & beamVelocity, double & T0targIn, double & beamEta, std::vector<double> & Lx,
 			    double & T0);
-  void InitializeAnalytic(int & patternIDIn, std::vector<double> & beamSTDIn,
-                                   double & beamVelocityIn, std::vector<double> & LxIn,
+  void InitializeAnalytic(int & patternIDIn, std::vector<double> & meltparam, 
+                                   double & beamVelocityIn, double & bhatch, std::vector<double> & LxIn,
                                    double & T0In);
   void Test2ComputeTemp(double T20, double T10, double a,double tcurr);
   void ReadCSVMoose1();
