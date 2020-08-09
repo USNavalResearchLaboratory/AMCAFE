@@ -10,7 +10,6 @@ evolution of AM builds (20190123)
 #include "TempField.h"
 #include "Partition.h"
 #include "SampleOrientation.h"
-#include "Param.h"
 #include "iostream"
 #include "vector"
 #include <math.h>
@@ -26,65 +25,34 @@ int main(int argc, char *argv[])
     initialization step */
   auto texec1 = std::chrono::high_resolution_clock::now();
   MPI_Init(NULL,NULL);
-  int nprocs,myid,ictrl=3;
+  int nprocs,myid;
   MPI_Comm_size(MPI_COMM_WORLD,&nprocs);
   MPI_Comm_rank(MPI_COMM_WORLD,&myid);
-  int cc1,nDim;
-  std::vector<double> LX,beamSTD(3);
-  double tL,tS,mL,c0,Gamma,dP,dL,dtM,muN,layerThickness,T0,dTempM,dTempS,rNmax;
-  std::string filbaseOut,filout,neighOrder,neighType,filLogOut,filParamIn;
-  double mu; //2e11;//5e9 // rate for baseplate voronoi;
-  double heightBase;
+  int cc1;
+  std::string filbaseOut,filout,filLogOut,filParamIn;
   // schwalbach parameters
-  int patternID;
   double beamVel,beamPower,wEst,cP,rho,kappa,beamEta,rcut,T0targ;
   filParamIn = argv[1];
-  Param p(filParamIn,myid,nprocs);
-  LX = {p.nX[0]*p.dX[0],p.nX[1]*p.dX[1],p.nX[2]*p.dX[2]};
-  nDim = p.nX.size();
-  dTempM = (p.tL-p.tS)*.75; //7.5; // 2.5 // K (mean undercooling for nucleation)
-  dTempS = (p.tL-p.tS)/3.0; //5.0; // 1.0 // K (standard dev undercooling for nucleation)
-  mL = -10.9; // (K / wt%)
-  dL = 3e-9; // (m^2/s)
-  Gamma = 1e-7;  // (K m)
-  muN = 9e-2; // 9 // 9e-2; 
-  dP = .48;
-  c0 = 4.85; // (wt %)
-  neighOrder = "first"; // can only equal "first"
-  neighType = "Moore"; // either "Moore" or "VonNeumann"
-  rho = 8000.0; // kg /m^3
-  cP = 502; // 502.0; // J/kg-K)
-  kappa = 18; //18; //18.0; // W/(m-K)
-  layerThickness = 25e-6;
-  beamSTD = {7.5e-5,7.5e-5,7.5e-5};
-  heightBase = p.layerT;
-  patternID = 1; // see TempField.C for description
-  T0targ = 1500;//2000.0; // target peak temperature for one ellipsoid
-  beamEta = 1.0;
-  Grid g(p.dX,p.nX,p.tL,p.tS,mL,c0,Gamma,dP,dL,muN,rho,cP,kappa,p.layerT,neighOrder,dTempM,dTempS,p.rnuc,nDim,neighType,ictrl);
+  Grid g(filParamIn,myid,nprocs);
   Partition part(g,myid,nprocs);
   //part.PartitionGraph();
   part.PartitionGraph2();
-  mu = 1e4/LX[0]/LX[1]/p.dX[2];// heightBase;//2e13; // 2e11 , 2e14  // rate for nucleation for baseplate 
-  //mu = .5*1e4/LX[0]/LX[1]/dX[2];// heightBase;//2e13; // 2e11 , 2e14  // rate for nucleation for baseplate   
-  BasePlate bp(g,heightBase,mu, part);
+  BasePlate bp(g, part);
   TempField TempF(g,part,bp);
-  wEst  = pow(8*beamPower/(exp(1.0)*M_PI*rho*cP*(tL-298.0)*beamVel),.5); // see EQ (1) in schwalbach
-  T0 = 300.0; // initial temperature in (K)
   int Ntot=part.ncellLoc+ part.nGhost;
-  if (ictrl==4){
+  if (g.ictrl==4){
     // this is a test case scenario
-    TempF.InitializeSchwalbach(p.patternID,beamSTD,p.bmV,T0targ,beamEta,LX,T0);
-    //TempF.Test2ComputeTemp(1.02*tL,.97*tL,514880,0.0);
-    TempF.Test2ComputeTemp(0.97*tL,.97*tL,0.0,0.0);
+    TempF.InitializeSchwalbach(); 
+    //TempF.Test2ComputeTemp(1.02*g.tL,.97*g.tL,514880,0.0);
+    TempF.Test2ComputeTemp(0.97*g.tL,.97*g.tL,0.0,0.0);
   } else{
-    //TempF.InitializeSchwalbach(p.patternID,beamSTD,beamVel,T0targ,beamEta,LX,T0);
+    //TempF.InitializeSchwalbach(g); 
     //TempF.SchwalbachTempCurr();
-    TempF.InitializeAnalytic(p.patternID,p.meltparam,p.bmV,p.bhatch,LX,T0);
+    TempF.InitializeAnalytic();
     TempF.AnalyticTempCurr(g.time,TempF.TempCurr,part.icellidLoc,Ntot);
   }
   VoxelsCA vox(g,TempF, part);
-  if (ictrl==4){
+  if (g.ictrl==4){
   //vox.InitializeTest1();
   vox.InitializeTest2();
   } else{
@@ -95,7 +63,7 @@ int main(int argc, char *argv[])
   cc1=0;
   int indOut,nTmax=TempF.nTTemp[0]*TempF.nTTemp[1]*TempF.nTTemp[2],
     nFils,iNL;
-  double filSize=(p.nX[0]/1e2*p.nX[1]/1e2*p.nX[2]/1e2*4*(9+3+3+8)+12)/1e3;
+  double filSize=(g.nX[0]/1e2*g.nX[1]/1e2*g.nX[2]/1e2*4*(9+3+3+8)+12)/1e3;
   nFils = int(ceil(filSize/1.5 ));
   std::vector<int> filinds,out2(2,0),j123(3,0);
   std::vector<double> filtime;
@@ -116,11 +84,11 @@ int main(int argc, char *argv[])
     j123[1] = floor((TempF.tInd - (TempF.nTTemp[0]*TempF.nTTemp[1])*j123[2])/ TempF.nTTemp[0]);
     j123[0] = TempF.tInd - (TempF.nTTemp[0]*TempF.nTTemp[1])*j123[2] - TempF.nTTemp[0]*j123[1];
     //indOut = j123[2] % out2[1] + (TempF.nTTemp[0]*j123[1]+j123[0]) % out2[0];
-    indOut = (TempF.nTTemp[0]*TempF.nTTemp[1]*j123[2]+TempF.nTTemp[0]*j123[1]+j123[0]) % p.outint;
+    indOut = (TempF.nTTemp[0]*TempF.nTTemp[1]*j123[2]+TempF.nTTemp[0]*j123[1]+j123[0]) % g.outint;
     iNL=fmod(TempF.tInd,TempF.nTTemp[0]*TempF.nTTemp[1]);
     if (irep==0){
       irep=1;
-      if (indOut==0 || TempF.tInd ==(nTmax-1) || iNL==0){
+      if (indOut==0 || TempF.tInd ==(nTmax-1) || (iNL==0 && g.outNL==0)){
 	filinds.push_back(TempF.tInd);
 	filtime.push_back(g.time);
 	filout = filbaseOut+std::to_string(TempF.tInd);

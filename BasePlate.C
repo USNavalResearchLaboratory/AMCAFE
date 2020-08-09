@@ -15,13 +15,13 @@
 
 
 // constructor
-BasePlate::BasePlate(const Grid & g, const double & hIn,const double & muIn, Partition & part)
+BasePlate::BasePlate(const Grid & g, Partition & part)
 {
   _xyz = &g;
   _part = &part;
-  mu = muIn;
-  height = ceil(hIn/_xyz->dX[2])*_xyz->dX[2];
-  Nzh = ceil(hIn/_xyz->dX[2]);
+  mu = _xyz->mu;
+  height = ceil(_xyz->bpH/_xyz->dX[2])*_xyz->dX[2];
+  Nzh = std::min(_xyz->nX[2],int(ceil(_xyz->bpH/_xyz->dX[2])));
   height = Nzh*(_xyz->dX[2]);
   // if you want seed to be different every time program runs
   //seed = std::chrono::system_clock::now().time_since_epoch().count();
@@ -30,9 +30,9 @@ BasePlate::BasePlate(const Grid & g, const double & hIn,const double & muIn, Par
 } // end constructor
 void BasePlate::GenerateNgrain()
 {
-  double rate = mu* _xyz->dX[0]*_xyz->dX[1]* _xyz->nX[0]*_xyz->nX[1]* height;
-  
+  double rate = mu* (_xyz->dX[0]*1e6)*(_xyz->dX[1]*1e6)* _xyz->nX[0]*_xyz->nX[1]* (height*1e6);
   std::poisson_distribution<int> ng(rate);
+
   Ngrain =0;
   while (Ngrain == 0){
     Ngrain = ng(generator);
@@ -46,7 +46,7 @@ void BasePlate::GenerateVoxel()
   std::vector<std::vector<double>> Xsite(Ngrain, std::vector<double>(3));
   unsigned int sdloc;
   std::uniform_real_distribution<double> xrand(0.0,1.0);
-  double Lx = _xyz->dX[0] * _xyz-> nX[0];
+  double Lx = _xyz->dX[0] * _xyz->nX[0];
   double Ly = _xyz->dX[1] * _xyz->nX[1];
   gNucleus.assign(Ngrain,0);
   for (int j=0; j<Ngrain;++j){

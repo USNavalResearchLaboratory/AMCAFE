@@ -9,17 +9,9 @@ class Grid
 {
  public:
   // default constructor
-  Grid( const std::vector<double> & dxIn, const std::vector<int> & nXIn, 
-	const double &tL, const double &tSIn,
-	const double &mL,const double &c0,const double &Gamma, 
-	const double &kP,const double &dL, const double & muN,
-	const double & rhoIn, const double & cPIn, const double & kappaIn,
-	const double &layerThicknessIn, const std::string neighOrderIn,
-	const double &dTempMIn, const double &dTempSIn, 
-	const double &rNmaxIn, const int &nDimIn, const std::string ntypeIn,
-	const int &ictrlIn);
-
+  Grid(std::string & filIn, int & myid, int & nprocs);  
   // any functions added here
+  void readInputFile();
   void UpdateTime(const double &velo);
   void UpdateTime2(const double &dtIn);
   void UpdateTimeTest1(const double &velo);
@@ -46,13 +38,13 @@ class Grid
       } // for (int i2...
     } // for (int i3...
   } // end inline Compute...
-
-
+  std::string filInput;
   double deltaXmin,deltaTcheck,dt,time;
-  std::vector<double> dX;
+  std::vector<double> dX,meltparam,beamSTD,LX,offset;
   std::vector<int> nX;
-  int nDim,tInd,nnodePerCell,ictrl,nZlayer;
-  double tL,tS; // liquidus and solidus temp (K)
+  int nDim,tInd,nnodePerCell,ictrl,nZlayer,patternID,outint,myid,nprocs,outNL,nTsd;
+  double bmV,bmP,bhatch; // beam velocity,power, hatch spacing, nucleation rate
+  double tL,tS,T0; // liquidus, solidus, room temp (K)
   double mL; // liquidus slope of (K/wt%)
   double c0; // initial concentration (wt %)
   double Gamma; // Gibbs-Thompson coefficient (K m)
@@ -63,11 +55,14 @@ class Grid
   double kappa; // material thermal conductivity (W/(m-K))
   double dTempM; // mean undercooling for nucleation (K)
   double dTempS; // standard dev undercooling for nucleation (K)
-  double rNmax; // maximum nucleation density (m^{-3})
-  double cP; // specific heat capacity (J/(kg-K))
+  double rNmax; // nucleation density (m^{-3})
+  double cP,dP; // specific heat capacity (J/(kg-K)), partition coeff
   double layerT; // thickness of each layer
   double ethresh; // 1- cut off probability for Delta t max (see latex notes)
   double deltaThresh; // threshold value of pmf for allowing if voxel can be captured
+  double mu; // rate for Voronoi tessellation for baseplate
+  double bpH; // base plate height
+  double beamEta,T0targ,bmDelT;
   std::string ntype; // type of neighborhood: Moore or VonNeumann
   std::string neighOrder; // order of neighborhood
 }; // end class Grid

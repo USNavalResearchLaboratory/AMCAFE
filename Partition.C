@@ -126,11 +126,11 @@ void Partition::PartitionGraph()
       iloc2Neighptr.assign(nneighProc+1,0);
       iloc2NeighVals.assign(nedge,0);
       cc2=0;
-      for (int jn=0;jn<nneighProc;++jn){
+      for (int jz=0;jz<nneighProc;++jz){
         cellNeigh.assign(nedge,0);
         cc1=0;
         for (int j=0;j<nelem;++j){
-          if (epart[j]==ineighProcId[jn]){
+          if (epart[j]==ineighProcId[jz]){
             for (int j1=myeptr[j];j1<myeptr[j+1];++j1){
               cellNeigh[cc1] = myeind[j1];
               cc1+=1;
@@ -142,14 +142,14 @@ void Partition::PartitionGraph()
         tmp = std::unique(cellNeigh.begin(),cellNeigh.end());
         cellNeigh.resize(std::distance(cellNeigh.begin(),tmp));
         nneigh = cellNeigh.size();
-        iloc2Neighptr[jn]=cc2;
+        iloc2Neighptr[jz]=cc2;
         for (int j=0;j<nneigh;++j){
           if (epart[cellNeigh[j]] ==jid){
             iloc2NeighVals[cc2] =std::distance(icellidLoc.begin(),std::find(icellidLoc.begin(),icellidLoc.end(),cellNeigh[j]));
             cc2+=1;
           }
         }
-      } // for jn
+      } // for jz
       iloc2Neighptr[nneighProc]=cc2;
       iloc2NeighVals.resize(cc2);
       // compute pointIDs for cells

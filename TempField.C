@@ -60,9 +60,7 @@ void TempField::Test2ComputeTemp(double T20, double T10, double a,double tcurr)
     //DelT = .0125;
   } // for (int j...     
 }
-void TempField::InitializeAnalytic(int & patternIDIn, std::vector<double> & meltparam, 
-				   double & beamVelocityIn, double & bhatch,std::vector<double> & LxIn,
-				   double & T0In)
+void TempField::InitializeAnalytic()
 {
   /*
     This this 2 double ellipsoids (one encompassing another) to represent the temperature
@@ -78,47 +76,28 @@ void TempField::InitializeAnalytic(int & patternIDIn, std::vector<double> & melt
     patternID=4: scan in alternating +/- X direction for layer i and 
 		 alternating +/- Y direction for layer i+1
    */
-  bmV = beamVelocityIn;
-  patternID = patternIDIn;
+  bmV = _xyz->bmV;
+  patternID = _xyz->patternID;
   a1.resize(6);
   Qp.resize(2);
-  a1[0] = meltparam[0];
-  a1[1] = meltparam[2];
-  a1[2] = meltparam[3];
-  a1[3] = meltparam[1];
+  a1[0] = _xyz->meltparam[0];
+  a1[1] = _xyz->meltparam[2];
+  a1[2] = _xyz->meltparam[3];
+  a1[3] = _xyz->meltparam[1];
   a1[4] = a1[1];
   a1[5] = a1[2];
-
-  T0 = T0In;
+  T0 = _xyz->T0;
   zlaserOff=1.0; // 1.0 (this specifies where laser z value is - see SchwalbachTempCurr)
-  if (patternID==0 || patternID==1 || patternID==2 || patternID==3 || patternID==4){
-    DelT = 4.0/3.0*a1[0]/bmV;
-    bmDX = {DelT*bmV,bhatch,_xyz->layerT};
-    offset={0.0,0.0,0.0};
-    bmLx={LxIn[0]+1*bmDX[0],LxIn[1]+1*bmDX[1],LxIn[2]};
-    if (patternID==1){
-      offset={0.0,0.0,0.0};
-      shiftL={2.66*bmDX[0],0.0,0.0};
-      bmDX = {DelT*bmV,bhatch,_xyz->layerT};
-      bmLx={LxIn[0]+shiftL[0],LxIn[1],LxIn[2]};
-    } // if (patternID==1...
-    if (patternID==2){    
-      offset={0.0,0.0,0.0};
-      shiftL={2.66*bmDX[0],0.0,0.0};
-      bmDX = {DelT*bmV,bhatch,_xyz->layerT};
-      bmLx={LxIn[0]+shiftL[0],LxIn[1],LxIn[2]};
-    } // if (patternID==2...
-    if (patternID==4){
-      // scan is back and forth in x then back and forth in y
-      offset={0.0,0.0,0.0};
-      shiftL={2.66*bmDX[0],0.0,0.0};
-      bmDX = {DelT*bmV,bhatch,_xyz->layerT};
-      bmLx={LxIn[0]+shiftL[0],LxIn[1],LxIn[2]};
-    } // if (patternID==4...
-    nTTemp = {int(floor(bmLx[0]/bmDX[0] ))+1,int(floor(bmLx[1]/bmDX[1]))+1,
-            int(floor(bmLx[2]/bmDX[2]))};
-    bmLx={(nTTemp[0]-1)*bmDX[0],(nTTemp[1]-1)*bmDX[1],(nTTemp[2]-1)*bmDX[2]};
-  }
+  DelT = _xyz->bmDelT;
+  bmDX = {DelT*bmV,_xyz->bhatch,_xyz->layerT}; // (SD, TD, BD) per layer
+  offset=_xyz->offset;
+  shiftL={a1[3],0.0,0.0}; // (SD, TD, BD) per layer
+  bmLx={_xyz->LX[0]+shiftL[0],_xyz->LX[1],_xyz->LX[2]}; // (SD, TD, BD) per layer
+  nTTemp = {_xyz->nTsd==2 ? _xyz->nTsd : int(ceil(bmLx[0]/bmDX[0] ))+1,
+	    bmDX[1]>_xyz->LX[1] ? 1 : int(ceil(bmLx[1]/bmDX[1]))+1,
+            bmDX[2]<std::numeric_limits<double>::epsilon() ? 1: int(ceil(bmLx[2]/bmDX[2]))};
+  bmLx={(nTTemp[0]-1)*bmDX[0],(nTTemp[1]-1)*bmDX[1],(nTTemp[2]-1)*bmDX[2]};
+  
 } // end InitializeAnalytic 
 
 void TempField::AnalyticTempCurr(double tcurr,std::vector<double> & TempOut, std::vector<int> &icellid, int Ntot)
@@ -314,9 +293,7 @@ void TempField::ComputeStartTime()
   } // for (int j=0...
 } // end StartTime                             
 
-void TempField::InitializeSchwalbach(int & patternIDIn, std::vector<double> & beamSTDIn, 
-				     double & beamVelocityIn,double & T0targIn,
-				     double & beamEtaIn, std::vector<double> & LxIn, double & T0In)
+void TempField::InitializeSchwalbach()
 {
   /*
     This follows the model: Schwalbach, Edwin J., et al. "A discrete source model of powder 
@@ -332,12 +309,12 @@ void TempField::InitializeSchwalbach(int & patternIDIn, std::vector<double> & be
     patternID=4: scan in alternating +/- X direction for layer i and 
 		 alternating +/- Y direction for layer i+1
    */
-  bmSTD = beamSTDIn;
-  bmV = beamVelocityIn;
-  T0targ = T0targIn;
-  bmEta = beamEtaIn;
-  patternID = patternIDIn;
-  T0 = T0In;
+  bmSTD = _xyz->beamSTD;
+  bmV = _xyz->bmV;
+  T0targ = _xyz->T0targ;
+  bmEta = _xyz->beamEta;
+  patternID = _xyz->patternID;
+  T0 = _xyz->T0;
   zlaserOff=1.0; // 1.0 (this specifies where laser z value is - see SchwalbachTempCurr)
   double tb,minTemp;
   if (patternID==0 || patternID==1 || patternID==2 || patternID==3 || patternID==4){
@@ -352,12 +329,12 @@ void TempField::InitializeSchwalbach(int & patternIDIn, std::vector<double> & be
     minTemp = 0.250; // cut off change in temperature for tcut
     tcut = pow(Ci/(2*alpha*minTemp),2.0/3.0);		       
     nSource = ceil(tcut/DelT);
-    offset={0.0,0.0,0.0};
-    bmLx={LxIn[0]+1*bmDX[0],LxIn[1]+1*bmDX[1],LxIn[2]};
+    offset=_xyz->offset;
+    bmLx={_xyz->LX[0]+1*bmDX[0],_xyz->LX[1]+1*bmDX[1],_xyz->LX[2]};
     if (patternID==1){
       offset={0.0,-_xyz->nX[1]*_xyz->dX[1]/2.0,0.0}; // positive value means starting outside domain
       shiftL={3*bmDX[0],0.0,0.0};
-      bmLx={LxIn[0]+shiftL[0],LxIn[1]+1*bmDX[1],LxIn[2]};
+      bmLx={_xyz->LX[0]+shiftL[0],_xyz->LX[1]+1*bmDX[1],_xyz->LX[2]};
     } // if (patternID==1...
     nTTemp = {int(floor(bmLx[0]/bmDX[0] ))+1,int(floor(bmLx[1]/bmDX[1]))+1,
             int(floor(bmLx[2]/bmDX[2]))};

@@ -6,57 +6,197 @@
 #include "string"
 #include <algorithm>
 #include <vector>
+#include "mpi.h"
+#include "fstream"
+#include "sstream"
+#include "numeric"
 
-// constructor
-Grid::Grid(const std::vector<double> & dxIn, const std::vector<int> & NxIn, 
-	   const double &tLIn, const double &tSIn,
-	   const double &mLIn,const double &c0In,const double &GammaIn,
-	   const double &kPIn,const double &dLIn,const double &muNIn, 
-	   const double & rhoIn, const double & cPIn, const double & kappaIn,
-	   const double &layerThicknessIn, const std::string neighOrderIn,
-	   const double &dTempMIn, const double &dTempSIn, 
-	   const double &rNmaxIn, const int &nDimIn, const std::string ntypeIn,
-	   const int &ictrlIn)
+//constructor
+Grid::Grid(std::string &filIn, int & myidIn, int & nprocsIn)
 {
-  // read in domain and  material parameters
-  nDim = nDimIn;
-  dX.resize(nDim);
-  nX.resize(nDim);
-  for (int j=0;j<nDim;++j){
-    dX[j] = dxIn[j];
-    nX[j] = NxIn[j];
-  }
-  tL = tLIn;
-  tS = tSIn;
-  mL = mLIn;
-  c0 = c0In;
-  Gamma = GammaIn;
-  kP = kPIn;
-  dL = dLIn;
-  muN = muNIn;
-  rho = rhoIn;
-  cP = cPIn;
-  kappa = kappaIn;
-  dTempM = dTempMIn;
-  dTempS = dTempSIn;
-  rNmax = rNmaxIn;
-  layerT = floor(layerThicknessIn/dX[2])*dX[2];
-  nZlayer = round(layerT/dX[2]);
-  deltaXmin = *std::min_element(dX.begin(),dX.end());
-  deltaTcheck = pow(deltaXmin,2.0)/dL;
+  // initialize default settings which will change if specified input file
   time =0.0;
   tInd =0;
   dt=0;
-  neighOrder = neighOrderIn;
-  ntype = ntypeIn;
-  ictrl = ictrlIn;
+  filInput = filIn;
+  myid = myidIn;
+  nprocs = nprocsIn;
+  nX = {128,128,64};
+  dX = {1e-6,1e-6,1e-6};
+  nDim = 3;
+  outint = 1;
+  patternID = 1;
+  tL = 1620;
+  tS = 1531.5;
+  dTempM = (tL-tS)*.75; //7.5; // 2.5 // K (mean undercooling for nucleation)
+  dTempS = (tL-tS)/3.0; //5.0; // 1.0 // K (standard dev undercooling for nucleation)
+  mL = -10.9; // (K / wt%)
+  dL = 3e-9; // (m^2/s)
+  Gamma = 1e-7;  // (K m)
+  muN = 9e-2; // 9 // 9e-2;
+  dP = .48;
+  c0 = 4.85; // (wt %)
+  neighOrder = "first"; // can only equal "first"
+  ntype = "Moore"; // either "Moore" or "VonNeumann"
   nnodePerCell = pow(2,nDim);
-
-  // this should change into a user parameter
+  rho = 8000.0; // kg /m^3
+  cP = 502; // 502.0; // J/kg-K)
+  kappa = 18; //18; //18.0; // W/(m-K)
+  beamSTD = {7.5e-5,7.5e-5,7.5e-5};
+  layerT = 25e-6;
+  bpH = 0.0;
+  mu = .01; // note that this is rate/ (\mu m)^3 for base plate tessellation
+  beamEta =1.0;
+  T0targ = 1500;
+  T0 = 300;
+  ictrl = 3;
+  meltparam = {75e-6,162.75e-6,75e-6,75e-6};
+  bmV = 500e-3;
+  bmDelT = 4.0/3.0*meltparam[0]/bmV;
+  bhatch = 1.53*meltparam[2];
+  rNmax = .002;
+  offset={0.0,0.0,0.0}; // positive value means starting outside of domain
+  outNL = 0;
+  //read data from input file
+  readInputFile();
+  LX = {nX[0]*dX[0],nX[1]*dX[1],nX[2]*dX[2]};
+  bpH< std::numeric_limits<double>::epsilon() ? bpH=layerT : bpH=bpH;
+  nZlayer = round(layerT/dX[2]);
+  deltaXmin = *std::min_element(dX.begin(),dX.end());
+  deltaTcheck = pow(deltaXmin,2.0)/dL;
   ethresh = .01; 
   deltaThresh=.95;  
 } // end constructor
 
+void Grid::readInputFile()
+{
+  std::ifstream filIn;
+  std::string inputData,keyword;
+  int k=0,n=0;
+  if (myid==0){
+    filIn.open(filInput.c_str());
+    while (!filIn.eof()){
+      char c;
+      filIn.get(c);
+      if (c == '#') {
+        // skip comments indicated by "#" in input file
+	while (filIn && c != '\n') {
+          filIn.get(c);
+        }
+      }
+      if (k >= n) {
+        n = 2*n;
+        const int m = 10000;
+        if (n < m) n = m;
+        inputData.resize(n);
+      }
+      inputData[k++] = c;
+    }
+    filIn.close();
+    inputData.resize(k);
+  }
+  MPI_Bcast(&k,1,MPI_INT,0,MPI_COMM_WORLD);
+  inputData.resize(k);
+  MPI_Bcast(&inputData[0],k,MPI_CHAR,0,MPI_COMM_WORLD);
+  std::istringstream simInput(inputData);
+  simInput >> keyword;
+  while(simInput){
+    std::transform(keyword.begin(),keyword.end(),keyword.begin(),
+                   [](unsigned char s){return std::tolower(s);});
+    if (keyword=="dx") {
+      dX.resize(3);
+      simInput >> keyword;
+      dX[0]=std::stod(keyword);
+      dX[1]=dX[0];
+      dX[2]=dX[0];
+    }
+    if (keyword=="bmv") {
+      simInput >> keyword;
+      bmV=std::stod(keyword);
+    }
+    if (keyword=="bmp") {
+      simInput >> keyword;
+      bmP=std::stod(keyword);
+    }
+    if (keyword=="bmdelt") {
+      simInput >> keyword;
+      bmDelT=std::stod(keyword);
+    }
+    if (keyword=="nx") {
+      nX.resize(3);
+      simInput >> keyword;
+      nX[0]=std::stoi(keyword);
+      simInput >> keyword;
+      nX[1]=std::stoi(keyword);
+      simInput >> keyword;
+      nX[2]=std::stoi(keyword);
+    }
+    if (keyword=="r") {
+      simInput >> keyword;
+      rNmax=std::stod(keyword);
+    }
+    if (keyword=="lt") {
+      simInput >> keyword;
+      layerT=std::stod(keyword);
+    }
+    if (keyword=="tl") {
+      simInput >> keyword;
+      tL=std::stod(keyword);
+    }
+    if (keyword=="ts") {
+      simInput >> keyword;
+      tS=std::stod(keyword);
+    }
+    if (keyword=="bhatch") {
+      simInput >> keyword;
+      bhatch=std::stod(keyword);
+    }
+    if (keyword=="mu") {
+      simInput >> keyword;
+      mu=std::stod(keyword);
+    }
+    if (keyword=="bph") {
+      simInput >> keyword;
+      bpH=std::stod(keyword);
+    }
+    if (keyword=="outnl") {
+      simInput >> keyword;
+      outNL=std::stoi(keyword);
+    }
+    if (keyword=="ntsd") {
+      simInput >> keyword;
+      nTsd=std::stoi(keyword);
+    }
+    if (keyword=="offset") {
+      simInput >> keyword;
+      offset[0]=std::stod(keyword);
+      simInput >> keyword;
+      offset[1]=std::stod(keyword);
+      simInput >> keyword;
+      offset[2]=std::stod(keyword);
+    }
+    if (keyword=="meltparam") {
+      meltparam.resize(4);
+      simInput >> keyword;
+      meltparam[0]=std::stod(keyword);
+      simInput >> keyword;
+      meltparam[1]=std::stod(keyword);
+      simInput >> keyword;
+      meltparam[2]=std::stod(keyword);
+      simInput >> keyword;
+      meltparam[3]=std::stod(keyword);
+    }
+    if (keyword=="patternid") {
+      simInput >> keyword;
+      patternID=std::stoi(keyword);
+    }
+    if (keyword=="outint") {
+      simInput >> keyword;
+      outint=std::stoi(keyword);
+    }
+    simInput >> keyword;
+  } // while(simInput)
+} // readInputFile
 void Grid::UpdateTime(const double &vmax)
 {
   dt = .25*std::min(deltaTcheck,deltaXmin/vmax);

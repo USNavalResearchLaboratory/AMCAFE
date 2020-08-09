@@ -11,7 +11,7 @@ CPPINCLUDE = -I /opt/petsc/arch-linux2-c-opt/include/
 METISLIB = /opt/petsc/arch-linux2-c-opt/lib/libmetis.so
 
 #SOURCES = $(wildcard *.C)
-SOURCES = main1.C Grid.C BasePlate.C TempField.C Param.C Partition.C SampleOrientation.C VoxelsCA.C 
+SOURCES = main1.C Grid.C BasePlate.C TempField.C Partition.C SampleOrientation.C VoxelsCA.C 
 SOURCES2 = main1Scale.C Grid.C BasePlate.C TempFieldScale.C Partition.C SampleOrientation.C VoxelsCA.C 
 SOURCES3 = main1val1.C Grid.C BasePlateval1.C TempFieldval1.C Partition.C SampleOrientation.C VoxelsCAval1.C
 OBJECTS = $(SOURCES:.C=.o)

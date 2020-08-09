@@ -13,7 +13,7 @@ class BasePlate
 {
  public:
   // default constructor: 
-  BasePlate(const Grid &g, const double &height, const double &rate, Partition &);
+  BasePlate(const Grid &g, Partition &);
 
   // any functions added here
   void GenerateNgrain();

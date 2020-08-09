@@ -16,12 +16,8 @@ class TempField
   TempField(Grid &g, Partition &, BasePlate &);
   void InitializeMoose(std::string & filnambase, const int &NtIn, 
 		       const double &dtM, const std::vector<int> &nXM, const std::vector<double> &dXM);
-  void InitializeSchwalbach(int & patternId, std::vector<double> & beamSTD, 
-			    double & beamVelocity, double & T0targIn, double & beamEta, std::vector<double> & Lx,
-			    double & T0);
-  void InitializeAnalytic(int & patternIDIn, std::vector<double> & meltparam, 
-                                   double & beamVelocityIn, double & bhatch, std::vector<double> & LxIn,
-                                   double & T0In);
+  void InitializeSchwalbach();
+  void InitializeAnalytic();
   void Test2ComputeTemp(double T20, double T10, double a,double tcurr);
   void ReadCSVMoose1();
   void ReadCSVMoose2();
