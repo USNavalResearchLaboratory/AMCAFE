@@ -14,6 +14,8 @@
 #include "mpi.h"
 #include "SampleOrientation.h"
 #include <chrono>
+#include <adios2.h>
+
 
 // constructor
 VoxelsCA::VoxelsCA(Grid &g,TempField &tf, Partition &part)
@@ -2996,6 +2998,161 @@ void VoxelsCA::WriteToVTU1(const std::string &filename)
   }
   MPI_Barrier(MPI_COMM_WORLD);  
 } // end WriteToVTU1
+void VoxelsCA::WriteToHDF1(const std::string &filename)
+{
+  // writes gID, vState, cTheta per voxel
+  int Ntot=_part->ncellLoc, i1,i2,i3;
+  std::string hdf5Filename = filename + ".h5";
+  std::vector< float> TempOut(Ntot,0),IPFmapBD(3*Ntot,0), IPFmapx(3*Ntot,0), IPFmapy(3*Ntot,0);
+  double vBD[3]={0.0,0.0,1.0},omega,ax[3],vCD[3],mxAng,blue,green,red,rRot[3][3],mscale,
+    vX[3]={1.0,0.0,0.0},vY[3]={0.0,1.0,0.0};
+  for (int j=0;j<Ntot;++j){
+    TempOut[j] = _temp->TempCurr[j];
+    if (gID[j]<1){
+      IPFmapBD[3*j] = 0.0;
+      IPFmapBD[3*j+1] = 0.0;
+      IPFmapBD[3*j+2] = 0.0;
+      IPFmapx[3*j] = 0.0;
+      IPFmapx[3*j+1] = 0.0;
+      IPFmapx[3*j+2] = 0.0;
+      IPFmapy[3*j] = 0.0;
+      IPFmapy[3*j+1] = 0.0;
+      IPFmapy[3*j+2] = 0.0;
+    } else {
+      omega = cTheta[4*(gID[j]-1)];
+      ax[0]= cTheta[4*(gID[j]-1)+1];
+      ax[1]= cTheta[4*(gID[j]-1)+2];
+      ax[2]= cTheta[4*(gID[j]-1)+3];
+      // matrix is local->global; need to multiply by transpose for global->local            
+      rRot[0][0] = cos(omega) + pow(ax[0],2.0)*(1-cos(omega));
+      rRot[0][1] = ax[0]*ax[1]*(1-cos(omega)) - ax[2]*sin(omega);
+      rRot[0][2] = ax[0]*ax[2]*(1-cos(omega)) + ax[1]*sin(omega);
+      rRot[1][0] = ax[0]*ax[1]*(1-cos(omega)) + ax[2]*sin(omega);
+      rRot[1][1] = cos(omega) + pow(ax[1],2.0)*(1-cos(omega));
+      rRot[1][2] = ax[1]*ax[2]*(1-cos(omega)) - ax[0]*sin(omega);
+      rRot[2][0] = ax[2]*ax[0]*(1-cos(omega)) - ax[1]*sin(omega);
+      rRot[2][1] = ax[2]*ax[1]*(1-cos(omega)) + ax[0]*sin(omega);
+      rRot[2][2] = cos(omega) + pow(ax[2],2.0)*(1-cos(omega));
+      vCD[0] = std::fabs(rRot[0][0]*vBD[0]+rRot[1][0]*vBD[1]+rRot[2][0]*vBD[2]);
+      vCD[1] = std::fabs(rRot[0][1]*vBD[0]+rRot[1][1]*vBD[1]+rRot[2][1]*vBD[2]);
+      vCD[2] = std::fabs(rRot[0][2]*vBD[0]+rRot[1][2]*vBD[1]+rRot[2][2]*vBD[2]);
+      std::sort(vCD,vCD+3);
+      std::swap(vCD[0],vCD[1]);
+      vCD[2] = std::min(vCD[2],1.0);
+      mxAng = M_PI/4.0;
+      red = std::fabs( (mxAng - acos(vCD[2]))/mxAng );
+      blue = atan2(vCD[1],vCD[0]);
+      green = mxAng - blue;
+      blue *= (1-red)/mxAng;
+      green *= (1-red)/mxAng;
+      mscale = std::max(red,std::max(green,blue));
+      IPFmapBD[3*j] = red/mscale;
+      IPFmapBD[3*j+1] = green/mscale;
+      IPFmapBD[3*j+2] = blue/mscale;
+      // x dir
+      vCD[0] = std::fabs(rRot[0][0]*vX[0]+rRot[1][0]*vX[1]+rRot[2][0]*vX[2]);
+      vCD[1] = std::fabs(rRot[0][1]*vX[0]+rRot[1][1]*vX[1]+rRot[2][1]*vX[2]);
+      vCD[2] = std::fabs(rRot[0][2]*vX[0]+rRot[1][2]*vX[1]+rRot[2][2]*vX[2]);
+      std::sort(vCD,vCD+3);
+      std::swap(vCD[0],vCD[1]);
+      vCD[2]=std::min(vCD[2],1.0);
+      mxAng = M_PI/4.0;
+      red = std::fabs( (mxAng - acos(vCD[2]))/mxAng );
+      blue = atan2(vCD[1],vCD[0]);
+      green = mxAng - blue;
+      blue *= (1-red)/mxAng;
+      green *= (1-red)/mxAng;
+      mscale = std::max(red,std::max(green,blue));
+      IPFmapx[3*j] = red/mscale;
+      IPFmapx[3*j+1] = green/mscale;
+      IPFmapx[3*j+2] = blue/mscale;
+      // y dir 
+      vCD[0] = std::fabs(rRot[0][0]*vY[0]+rRot[1][0]*vY[1]+rRot[2][0]*vY[2]);
+      vCD[1] = std::fabs(rRot[0][1]*vY[0]+rRot[1][1]*vY[1]+rRot[2][1]*vY[2]);
+      vCD[2] = std::fabs(rRot[0][2]*vY[0]+rRot[1][2]*vY[1]+rRot[2][2]*vY[2]);
+      std::sort(vCD,vCD+3);
+      std::swap(vCD[0],vCD[1]);
+      vCD[2]=std::min(vCD[2],1.0);
+      mxAng = M_PI/4.0;
+      red = std::fabs( (mxAng - acos(vCD[2]))/mxAng );
+      blue = atan2(vCD[1],vCD[0]);
+      green = mxAng - blue;
+      blue *= (1-red)/mxAng;
+      green *= (1-red)/mxAng;
+      mscale = std::max(red,std::max(green,blue));
+      IPFmapy[3*j] = red/mscale;
+      IPFmapy[3*j+1] = green/mscale;
+      IPFmapy[3*j+2] = blue/mscale;
+    }
+  }
+  /*
+  std::vector<int> gNidj,gnb;
+  std::vector<float> mGB(Ntot+_part->nGhost,1.0);
+  for (int j=0;j<Ntot;++j){
+    i1 = ineighptr[j+1] - ineighptr[j];
+    gNidj.resize(i1);
+    for (int j1=0;j1<i1;++j1){
+      i2 = ineighID[ineighptr[j]+j1];
+      gNidj[j1]=gID[i2];
+    }
+    i2=gID[j];
+    gNidj.erase(std::remove(gNidj.begin(),gNidj.end(),i2),gNidj.end());
+    if (gNidj.size()==0){continue;}
+    
+    //i2=std::distance(gNidj.begin(),std::min_element(gNidj.begin(),gNidj.end()));
+    //i3=ineighID[ineighptr[j]+i2];
+    //gID[j] < gID[i3] ? mGB[j]=0.0 : mGB[i3] =0.0;
+
+    mGB[j]=0.0;
+
+  }
+  */
+
+  unsigned int nVoxT, js,jc;
+  nVoxT = _xyz->nX[0]*_xyz->nX[1]*_xyz->nX[2];
+  js = _part->icellidLoc[0];
+  jc = _part->icellidLoc[Ntot-1]-js + 1;
+  std::vector<float> dX(_xyz->dX.begin(),_xyz->dX.end());
+  adios2::ADIOS adios(MPI_COMM_WORLD);
+  adios2::IO hdf5IO = adios.DeclareIO("HDFFileIO");
+  hdf5IO.SetEngine("HDF5");
+  // global array : name, { shape (total) }, { start (local) }, { count (local) }  all are constant dimensions
+  adios2::Variable<int> dimsa = hdf5IO.DefineVariable<int>(
+	      "dims", {3}, {0}, {3});
+  adios2::Variable<float> dxa = hdf5IO.DefineVariable<float>(
+	      "VoxelDX", {3}, {0}, {3});
+  adios2::Variable<int> gida = hdf5IO.DefineVariable<int>(
+	      "gID", {nVoxT}, {js}, {jc});
+  adios2::Variable<int> vStatea = hdf5IO.DefineVariable<int>(
+	      "vState", {nVoxT}, {js}, {jc});
+  adios2::Variable<float> TempOuta = hdf5IO.DefineVariable<float>(
+	      "Temperature", {nVoxT}, {js}, {jc});
+  adios2::Variable<float> IPFmapBDa = hdf5IO.DefineVariable<float>(
+	      "IPFz", {3*nVoxT}, {3*js}, {3*jc});
+  adios2::Variable<float> IPFmapxa = hdf5IO.DefineVariable<float>(
+	      "IPFx", {3*nVoxT}, {3*js}, {3*jc});
+  adios2::Variable<float> IPFmapya = hdf5IO.DefineVariable<float>(
+	      "IPFy", {3*nVoxT}, {3*js}, {3*jc});
+  //adios2::Variable<float> mGBa = hdf5IO.DefineVariable<float>(
+//	      "microGB", {nVoxT}, {js}, {jc});
+
+
+  adios2::Engine hdf5Writer =
+      hdf5IO.Open(hdf5Filename, adios2::Mode::Write);
+  hdf5Writer.Put<int>(dimsa, _xyz->nX.data());
+  hdf5Writer.Put<float>(dxa, dX.data());
+  hdf5Writer.Put<int>(gida, gID.data());
+  hdf5Writer.Put<int>(vStatea, vState.data());
+  hdf5Writer.Put<float>(TempOuta, TempOut.data());
+  hdf5Writer.Put<float>(IPFmapBDa, IPFmapBD.data());
+  hdf5Writer.Put<float>(IPFmapxa, IPFmapx.data());
+  hdf5Writer.Put<float>(IPFmapya, IPFmapy.data());
+  //hdf5Writer.Put<float>(mGBa, mGB.data());
+
+  hdf5Writer.Close();
+  MPI_Barrier(MPI_COMM_WORLD);  
+} // end WriteToHDF1
+
 void VoxelsCA::WriteToVTU2(const std::string &filename)
 {
   // writes gID, vState, cTheta per voxel

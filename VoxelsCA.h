@@ -52,6 +52,7 @@ class VoxelsCA
   void WriteToVTU1(const std::string &filname);
   void WriteToVTU2(const std::string &filname);
   void WriteToPVTU1(const std::string &filname, int & nFile);
+  void WriteToHDF1(const std::string &filname);
   void WriteCSVData(const std::string &filname);
   void WriteCSVData1(const std::string &filname);
   void WriteToPVD(const std::string &filname, const std::vector<int> &, const std::vector<double> &);

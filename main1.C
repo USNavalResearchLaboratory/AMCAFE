@@ -93,15 +93,12 @@ int main(int argc, char *argv[])
 	filtime.push_back(g.time);
 	filout = filbaseOut+std::to_string(TempF.tInd);
 	cc1+=1;
-	if (nFils==1){
-	  vox.WriteToVTU1(filout);
-	  if (cc1 % 20 || TempF.tInd==(nTmax-1)){
-	    filout=filbaseOut;
-	    vox.WriteToPVD(filout,filinds,filtime);
-	  } // if (cc1
-	} else {
-	  vox.WriteToPVTU1(filout,nFils);
-	}
+	vox.WriteToHDF1(filout);
+//	vox.WriteToVTU1(filout);
+	if (cc1 % 20 || TempF.tInd==(nTmax-1)){
+	  filout=filbaseOut;
+	  vox.WriteToPVD(filout,filinds,filtime);
+	} // if (cc1
         filout = filbaseOut+"_t"+std::to_string(TempF.tInd)+".csv";
         vox.WriteCSVData1(filout); // done s.t. orientation info corresponds with
                                    // grain info in output file 

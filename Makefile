@@ -1,7 +1,7 @@
 # #!/bin/sh
 
 CPP = /opt/petsc/arch-linux2-c-opt/bin/mpic++
-CPPFLAGS = -std=c++11
+CPPFLAGS = -std=c++11 -DADIOS2_USE_MPI -isystem /home/kteferra/Documents/research/software/ADIOS2/include
 
 #CPPOOPTTFLAGS = -O2 -Wall
 CPPOOPTTFLAGS = -Wall -Werror
@@ -9,6 +9,8 @@ CPPOOPTTFLAGS = -Wall -Werror
 
 CPPINCLUDE = -I /opt/petsc/arch-linux2-c-opt/include/ 
 METISLIB = /opt/petsc/arch-linux2-c-opt/lib/libmetis.so
+adioslib=-Wl,-rpath,/home/kteferra/Documents/research/software/ADIOS2/lib /home/kteferra/Documents/research/software/ADIOS2/lib/libadios2_cxx11_mpi.so.2.6.0 /home/kteferra/Documents/research/software/ADIOS2/lib/libadios2_cxx11.so.2.6.0 -Wl,-rpath-link,/home/kteferra/Documents/research/software/ADIOS2/lib
+
 
 #SOURCES = $(wildcard *.C)
 SOURCES = main1.C Grid.C BasePlate.C TempField.C Partition.C SampleOrientation.C VoxelsCA.C 
@@ -21,15 +23,15 @@ OBJECTS3 = $(SOURCES3:.C=.o)
 
 cafe: $(OBJECTS)
 	@rm -f $@
-	$(CPP) -o $@ $^ $(METISLIB)
+	$(CPP) -o $@ $^ $(METISLIB) $(adioslib)
 
 cafeScale: $(OBJECTS2)
 	@rm -f $@
-	$(CPP) -o $@ $^ $(METISLIB)
+	$(CPP) -o $@ $^ $(METISLIB) $(adioslib)
 
 cafeval1: $(OBJECTS3)
 	@rm -f $@
-	$(CPP) -o $@ $^ $(METISLIB)
+	$(CPP) -o $@ $^ $(METISLIB) $(adioslib)
 
 clean:
 	rm -f *.o
