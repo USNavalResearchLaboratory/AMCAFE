@@ -52,7 +52,12 @@ then i git cloned the ADIOS2, mkdir adios2-build and cd'ed to it
 7) Make install
 The adios-config file is in the ../ADIOS/bin directory; to determine flags to compile your application with
 8) ./adios-config --cxx-flags
-9) ./adios-config --cxx-flags
+9) ./adios-config --cxx-libs
+
+However, for some reason, the cxx-libs does not give all the necessary libraries. In order to get it to work i needed to use this command in the makefile
+for the adioslibrary
+adioslib = -Wl,-rpath,/p/home/kteferra/Documents/software/ADIOS2/lib64 /p/home/kteferra/Documents/software/ADIOS2/lib64/libadios2_cxx11_mpi.so.2.6.0 /p/home/kteferra/Documents/software/ADIOS2/lib64/libadios2_cxx11.so.2.6.0 /p/home/kteferra/Documents/software/ADIOS2/lib64/libadios2_core_mpi.so.2.6.0 /p/home/kteferra/Documents/software/ADIOS2/lib64/libadios2_core.so.2.6.0 /p/home/kteferra/Documents/software/ADIOS2/lib64/libadios2_evpath.so /p/home/kteferra/Documents/software/ADIOS2/lib64/libadios2_ffs.so.1.6.0 /p/home/kteferra/Documents/software/ADIOS2/lib64/libadios2_atl.so.2.2.1 /p/home/kteferra/Documents/software/ADIOS2/lib64/libadios2_dill.so.2.4.1 /p/home/kteferra/Documents/software/ADIOS2/lib64/libadios2_enet.so.1.3.14 /p/home/kteferra/Documents/software/ADIOS2/lib64/libadios2_taustubs.so -Wl,-rpath-link,/p/home/kteferra/Documents/software/ADIOS2/lib64
+
 
 
 lastly when compile (AND EXECUTE) an application that uses adios2, you have to make sure you have the following modules loaded
@@ -60,6 +65,9 @@ module swap compiler/intel/2019.4.243 compiler/intel/2019.5.281
 module swap mpt/2.20 compiler/intelmpi/2019.5.281
 module load hdf5-parallel/intel-18.1.163/1.10.5
 module load gcc/9.2.0
+
+see the Makefile
+
 
 ONYX:
 I'm not really sure how this happened, but I compiled a static library in onyx whereas the others are dynamic, but this is what i did

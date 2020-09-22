@@ -2388,6 +2388,92 @@ void VoxelsCA::ConvertSolid1(const int &iswitch)
     } // for j
   } // if (iswitch==0)
 }; // ConvertSolid1
+void VoxelsCA::CleanLayer(){
+ /*
+   at beginning of each layer, function purges indices of cTheta associated
+   with grains having no volume and renumbers gID to eliminate grains
+   with no volume
+ */
+
+  // purge indices of cTheta associated with grains having no volume
+  std::vector<double> gVol(nGrain,0.0),gVolT(nGrain,0),ctmp;
+  std::vector<int> gtmp,itmp1(nGrain,0);
+  int Ntot,Ntot2,nGtmp,i1t;
+  double vvol;
+  Ntot = _part->ncellLoc;
+  Ntot2 = _part->ncellLoc + _part->nGhost;
+  vvol = _xyz->dX[0]*_xyz->dX[1]*_xyz->dX[2];
+  for (int j=0;j<Ntot;++j){
+    if (gID[j]>0){gVol[gID[j]-1]+=vvol;}
+  }
+  MPI_Allreduce(&gVol[0],&gVolT[0],nGrain,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+  nGtmp=0;
+  ctmp.assign(4*nGrain,0);
+  for (int j=0;j<nGrain;++j){
+    if (gVolT[j]>0.0){
+      ctmp[4*nGtmp] = cTheta[4*j];
+      ctmp[4*nGtmp+1] = cTheta[4*j+1];
+      ctmp[4*nGtmp+2] = cTheta[4*j+2];
+      ctmp[4*nGtmp+3] = cTheta[4*j+3];
+      itmp1[j] = nGtmp+1;
+      nGtmp+=1;
+    }
+  }
+  cTheta.assign(ctmp.begin(),ctmp.begin()+4*nGtmp);
+  nGrain = nGtmp;
+  for (int j=0;j<Ntot2;++j){
+    if (gID[j]==0){continue;}
+    i1t = itmp1[gID[j]-1];
+    gID[j] =  i1t;
+  }
+ 
+}; // CleanLayer
+void VoxelsCA::AddLayer(){
+  /*
+    function adds the layer of powder and is called at the beginning of new layer
+   */
+  int Ntot,Ntot2,i1t,nVlayer,j1,j2,j3,iz1,jvox0;
+  Ntot = _part->ncellLoc;
+  Ntot2 = _part->ncellLoc + _part->nGhost;
+  nVlayer = _xyz->nX[0]*_xyz->nX[1]*_xyz->nZlayer;
+  std::default_random_engine gen1(3134525);
+  unsigned int sdloc;
+  sdloc = unsigned(double(gen1())/double(gen1.max())*pow(2.0,32.0));
+  SampleOrientation sa1;
+  // randomly generate crystallographic orientations
+  std::vector<double> aa;
+  sa1.GenerateSamples(nVlayer,sdloc,aa);
+  cTheta.insert(cTheta.end(), aa.begin(),aa.end());
+  // ASSIGN GID NGRAIN1+1...NGRAIN TO PROPER VOXELS
+  // LOOK INTO WHETHER GNUCLEUS IS IMPORTANT IN WHICH
+  // CASE IT WILL BE THE VOXEL CENTERS
+  iz1 = _temp->ilaserLoc - _xyz->nZlayer;
+  jvox0 = _xyz->nX[0]*_xyz->nX[1]*iz1;
+  for (int j=0;j<Ntot2;++j){
+    j3 = floor(_part->icellidLoc[j]/(_xyz->nX[0]*_xyz->nX[1]));
+    if (j3>=iz1 && j3<_temp->ilaserLoc){
+      j2 = floor( (_part->icellidLoc[j]- _xyz->nX[0]*_xyz->nX[1]*j3)/_xyz->nX[0]);
+      j1 = _part->icellidLoc[j] - _xyz->nX[0]*_xyz->nX[1]*j3 - _xyz->nX[0]*j2;
+      gID[j] = nGrain + _xyz->nX[0]*_xyz->nX[1]*j3+_xyz->nX[0]*j2+j1 - jvox0 + 1;
+      vState[j] = 3;
+      if (j<Ntot){
+	centroidOct[3*j]=(double(j1)+.5)*_xyz->dX[0];
+	centroidOct[3*j+1]=(double(j2)+.5)*_xyz->dX[1];
+	centroidOct[3*j+2]=(double(j3)+.5)*_xyz->dX[2];
+      } // if (j<Ntot)
+    } // if (j3>=iz1 && j3<_temp->ilaserLoc ...
+  } // for (int j...
+  nGrain += _xyz->nX[0]*_xyz->nX[1]*_xyz->nZlayer;  
+  // assign appropriate vState (including zeroing states above ilaserLoc
+  iz1 = _xyz->nX[0]*_xyz->nX[1]*_temp->ilaserLoc;
+  for (int j=0;j<Ntot2;++j){
+    if (_part->icellidLoc[j] >=iz1){
+      vState[j] = 0;
+      gID[j] = 0;
+    }    
+  } // for j  
+}; // AddLayer
+
 
 void VoxelsCA::UpdateLayer(std::string &filCSV){
   /*
@@ -3003,7 +3089,7 @@ void VoxelsCA::WriteToHDF1(const std::string &filename)
   // writes gID, vState, cTheta per voxel
   int Ntot=_part->ncellLoc, i1,i2,i3;
   std::string hdf5Filename = filename + ".h5";
-  std::vector< float> TempOut(Ntot,0),IPFmapBD(3*Ntot,0), IPFmapx(3*Ntot,0), IPFmapy(3*Ntot,0);
+  std::vector< float> TempOut(Ntot,0),IPFmapBD(3*Ntot,0), IPFmapx(3*Ntot,0), IPFmapy(3*Ntot,0),cth(4*nGrain,0);
   double vBD[3]={0.0,0.0,1.0},omega,ax[3],vCD[3],mxAng,blue,green,red,rRot[3][3],mscale,
     vX[3]={1.0,0.0,0.0},vY[3]={0.0,1.0,0.0};
   for (int j=0;j<Ntot;++j){
@@ -3085,31 +3171,10 @@ void VoxelsCA::WriteToHDF1(const std::string &filename)
       IPFmapy[3*j+2] = blue/mscale;
     }
   }
-  /*
-  std::vector<int> gNidj,gnb;
-  std::vector<float> mGB(Ntot+_part->nGhost,1.0);
-  for (int j=0;j<Ntot;++j){
-    i1 = ineighptr[j+1] - ineighptr[j];
-    gNidj.resize(i1);
-    for (int j1=0;j1<i1;++j1){
-      i2 = ineighID[ineighptr[j]+j1];
-      gNidj[j1]=gID[i2];
-    }
-    i2=gID[j];
-    gNidj.erase(std::remove(gNidj.begin(),gNidj.end(),i2),gNidj.end());
-    if (gNidj.size()==0){continue;}
-    
-    //i2=std::distance(gNidj.begin(),std::min_element(gNidj.begin(),gNidj.end()));
-    //i3=ineighID[ineighptr[j]+i2];
-    //gID[j] < gID[i3] ? mGB[j]=0.0 : mGB[i3] =0.0;
-
-    mGB[j]=0.0;
-
-  }
-  */
-
-  unsigned int nVoxT, js,jc;
+  for (int j=0;j<4*nGrain;++j){cth[j]=cTheta[j];}
+  unsigned int nVoxT, js,jc,ncth;
   nVoxT = _xyz->nX[0]*_xyz->nX[1]*_xyz->nX[2];
+  ncth=4*nGrain;
   js = _part->icellidLoc[0];
   jc = _part->icellidLoc[Ntot-1]-js + 1;
   std::vector<float> dX(_xyz->dX.begin(),_xyz->dX.end());
@@ -3133,10 +3198,8 @@ void VoxelsCA::WriteToHDF1(const std::string &filename)
 	      "IPFx", {3*nVoxT}, {3*js}, {3*jc});
   adios2::Variable<float> IPFmapya = hdf5IO.DefineVariable<float>(
 	      "IPFy", {3*nVoxT}, {3*js}, {3*jc});
-  //adios2::Variable<float> mGBa = hdf5IO.DefineVariable<float>(
-//	      "microGB", {nVoxT}, {js}, {jc});
-
-
+  adios2::Variable<float> angAx = hdf5IO.DefineVariable<float>(
+	      "angleAxis", {ncth}, {0}, {ncth});
   adios2::Engine hdf5Writer =
       hdf5IO.Open(hdf5Filename, adios2::Mode::Write);
   hdf5Writer.Put<int>(dimsa, _xyz->nX.data());
@@ -3147,7 +3210,7 @@ void VoxelsCA::WriteToHDF1(const std::string &filename)
   hdf5Writer.Put<float>(IPFmapBDa, IPFmapBD.data());
   hdf5Writer.Put<float>(IPFmapxa, IPFmapx.data());
   hdf5Writer.Put<float>(IPFmapya, IPFmapy.data());
-  //hdf5Writer.Put<float>(mGBa, mGB.data());
+  hdf5Writer.Put<float>(angAx, cth.data());
 
   hdf5Writer.Close();
   MPI_Barrier(MPI_COMM_WORLD);  

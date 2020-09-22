@@ -86,30 +86,28 @@ int main(int argc, char *argv[])
     //indOut = j123[2] % out2[1] + (TempF.nTTemp[0]*j123[1]+j123[0]) % out2[0];
     indOut = (TempF.nTTemp[0]*TempF.nTTemp[1]*j123[2]+TempF.nTTemp[0]*j123[1]+j123[0]) % g.outint;
     iNL=fmod(TempF.tInd,TempF.nTTemp[0]*TempF.nTTemp[1]);
+    if (iNL==0){vox.CleanLayer();}
     if (irep==0){
       irep=1;
-      if (indOut==0 || TempF.tInd ==(nTmax-1) || (iNL==0 && g.outNL==0)){
+      if (indOut==0 || TempF.tInd ==nTmax || (iNL==0 && g.outNL==0)){
 	filinds.push_back(TempF.tInd);
 	filtime.push_back(g.time);
 	filout = filbaseOut+std::to_string(TempF.tInd);
 	cc1+=1;
+        filout = filbaseOut+"_t"+std::to_string(TempF.tInd)+".csv";
 	vox.WriteToHDF1(filout);
-//	vox.WriteToVTU1(filout);
+	/*
+	vox.WriteToVTU1(filout);
 	if (cc1 % 20 || TempF.tInd==(nTmax-1)){
 	  filout=filbaseOut;
 	  vox.WriteToPVD(filout,filinds,filtime);
 	} // if (cc1
-        filout = filbaseOut+"_t"+std::to_string(TempF.tInd)+".csv";
-        vox.WriteCSVData1(filout); // done s.t. orientation info corresponds with
-                                   // grain info in output file 
+	*/
 	MPI_Barrier(MPI_COMM_WORLD);
       } // (indOut==0 ...
     } // if (irep==0
-    // update next step for voxels (time is updated in vox.ComputeExtents() )
-    if (iNL==0){
-      filout = filbaseOut+"_t"+std::to_string(TempF.tInd)+".csv";
-      vox.UpdateLayer(filout); // WriteCSVData1 called in UpdateLayer
-    }
+    if (iNL==0){vox.AddLayer();}
+    // update next step for voxels 
     vox.UpdateVoxels8();
     g.UpdateTime2(TempF.DelT);    
     // update temperature field

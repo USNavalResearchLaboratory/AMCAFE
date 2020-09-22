@@ -9,7 +9,7 @@ CPPOOPTTFLAGS = -Wall -Werror
 
 CPPINCLUDE = -I /opt/petsc/arch-linux2-c-opt/include/ 
 METISLIB = /opt/petsc/arch-linux2-c-opt/lib/libmetis.so
-adioslib=-Wl,-rpath,/home/kteferra/Documents/research/software/ADIOS2/lib /home/kteferra/Documents/research/software/ADIOS2/lib/libadios2_cxx11_mpi.so.2.6.0 /home/kteferra/Documents/research/software/ADIOS2/lib/libadios2_cxx11.so.2.6.0 -Wl,-rpath-link,/home/kteferra/Documents/research/software/ADIOS2/lib
+adioslib=-Wl,-rpath,/home/kteferra/Documents/research/software/ADIOS2/lib /home/kteferra/Documents/research/software/ADIOS2/lib/libadios2_cxx11_mpi.so.2.6.0 /home/kteferra/Documents/research/software/ADIOS2/lib/libadios2_cxx11.so.2.6.0 /home/kteferra/Documents/research/software/ADIOS2/lib/libadios2_core_mpi.so.2.6.0 /home/kteferra/Documents/research/software/ADIOS2/lib/libadios2_core.so.2.6.0 /home/kteferra/Documents/research/software/ADIOS2/lib/libadios2_evpath.so /home/kteferra/Documents/research/software/ADIOS2/lib/libadios2_ffs.so.1.6.0 /home/kteferra/Documents/research/software/ADIOS2/lib/libadios2_atl.so.2.2.1 /home/kteferra/Documents/research/software/ADIOS2/lib/libadios2_dill.so.2.4.1 /home/kteferra/Documents/research/software/ADIOS2/lib/libadios2_enet.so.1.3.14 /home/kteferra/Documents/research/software/ADIOS2/lib/libadios2_taustubs.so  -Wl,-rpath-link,/home/kteferra/Documents/research/software/ADIOS2/lib
 
 
 #SOURCES = $(wildcard *.C)
