@@ -3087,11 +3087,25 @@ void VoxelsCA::WriteToVTU1(const std::string &filename)
 void VoxelsCA::WriteToHDF1(const std::string &filename)
 {
   // writes gID, vState, cTheta per voxel
-  int Ntot=_part->ncellLoc, i1,i2,i3;
+  int Ntot=_part->ncellLoc, i1,i2,i3,icase;
   std::string hdf5Filename = filename + ".h5";
   std::vector< float> TempOut(Ntot,0),IPFmapBD(3*Ntot,0), IPFmapx(3*Ntot,0), IPFmapy(3*Ntot,0),cth(4*nGrain,0);
   double vBD[3]={0.0,0.0,1.0},omega,ax[3],vCD[3],mxAng,blue,green,red,rRot[3][3],mscale,
-    vX[3]={1.0,0.0,0.0},vY[3]={0.0,1.0,0.0};
+    vX[3]={1.0,0.0,0.0},vY[3]={0.0,1.0,0.0},xp,yp,x0,y0,m,a,b,c,H,S,V,sMax,ff,p,q,t;
+  std::vector<std::vector<double>> triPts(2,std::vector<double>(3,0));
+  triPts[0][0]=0.0;
+  triPts[0][1]=2./pow(2,.5)/(1.+1./pow(2,.5));
+  triPts[0][2]=2./pow(3,.5)/(1.+1./pow(3,.5));
+  triPts[1][0]=0.0;
+  triPts[1][1]=0.0;
+  triPts[1][2]=2./pow(3,.5)/(1.+1./pow(3,.5));
+  m=tan(1./2.*atan2(triPts[1][2],triPts[0][2]));
+  a=pow(pow(triPts[1][2]-triPts[1][1],2.)+pow(triPts[0][2]-triPts[0][1],2.),.5);
+  b=pow(pow(triPts[0][1],2.)+pow(triPts[1][1],2.) ,0.5);
+  c=pow(pow(triPts[0][2],2.)+pow(triPts[1][2],2.),0.5);
+  y0=1./2.*pow((b+c-a)*(c+a-b)*(a+b-c)/(a+b+c),.5);
+  x0=y0/m;
+  sMax=pow(pow(x0,2.)+pow(y0,2.),.5);
   for (int j=0;j<Ntot;++j){
     TempOut[j] = _temp->TempCurr[j];
     if (gID[j]<1){
@@ -3125,16 +3139,55 @@ void VoxelsCA::WriteToHDF1(const std::string &filename)
       std::sort(vCD,vCD+3);
       std::swap(vCD[0],vCD[1]);
       vCD[2] = std::min(vCD[2],1.0);
-      mxAng = M_PI/4.0;
-      red = std::fabs( (mxAng - acos(vCD[2]))/mxAng );
-      blue = atan2(vCD[1],vCD[0]);
-      green = mxAng - blue;
-      blue *= (1-red)/mxAng;
-      green *= (1-red)/mxAng;
-      mscale = std::max(red,std::max(green,blue));
-      IPFmapBD[3*j] = red/mscale;
-      IPFmapBD[3*j+1] = green/mscale;
-      IPFmapBD[3*j+2] = blue/mscale;
+      xp = 2.*vCD[0]/(1.+vCD[2]);
+      yp = 2.*vCD[1]/(1.+vCD[2]);
+      H=atan2( (yp-y0),(xp-x0))*180./M_PI;
+      V=1.;
+      xp < x0 ? H+=180: H;
+      S=pow(pow(xp-x0,2.)+pow(yp-y0,2.),.5);
+      S=S/sMax*0.8 + 0.2;
+      H>=360.0 ? H=0.0 : H;
+      icase = floor(H/60.0);
+      ff= H/6.0 - icase;
+      p=V*(1.-S);
+      q=V*(1.-S*ff);
+      t=V*(1.-(S*(1.-ff)));
+      if (S<=0.0){
+	IPFmapBD[3*j]=0.0;
+	IPFmapBD[3*j+1]=0.0;
+	IPFmapBD[3*j+2]=0.0;
+      } else {
+	if (icase==0){
+	  IPFmapBD[3*j]=V;
+	  IPFmapBD[3*j+1]=t;
+	  IPFmapBD[3*j+2]=p;
+	}
+	if (icase==1){
+	  IPFmapBD[3*j]=q;
+	  IPFmapBD[3*j+1]=V;
+	  IPFmapBD[3*j+2]=p;
+	}
+	if (icase==2){
+	  IPFmapBD[3*j]=p;
+	  IPFmapBD[3*j+1]=V;
+	  IPFmapBD[3*j+2]=t;
+	}
+	if (icase==3){
+	  IPFmapBD[3*j]=p;
+	  IPFmapBD[3*j+1]=q;
+	  IPFmapBD[3*j+2]=V;
+	}
+	if (icase==4){
+	  IPFmapBD[3*j]=t;
+	  IPFmapBD[3*j+1]=p;
+	  IPFmapBD[3*j+2]=V;
+	}
+	if (icase==5){
+	  IPFmapBD[3*j]=V;
+	  IPFmapBD[3*j+1]=p;
+	  IPFmapBD[3*j+2]=q;
+	}
+      }
       // x dir
       vCD[0] = std::fabs(rRot[0][0]*vX[0]+rRot[1][0]*vX[1]+rRot[2][0]*vX[2]);
       vCD[1] = std::fabs(rRot[0][1]*vX[0]+rRot[1][1]*vX[1]+rRot[2][1]*vX[2]);
@@ -3142,16 +3195,55 @@ void VoxelsCA::WriteToHDF1(const std::string &filename)
       std::sort(vCD,vCD+3);
       std::swap(vCD[0],vCD[1]);
       vCD[2]=std::min(vCD[2],1.0);
-      mxAng = M_PI/4.0;
-      red = std::fabs( (mxAng - acos(vCD[2]))/mxAng );
-      blue = atan2(vCD[1],vCD[0]);
-      green = mxAng - blue;
-      blue *= (1-red)/mxAng;
-      green *= (1-red)/mxAng;
-      mscale = std::max(red,std::max(green,blue));
-      IPFmapx[3*j] = red/mscale;
-      IPFmapx[3*j+1] = green/mscale;
-      IPFmapx[3*j+2] = blue/mscale;
+      xp = 2.*vCD[0]/(1.+vCD[2]);
+      yp = 2.*vCD[1]/(1.+vCD[2]);
+      H=atan2( (yp-y0),(xp-x0))*180./M_PI;
+      V=1.;
+      xp < x0 ? H+=180: H;
+      S=pow(pow(xp-x0,2.)+pow(yp-y0,2.),.5);
+      S=S/sMax*0.8 + 0.2;
+      H>=360.0 ? H=0.0 : H;
+      icase = floor(H/60.0);
+      ff= H/6.0 - icase;
+      p=V*(1.-S);
+      q=V*(1.-S*ff);
+      t=V*(1.-(S*(1.-ff)));
+      if (S<=0.0){
+	IPFmapx[3*j]=0.0;
+	IPFmapx[3*j+1]=0.0;
+	IPFmapx[3*j+2]=0.0;
+      } else {
+	if (icase==0){
+	  IPFmapx[3*j]=V;
+	  IPFmapx[3*j+1]=t;
+	  IPFmapx[3*j+2]=p;
+	}
+	if (icase==1){
+	  IPFmapx[3*j]=q;
+	  IPFmapx[3*j+1]=V;
+	  IPFmapx[3*j+2]=p;
+	}
+	if (icase==2){
+	  IPFmapx[3*j]=p;
+	  IPFmapx[3*j+1]=V;
+	  IPFmapx[3*j+2]=t;
+	}
+	if (icase==3){
+	  IPFmapx[3*j]=p;
+	  IPFmapx[3*j+1]=q;
+	  IPFmapx[3*j+2]=V;
+	}
+	if (icase==4){
+	  IPFmapx[3*j]=t;
+	  IPFmapx[3*j+1]=p;
+	  IPFmapx[3*j+2]=V;
+	}
+	if (icase==5){
+	  IPFmapx[3*j]=V;
+	  IPFmapx[3*j+1]=p;
+	  IPFmapx[3*j+2]=q;
+	}
+      }
       // y dir 
       vCD[0] = std::fabs(rRot[0][0]*vY[0]+rRot[1][0]*vY[1]+rRot[2][0]*vY[2]);
       vCD[1] = std::fabs(rRot[0][1]*vY[0]+rRot[1][1]*vY[1]+rRot[2][1]*vY[2]);
@@ -3159,18 +3251,57 @@ void VoxelsCA::WriteToHDF1(const std::string &filename)
       std::sort(vCD,vCD+3);
       std::swap(vCD[0],vCD[1]);
       vCD[2]=std::min(vCD[2],1.0);
-      mxAng = M_PI/4.0;
-      red = std::fabs( (mxAng - acos(vCD[2]))/mxAng );
-      blue = atan2(vCD[1],vCD[0]);
-      green = mxAng - blue;
-      blue *= (1-red)/mxAng;
-      green *= (1-red)/mxAng;
-      mscale = std::max(red,std::max(green,blue));
-      IPFmapy[3*j] = red/mscale;
-      IPFmapy[3*j+1] = green/mscale;
-      IPFmapy[3*j+2] = blue/mscale;
-    }
-  }
+      xp = 2.*vCD[0]/(1.+vCD[2]);
+      yp = 2.*vCD[1]/(1.+vCD[2]);
+      H=atan2( (yp-y0),(xp-x0))*180./M_PI;
+      V=1.;
+      xp < x0 ? H+=180: H;
+      S=pow(pow(xp-x0,2.)+pow(yp-y0,2.),.5);
+      S=S/sMax*0.8 + 0.2;
+      H>=360.0 ? H=0.0 : H;
+      icase = floor(H/60.0);
+      ff= H/6.0 - icase;
+      p=V*(1.-S);
+      q=V*(1.-S*ff);
+      t=V*(1.-(S*(1.-ff)));
+      if (S<=0.0){
+	IPFmapy[3*j]=0.0;
+	IPFmapy[3*j+1]=0.0;
+	IPFmapy[3*j+2]=0.0;
+      } else {
+	if (icase==0){
+	  IPFmapy[3*j]=V;
+	  IPFmapy[3*j+1]=t;
+	  IPFmapy[3*j+2]=p;
+	}
+	if (icase==1){
+	  IPFmapy[3*j]=q;
+	  IPFmapy[3*j+1]=V;
+	  IPFmapy[3*j+2]=p;
+	}
+	if (icase==2){
+	  IPFmapy[3*j]=p;
+	  IPFmapy[3*j+1]=V;
+	  IPFmapy[3*j+2]=t;
+	}
+	if (icase==3){
+	  IPFmapy[3*j]=p;
+	  IPFmapy[3*j+1]=q;
+	  IPFmapy[3*j+2]=V;
+	}
+	if (icase==4){
+	  IPFmapy[3*j]=t;
+	  IPFmapy[3*j+1]=p;
+	  IPFmapy[3*j+2]=V;
+	}
+	if (icase==5){
+	  IPFmapy[3*j]=V;
+	  IPFmapy[3*j+1]=p;
+	  IPFmapy[3*j+2]=q;
+	}
+      } // if (S<0.0...
+    } //     if (gID[j]<1){
+  } // for (int j..
   for (int j=0;j<4*nGrain;++j){cth[j]=cTheta[j];}
   unsigned int nVoxT, js,jc,ncth;
   nVoxT = _xyz->nX[0]*_xyz->nX[1]*_xyz->nX[2];
@@ -3211,7 +3342,6 @@ void VoxelsCA::WriteToHDF1(const std::string &filename)
   hdf5Writer.Put<float>(IPFmapxa, IPFmapx.data());
   hdf5Writer.Put<float>(IPFmapya, IPFmapy.data());
   hdf5Writer.Put<float>(angAx, cth.data());
-
   hdf5Writer.Close();
   MPI_Barrier(MPI_COMM_WORLD);  
 } // end WriteToHDF1

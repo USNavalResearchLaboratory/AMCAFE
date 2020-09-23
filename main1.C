@@ -94,7 +94,7 @@ int main(int argc, char *argv[])
 	filtime.push_back(g.time);
 	filout = filbaseOut+std::to_string(TempF.tInd);
 	cc1+=1;
-        filout = filbaseOut+"_t"+std::to_string(TempF.tInd)+".csv";
+        filout = filbaseOut+std::to_string(TempF.tInd);
 	vox.WriteToHDF1(filout);
 	/*
 	vox.WriteToVTU1(filout);
