@@ -1657,6 +1657,8 @@ void VoxelsCA::UpdateVoxels8()
   std::default_random_engine g1(30*_xyz->tInd+seed1);
   std::uniform_real_distribution<double> xrand1(0.0,1.0);
   double rX;
+  // set nucleation discrete
+  rX = _xyz->rNmax*Na*pow(_xyz->dX[0]*1e6,3.);
   // end nucleation grains
 
   // end assemble arrays to be used to compute grain growth
@@ -1672,6 +1674,7 @@ void VoxelsCA::UpdateVoxels8()
   cc=0;
   struct{double DtMin; int rank;} xin,xout;
   xin.rank=_part->myid;
+  
   while (std::count(vS.begin(),vS.end(),2)!=countS && tinc<_temp->DelT) {
   //while (std::count(vS.begin(),vS.end(),2)!=countS) {
     xin.DtMin=1e6;
@@ -1731,7 +1734,7 @@ void VoxelsCA::UpdateVoxels8()
     MPI_Bcast(&j1s,1,MPI_INT,xout.rank,MPI_COMM_WORLD);
     if (xout.DtMin>=1e6){break;}
     // test: make captured grain new grain based on rate
-    rX = _xyz->rNmax*exp( - 25*pow( (T[js]-_xyz->tS)/(_xyz->tL-_xyz->tS) ,2.0));
+    //rX = _xyz->rNmax*exp( - 25*pow( (T[js]-_xyz->tS)/(_xyz->tL-_xyz->tS) ,2.0));
     if (xrand1(g1)< rX){      
       i1 = ineighIDA[ineighAptr[js]+j1s];
       sa.GenerateSamples(1,sdloc,quatnuc);
@@ -3141,9 +3144,10 @@ void VoxelsCA::WriteToHDF1(const std::string &filename)
       vCD[2] = std::min(vCD[2],1.0);
       xp = 2.*vCD[0]/(1.+vCD[2]);
       yp = 2.*vCD[1]/(1.+vCD[2]);
-      H=atan2( (yp-y0),(xp-x0))*180./M_PI;
-      V=1.;
+      H=atan( (yp-y0)/(xp-x0))*180./M_PI;
       xp < x0 ? H+=180: H;
+      H = H+240-atan((triPts[1][2]-y0)/(triPts[0][2]-x0))*180/M_PI;
+      V=1.;
       S=pow(pow(xp-x0,2.)+pow(yp-y0,2.),.5);
       S=S/sMax*0.8 + 0.2;
       H>=360.0 ? H=0.0 : H;
@@ -3197,9 +3201,10 @@ void VoxelsCA::WriteToHDF1(const std::string &filename)
       vCD[2]=std::min(vCD[2],1.0);
       xp = 2.*vCD[0]/(1.+vCD[2]);
       yp = 2.*vCD[1]/(1.+vCD[2]);
-      H=atan2( (yp-y0),(xp-x0))*180./M_PI;
-      V=1.;
+      H=atan( (yp-y0)/(xp-x0))*180./M_PI;
       xp < x0 ? H+=180: H;
+      H = H+240-atan((triPts[1][2]-y0)/(triPts[0][2]-x0))*180/M_PI;
+      V=1.;
       S=pow(pow(xp-x0,2.)+pow(yp-y0,2.),.5);
       S=S/sMax*0.8 + 0.2;
       H>=360.0 ? H=0.0 : H;
@@ -3253,9 +3258,8 @@ void VoxelsCA::WriteToHDF1(const std::string &filename)
       vCD[2]=std::min(vCD[2],1.0);
       xp = 2.*vCD[0]/(1.+vCD[2]);
       yp = 2.*vCD[1]/(1.+vCD[2]);
-      H=atan2( (yp-y0),(xp-x0))*180./M_PI;
+      H = H+240-atan((triPts[1][2]-y0)/(triPts[0][2]-x0))*180/M_PI;
       V=1.;
-      xp < x0 ? H+=180: H;
       S=pow(pow(xp-x0,2.)+pow(yp-y0,2.),.5);
       S=S/sMax*0.8 + 0.2;
       H>=360.0 ? H=0.0 : H;
