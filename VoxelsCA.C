@@ -1658,7 +1658,7 @@ void VoxelsCA::UpdateVoxels8()
   std::uniform_real_distribution<double> xrand1(0.0,1.0);
   double rX;
   // set nucleation discrete
-  rX = _xyz->rNmax*Na*pow(_xyz->dX[0]*1e6,3.);
+  rX = _xyz->rNmax*pow(_xyz->dX[0]*1e6,3.);
   // end nucleation grains
 
   // end assemble arrays to be used to compute grain growth
