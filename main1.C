@@ -40,24 +40,10 @@ int main(int argc, char *argv[])
   BasePlate bp(g, part);
   TempField TempF(g,part,bp);
   int Ntot=part.ncellLoc+ part.nGhost;
-  if (g.ictrl==4){
-    // this is a test case scenario
-    TempF.InitializeSchwalbach(); 
-    //TempF.Test2ComputeTemp(1.02*g.tL,.97*g.tL,514880,0.0);
-    TempF.Test2ComputeTemp(0.97*g.tL,.97*g.tL,0.0,0.0);
-  } else{
-    //TempF.InitializeSchwalbach(g); 
-    //TempF.SchwalbachTempCurr();
-    TempF.InitializeAnalytic();
-    TempF.AnalyticTempCurr(g.time,TempF.TempCurr,part.icellidLoc,Ntot);
-  }
+  TempF.InitializeAnalytic();
+  TempF.AnalyticTempCurr(g.time,TempF.TempCurr,part.icellidLoc,Ntot);
   VoxelsCA vox(g,TempF, part);
-  if (g.ictrl==4){
-  //vox.InitializeTest1();
-  vox.InitializeTest2();
-  } else{
-    vox.InitializeVoxels(bp);
-  }
+  vox.InitializeVoxels(bp);
   /*-----------------------------------------------
     execute simulation */
   cc1=0;
@@ -83,7 +69,6 @@ int main(int argc, char *argv[])
     j123[2] = floor(TempF.tInd /(TempF.nTTemp[0]*TempF.nTTemp[1]));
     j123[1] = floor((TempF.tInd - (TempF.nTTemp[0]*TempF.nTTemp[1])*j123[2])/ TempF.nTTemp[0]);
     j123[0] = TempF.tInd - (TempF.nTTemp[0]*TempF.nTTemp[1])*j123[2] - TempF.nTTemp[0]*j123[1];
-    //indOut = j123[2] % out2[1] + (TempF.nTTemp[0]*j123[1]+j123[0]) % out2[0];
     indOut = (TempF.nTTemp[0]*TempF.nTTemp[1]*j123[2]+TempF.nTTemp[0]*j123[1]+j123[0]) % g.outint;
     iNL=fmod(TempF.tInd,TempF.nTTemp[0]*TempF.nTTemp[1]);
     if (iNL==0){vox.CleanLayer();}
@@ -96,19 +81,12 @@ int main(int argc, char *argv[])
 	cc1+=1;
         filout = filbaseOut+std::to_string(TempF.tInd);
 	vox.WriteToHDF1(filout);
-	/*
-	vox.WriteToVTU1(filout);
-	if (cc1 % 20 || TempF.tInd==(nTmax-1)){
-	  filout=filbaseOut;
-	  vox.WriteToPVD(filout,filinds,filtime);
-	} // if (cc1
-	*/
 	MPI_Barrier(MPI_COMM_WORLD);
       } // (indOut==0 ...
     } // if (irep==0
     if (iNL==0){vox.AddLayer();}
     // update next step for voxels 
-    vox.UpdateVoxels8();
+    vox.UpdateVoxels();
     g.UpdateTime2(TempF.DelT);    
     // update temperature field
     if (TempF.tInd != int(round(g.time/TempF.DelT))){

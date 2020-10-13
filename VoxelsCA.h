@@ -31,14 +31,6 @@ class VoxelsCA
   void ComputeVoxelCapture2();
   void ComputeExtents();
   void UpdateVoxels();
-  void UpdateVoxels2();
-  void UpdateVoxels3();
-  void UpdateVoxels4();
-  void UpdateVoxels5();
-  void UpdateVoxels6();
-  void UpdateVoxels7();
-  void UpdateVoxels8();
-  void UpdateVoxels9();
   void UpdateLayer(std::string &filCSV);
   void CleanLayer();
   void AddLayer();
