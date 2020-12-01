@@ -1,33 +1,27 @@
-notes for compilation and executing the NRL cafe code AMCAFE.
+20200914:
 
-In order to compile and execute:
-1) need metis
-   - go to metis library and install static library of metis
-   - http://glaros.dtc.umn.edu/gkhome/metis/metis/download
-2) need adios2
-   - there are various steps depending on existing environment
-   - adios2 needs cmake, HDF5-parallel, gcc
-   - follow instructions: https://adios2.readthedocs.io/en/latest/
-3) customize makefile 
-   - change variables to appropriate paths
-4) type "make cafe" in terminal
-5) run cafe executable: specific command depends on compiler used
+creating a fork in /opt/cafe that will create branches for others to work on
 
+20200821: compiling ADIOS2 to be able to output HDF5
 
-below are some notes on DoD HPC systems:
+adios2 needs, HDF5 parallel and cmake
 
 neocortex:
-compile HDF5
-1) untarred hdf5 and cd'd to directory
-2) did the following command
+HDF5
+1) untarred hdf5 and cd'd to directory /usr/local
+2) chmod 777 for the directory
+3) did the following command
 CC=mpicc ./configure --enable-parallel
 make -j 12
 make install
 
-* note that mpicc refers to a mpich build already on neocortex.
-  another build should have been ok.
+* note that mpicc refers to a petsc build already on neocortex:
+/opt/petsc/arch-linux2-c-opt/bin/mpicc
 
-compile CMAKE
+CMAKE
+
+option 1
+
 1) downloaded cmake source and untarred, cd'd to directory
 2) needed the openssl library (had an error first)
 sudo apt get install libssl-dev
@@ -36,15 +30,31 @@ sudo apt get install libssl-dev
 sudo make -j 12
 make install
 
-compile ADIOS2
+the did another chmod -R 777 . for the entire directory
+
+option 2
+
+download the cmake-version-.sh online then do
+sudo sh cmake-$version.$build-Linux-x86_64.sh --prefix=/opt/cmake
+then you can put the path with the cmake executable in PATH or jsut give full path when use cmake. Then, not sure if necessary but I make cmake RWX for everyone
+
+ADIOS2
+
+I am using this cmake: /opt/cmake/cmake-3.19.0-Linux-x86_64/bin/cmake
+also, i make sure i'm using this mpicc: /opt/petsc/arch-linux2-c-opt/bin/mpicc, by specifying that directory in my PATH variable in ~/.profile
+
+I created a folder /usr/local/ADIOS2 with sudo then gave 777 permissions
+
 1) git cloned it then created subdirectory adios2-build and cd'ed to it
-cmake -DCMAKE_INSTALL_PREFIX=/home/kteferra/Documents/research/software/ADIOS2 -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_MPI=ON -DADIOS2_USE_HDF5=ON -DHDF5_ROOT=/home/kteferra/Documents/research/software/hdf5-1.12.0/ ../../ADIOS2
-2)sudo make -j 12
+cmake -DCMAKE_INSTALL_PREFIX=/usr/local/ADIOS2 -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_MPI=ON -DADIOS2_USE_HDF5=ON -DHDF5_ROOT=/usr/local/hdf5-1.12.0/ ../../ADIOS2
+2) make -j 12
 3) make install
 
+Then had to again give 777 permissions in all folders
+
 The adios-config file is in the ../ADIOS/bin directory; to determine flags to compile your application with
-8) ./adios-config --cxx-flags
-9) ./adios-config --cxx-flags
+4) ./adios-config --cxx-flags
+5) ./adios-config --cxx-flags
 
 gaffney:
 
@@ -62,11 +72,8 @@ then i git cloned the ADIOS2, mkdir adios2-build and cd'ed to it
 7) Make install
 The adios-config file is in the ../ADIOS/bin directory; to determine flags to compile your application with
 8) ./adios-config --cxx-flags
-9) ./adios-config --cxx-libs
+9) ./adios-config --cxx-flags
 
-However, for some reason, the cxx-libs does not give all the necessary libraries. In order to get it to work i needed to use this command in the makefile
-for the adioslibrary
-adioslib = -Wl,-rpath,/p/home/kteferra/Documents/software/ADIOS2/lib64 /p/home/kteferra/Documents/software/ADIOS2/lib64/libadios2_cxx11_mpi.so.2.6.0 /p/home/kteferra/Documents/software/ADIOS2/lib64/libadios2_cxx11.so.2.6.0 /p/home/kteferra/Documents/software/ADIOS2/lib64/libadios2_core_mpi.so.2.6.0 /p/home/kteferra/Documents/software/ADIOS2/lib64/libadios2_core.so.2.6.0 /p/home/kteferra/Documents/software/ADIOS2/lib64/libadios2_evpath.so /p/home/kteferra/Documents/software/ADIOS2/lib64/libadios2_ffs.so.1.6.0 /p/home/kteferra/Documents/software/ADIOS2/lib64/libadios2_atl.so.2.2.1 /p/home/kteferra/Documents/software/ADIOS2/lib64/libadios2_dill.so.2.4.1 /p/home/kteferra/Documents/software/ADIOS2/lib64/libadios2_enet.so.1.3.14 /p/home/kteferra/Documents/software/ADIOS2/lib64/libadios2_taustubs.so -Wl,-rpath-link,/p/home/kteferra/Documents/software/ADIOS2/lib64
 
 lastly when compile (AND EXECUTE) an application that uses adios2, you have to make sure you have the following modules loaded
 module swap compiler/intel/2019.4.243 compiler/intel/2019.5.281
@@ -74,18 +81,93 @@ module swap mpt/2.20 compiler/intelmpi/2019.5.281
 module load hdf5-parallel/intel-18.1.163/1.10.5
 module load gcc/9.2.0
 
-see the Makefile
-
-
 ONYX:
+I'm not really sure how this happened, but I compiled a static library in onyx whereas the others are dynamic, but this is what i did
 1) module swap PrgEnv-cray PrgEnv-intel/6.0.5
 2) module load intel/19.0.1.144
 3) module load cray-hdf5-parallel/1.10.5.0
 4) module load gcc/8.3.0
+
+cmake:
+untared cmake-3.18 then did
+1) ./bootstrap
+2) make -j 12
+3) make install
 
 then git cloned adios2, created subdir adios2-build and cc'ed to it
 1) ../../cmake-3.18.2/bin/cmake -DCMAKE_INSTALL_PREFIX=/p/home/kteferra/Documents/software/ADIOS2 -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_MPI=ON -DADIOS2_USE_HDF5=ON ../../ADIOS2
 2) make -j 12
 3) make install
 
-this created static libraries. Onyx is a cray system and this system by default creates static librarys. compiler flags can be found by running executable adios2-config in ADIOS2/bin
+this created static libraries. again, you can find compiler flags by running executable adios2-config in ADIOS2/bin
+
+
+
+
+
+
+20200526:
+note that in the makefile in this repository there are links to 
+compiler wrapping MPI libraries in a petsc directory and a link to 
+metis library. I've typically compiled these libraries by downloading 
+petsc zip file, going to directory, and doing the following command (or at least some minor
+variation- you can go to the petsc website to see):
+
+./configure --with-cc=gcc --with-cxx=g++ --with-debugging=0 COPTFLAGS='-O3 -march=native -mtune=native' 
+CXXOPTFLAGS='-O3 -march=native -mtune=native' FOPTFLAGS='-O3 -march=native -mtune=native'
+ --download-mpich --download-metis
+
+That being said, on HPC it probably is better to use an intel compiler rather than GNU and to
+use any MPI library that is compiled already on the system by system administrators. That is likely
+to be more optimized. In that case, you must find the compiler that is wrapped around an mpi library.
+An example of me doing this is with the HPC system ONYX which is a cray system.
+
+
+
+
+This is a git repository for the 3D cafeMPI code. Please refer to the 
+comments in the commits to know about the details of each version of the
+code. This repository is likely to be cloned by my various machines, such as
+ghidora, lochness, gaffney, neocortex, etc. The initial commit of this code
+is from neocortex 8/22/2019
+
+
+Since this is the working repository, I cloned it in ghidorah for keeping a backup by doing
+
+git clone ssh://kteferra@neocortex.nrl.navy.mil:/home/kteferra/Documents/research/projects/AMICME/codes/CA/cafeMPI3D/
+
+The above is only done once, and then everything I commit (in neocortex), i pull it in ghidorah
+
+git pull
+
+this is done in ghidorah at:
+/Users/kteferra/Documents/research/projects/AMICME/codes/CA/cafeMPI3D/neocortex
+
+
+
+I'm doing most/all of the editing in neocortex so i created a branch for neocortex that 
+has the evolution of the code (commits), certainly as of 20191007
+
+-- below is old because i dont push fromo neocortex to anything any more. instead i use
+neocortex as the main repository and i pull from other places (i.e., ghidorah) that i set 
+up as clones.---
+
+When i push updates from neocortex to godzilla2:
+1) make sure godzilla2 is mounted (see line "sudo mount ..." in ~/.bashrc,
+   note you need sudo privileges to mount- i havent looked into how to do
+   this without sudo yet)
+
+2) type 'git push origin noecortex' (note that first time type: 'git push -u origin neocortex'
+
+note that you probably need to do 'sudo git push ...'
+   
+
+
+--
+Note that I added a new main file called main1Scale.C as well as a temperature field file
+TempFieldScale.C and TempFieldScale.h. Also, there is a new line in the Makefile to compile
+this and a new run file runCafeScale.sh to run this. This is to enable an automated way to 
+do a scale test of the simulation in terms of parallelization scalability. This will be done
+in HPC. The testing will be the time it takes to run a typical time step. A very large base 
+plate is used and then time between time step 1 and time step 2 will be used for comparison
+as a function of number of processors.
