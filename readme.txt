@@ -8,16 +8,20 @@ adios2 needs, HDF5 parallel and cmake
 
 neocortex:
 HDF5
-1) untarred hdf5 and cd'd to directory
-2) did the following command
+1) untarred hdf5 and cd'd to directory /usr/local
+2) chmod 777 for the directory
+3) did the following command
 CC=mpicc ./configure --enable-parallel
 make -j 12
 make install
 
-* note that mpicc refers to a mpich build already on neocortex.
-  another build should have been ok.
+* note that mpicc refers to a petsc build already on neocortex:
+/opt/petsc/arch-linux2-c-opt/bin/mpicc
 
 CMAKE
+
+option 1
+
 1) downloaded cmake source and untarred, cd'd to directory
 2) needed the openssl library (had an error first)
 sudo apt get install libssl-dev
@@ -26,15 +30,31 @@ sudo apt get install libssl-dev
 sudo make -j 12
 make install
 
+the did another chmod -R 777 . for the entire directory
+
+option 2
+
+download the cmake-version-.sh online then do
+sudo sh cmake-$version.$build-Linux-x86_64.sh --prefix=/opt/cmake
+then you can put the path with the cmake executable in PATH or jsut give full path when use cmake. Then, not sure if necessary but I make cmake RWX for everyone
+
 ADIOS2
+
+I am using this cmake: /opt/cmake/cmake-3.19.0-Linux-x86_64/bin/cmake
+also, i make sure i'm using this mpicc: /opt/petsc/arch-linux2-c-opt/bin/mpicc, by specifying that directory in my PATH variable in ~/.profile
+
+I created a folder /usr/local/ADIOS2 with sudo then gave 777 permissions
+
 1) git cloned it then created subdirectory adios2-build and cd'ed to it
-cmake -DCMAKE_INSTALL_PREFIX=/home/kteferra/Documents/research/software/ADIOS2 -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_MPI=ON -DADIOS2_USE_HDF5=ON -DHDF5_ROOT=/home/kteferra/Documents/research/software/hdf5-1.12.0/ ../../ADIOS2
-2)sudo make -j 12
+cmake -DCMAKE_INSTALL_PREFIX=/usr/local/ADIOS2 -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_MPI=ON -DADIOS2_USE_HDF5=ON -DHDF5_ROOT=/usr/local/hdf5-1.12.0/ ../../ADIOS2
+2) make -j 12
 3) make install
 
+Then had to again give 777 permissions in all folders
+
 The adios-config file is in the ../ADIOS/bin directory; to determine flags to compile your application with
-8) ./adios-config --cxx-flags
-9) ./adios-config --cxx-flags
+4) ./adios-config --cxx-flags
+5) ./adios-config --cxx-flags
 
 gaffney:
 
