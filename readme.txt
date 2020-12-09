@@ -1,3 +1,17 @@
+Compiling and running the AMCAFE code:
+
+The personal notes below show compilation notes for 3 systems titled neocortex, gaffney, and onyx (gaffney and onyx are DoD HPC machines), and can serveas guidelines for your system. The code is a C++ code that requires an MPI wrapper as well as external packages ADIOS2 and metis. The notes below give some guidance on how ADIOS2 can be compiled. METIS is a straightforward compilation. A static metis library can easily be compiled following instructions on the website. The variables in makefile in this folder need to specify the paths to the required libraries, executables, and include files. These must be adjusted to your system. After which, the executable can be built by typing "make cafe" in the terminal. The code is run by
+
+mpirun -n <number_of_processors> ./cafe <input_file_name>
+
+The executation command may need minor adjustments depending on your compiler. The *sh files in the folder give examples of how to run. The examples in paper XXXX can be run by input file SDX1_.in (example 1) and SDXY1_.in (example 2)
+
+
+For questions on compiling and running, please email: kirubel.teferra@nrl.navy.mil
+For usage of the code, please cite: XXXX
+
+
+
 20200914:
 
 creating a fork in /opt/cafe that will create branches for others to work on
@@ -82,7 +96,7 @@ module load hdf5-parallel/intel-18.1.163/1.10.5
 module load gcc/9.2.0
 
 ONYX:
-I'm not really sure how this happened, but I compiled a static library in onyx whereas the others are dynamic, but this is what i did
+As onyx is a CRAZY system ADIOS2 compiled as a static library. Here are the steps:
 1) module swap PrgEnv-cray PrgEnv-intel/6.0.5
 2) module load intel/19.0.1.144
 3) module load cray-hdf5-parallel/1.10.5.0
@@ -99,75 +113,16 @@ then git cloned adios2, created subdir adios2-build and cc'ed to it
 2) make -j 12
 3) make install
 
-this created static libraries. again, you can find compiler flags by running executable adios2-config in ADIOS2/bin
-
-
-
-
-
+you can find compiler flags by running executable adios2-config in ADIOS2/bin
 
 20200526:
-note that in the makefile in this repository there are links to 
-compiler wrapping MPI libraries in a petsc directory and a link to 
-metis library. I've typically compiled these libraries by downloading 
-petsc zip file, going to directory, and doing the following command (or at least some minor
-variation- you can go to the petsc website to see):
-
+if system does not have MPI wrapper, you can download petsc tar file, untar and install with:
 ./configure --with-cc=gcc --with-cxx=g++ --with-debugging=0 COPTFLAGS='-O3 -march=native -mtune=native' 
 CXXOPTFLAGS='-O3 -march=native -mtune=native' FOPTFLAGS='-O3 -march=native -mtune=native'
  --download-mpich --download-metis
 
 That being said, on HPC it probably is better to use an intel compiler rather than GNU and to
 use any MPI library that is compiled already on the system by system administrators. That is likely
-to be more optimized. In that case, you must find the compiler that is wrapped around an mpi library.
-An example of me doing this is with the HPC system ONYX which is a cray system.
+to be more optimized.
 
 
-
-
-This is a git repository for the 3D cafeMPI code. Please refer to the 
-comments in the commits to know about the details of each version of the
-code. This repository is likely to be cloned by my various machines, such as
-ghidora, lochness, gaffney, neocortex, etc. The initial commit of this code
-is from neocortex 8/22/2019
-
-
-Since this is the working repository, I cloned it in ghidorah for keeping a backup by doing
-
-git clone ssh://kteferra@neocortex.nrl.navy.mil:/home/kteferra/Documents/research/projects/AMICME/codes/CA/cafeMPI3D/
-
-The above is only done once, and then everything I commit (in neocortex), i pull it in ghidorah
-
-git pull
-
-this is done in ghidorah at:
-/Users/kteferra/Documents/research/projects/AMICME/codes/CA/cafeMPI3D/neocortex
-
-
-
-I'm doing most/all of the editing in neocortex so i created a branch for neocortex that 
-has the evolution of the code (commits), certainly as of 20191007
-
--- below is old because i dont push fromo neocortex to anything any more. instead i use
-neocortex as the main repository and i pull from other places (i.e., ghidorah) that i set 
-up as clones.---
-
-When i push updates from neocortex to godzilla2:
-1) make sure godzilla2 is mounted (see line "sudo mount ..." in ~/.bashrc,
-   note you need sudo privileges to mount- i havent looked into how to do
-   this without sudo yet)
-
-2) type 'git push origin noecortex' (note that first time type: 'git push -u origin neocortex'
-
-note that you probably need to do 'sudo git push ...'
-   
-
-
---
-Note that I added a new main file called main1Scale.C as well as a temperature field file
-TempFieldScale.C and TempFieldScale.h. Also, there is a new line in the Makefile to compile
-this and a new run file runCafeScale.sh to run this. This is to enable an automated way to 
-do a scale test of the simulation in terms of parallelization scalability. This will be done
-in HPC. The testing will be the time it takes to run a typical time step. A very large base 
-plate is used and then time between time step 1 and time step 2 will be used for comparison
-as a function of number of processors.
