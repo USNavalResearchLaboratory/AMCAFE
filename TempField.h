@@ -25,7 +25,6 @@ class TempField
 			 const std::vector<double> &yM, const int &jt);
   void InterpolateToGrid2(const std::vector<double> &tempM, const std::vector<int> &,
 			  std::vector<double> &);
-  void ComputeDDtTempDiscrete();
   void ComputeDDtTempAnalytical();
   void SchwalbachTempCurr();
   void AnalyticTempCurr(double tcurr,std::vector<double> &TempOut,std::vector<int> &icellid,int Ntot);    

@@ -857,10 +857,3 @@ void TempField::InterpolateToGrid2(const std::vector<double> &tempM,
     } // end i1
   } // end for j
 } // end InterpolateToGrid2
-
-void TempField::ComputeDDtTempDiscrete()
-{
-  for (int j=0;j<(_part->ncellLoc+_part->nGhost);++j){
-    DDtTemp[j] = (Temp[1][j]-Temp[0][j])/dtM;
-  } // for (int j...)
-} // end ComputeDDtTemp
