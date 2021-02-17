@@ -23,7 +23,7 @@ adios2 needs, HDF5 parallel and cmake
 neocortex:
 HDF5
 1) untarred hdf5 and cd'd to directory /usr/local
-2) chmod 777 for the directory
+2) chmod 755 for the directory
 3) did the following command
 CC=mpicc ./configure --enable-parallel
 make -j 12
@@ -44,13 +44,13 @@ sudo apt get install libssl-dev
 sudo make -j 12
 make install
 
-the did another chmod -R 777 . for the entire directory
+the did another chmod -R 755 . for the entire directory
 
 option 2
 
 download the cmake-version-.sh online then do
 sudo sh cmake-$version.$build-Linux-x86_64.sh --prefix=/opt/cmake
-then you can put the path with the cmake executable in PATH or jsut give full path when use cmake. Then, not sure if necessary but I make cmake RWX for everyone
+then you can put the path with the cmake executable in PATH or just give full path when use cmake. Then, not sure if necessary but I make cmake RWX for everyone
 
 ADIOS2
 
@@ -68,7 +68,7 @@ Then had to again give 777 permissions in all folders
 
 The adios-config file is in the ../ADIOS/bin directory; to determine flags to compile your application with
 4) ./adios-config --cxx-flags
-5) ./adios-config --cxx-flags
+5) ./adios-config --cxx-libs
 
 gaffney:
 
@@ -86,7 +86,7 @@ then i git cloned the ADIOS2, mkdir adios2-build and cd'ed to it
 7) Make install
 The adios-config file is in the ../ADIOS/bin directory; to determine flags to compile your application with
 8) ./adios-config --cxx-flags
-9) ./adios-config --cxx-flags
+9) ./adios-config --cxx-libs
 
 
 lastly when compile (AND EXECUTE) an application that uses adios2, you have to make sure you have the following modules loaded
@@ -96,7 +96,7 @@ module load hdf5-parallel/intel-18.1.163/1.10.5
 module load gcc/9.2.0
 
 ONYX:
-As onyx is a CRAZY system ADIOS2 compiled as a static library. Here are the steps:
+As onyx is a CRAY system ADIOS2 compiled as a static library. Here are the steps:
 1) module swap PrgEnv-cray PrgEnv-intel/6.0.5
 2) module load intel/19.0.1.144
 3) module load cray-hdf5-parallel/1.10.5.0
