@@ -96,7 +96,7 @@ module load hdf5-parallel/intel-18.1.163/1.10.5
 module load gcc/9.2.0
 
 ONYX:
-As onyx is a CRAZY system ADIOS2 compiled as a static library. Here are the steps:
+As onyx is a CRAY system ADIOS2 compiled as a static library. Here are the steps:
 1) module swap PrgEnv-cray PrgEnv-intel/6.0.5
 2) module load intel/19.0.1.144
 3) module load cray-hdf5-parallel/1.10.5.0
