@@ -4,9 +4,9 @@ CPP = /opt/petsc/arch-linux2-c-opt/bin/mpic++
 #CPPFLAGS = -std=c++11 -DADIOS2_USE_MPI -isystem /home/kteferra/Documents/research/software/ADIOS2/include
 CPPFLAGS = -std=c++11 -DADIOS2_USE_MPI -isystem /usr/local/ADIOS2/include
 
-#CPPOOPTTFLAGS = -O2 -Wall
+CPPOPTFLAGS = -g -O0
 #CPPOPTFLAGS = -Wall
-#CPPOOPTTFLAGS = -O3
+#CPPOPTFLAGS = -O3
 
 CPPINCLUDE = -I /opt/petsc/arch-linux2-c-opt/include/ 
 METISLIB = /opt/petsc/arch-linux2-c-opt/lib/libmetis.so
