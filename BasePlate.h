@@ -16,7 +16,7 @@ class BasePlate
   BasePlate(const Grid &g, Partition &);
 
   // any functions added here
-  void GenerateNgrain();
+  void GenerateNgrain(int & num_grain);
   void GenerateVoxel();
   double height;  // height_of_base_plate
   double mu; // rate of Poisson process for determining # of grains

@@ -84,7 +84,7 @@ int main(int argc, char *argv[])
 	MPI_Barrier(MPI_COMM_WORLD);
       } // (indOut==0 ...
     } // if (irep==0
-    if (iNL==0){vox.AddLayer();}
+    if (iNL==0){vox.AddLayer1();}
     // update next step for voxels 
     vox.UpdateVoxels();
     g.UpdateTime2(TempF.DelT);    

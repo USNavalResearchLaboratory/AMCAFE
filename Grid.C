@@ -159,6 +159,10 @@ void Grid::readInputFile()
       simInput >> keyword;
       bpH=std::stod(keyword);
     }
+    if (keyword=="lrate") {
+      simInput >> keyword;
+      lrate=std::stod(keyword);
+    }
     if (keyword=="outnl") {
       simInput >> keyword;
       outNL=std::stoi(keyword);

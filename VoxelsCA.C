@@ -771,7 +771,8 @@ void VoxelsCA::CleanLayer(){
 }; // CleanLayer
 void VoxelsCA::AddLayer(){
   /*
-    function adds the layer of powder and is called at the beginning of new layer
+    adds the layer of powder and is called at the beginning of new layer
+    - this version adds a new grain for every voxel
    */
   int Ntot,Ntot2,i1t,nVlayer,j1,j2,j3,iz1,jvox0;
   Ntot = _part->ncellLoc;
@@ -814,6 +815,104 @@ void VoxelsCA::AddLayer(){
     }    
   } // for j  
 }; // AddLayer
+
+void VoxelsCA::AddLayer1(){
+  /*
+    adds the layer of powder and is called at the beginning of new layer
+    - this version adds grains according to voronoi diagram with rate
+    - _xyz->lrate
+   */
+  int Ntot,Ntot2,i1t,nVlayer,j1,j2,j3,iz1,jvox0,ng2,ig1,i3,i2,jind,i1;
+  double zloc0,Lx,Ly,dsqc,dsq;
+  Ntot = _part->ncellLoc;
+  Ntot2 = _part->ncellLoc + _part->nGhost;
+  nVlayer = _xyz->nX[0]*_xyz->nX[1]*_xyz->nZlayer;
+  std::default_random_engine gen1(3134525),gen2(seed1);
+  unsigned int sdloc;
+  sdloc = unsigned(double(gen2())/double(gen2.max())*pow(2.0,32.0));
+  // generate number of new grains
+  double rate = _xyz->lrate* (_xyz->dX[0]*1e6)*(_xyz->dX[1]*1e6)*
+    _xyz->nX[0]*_xyz->nX[1]* (_xyz->layerT*1e6);
+  std::poisson_distribution<int> ng(rate);
+  ng2 =0;
+  while (ng2 == 0){ng2 = ng(gen2);} // end while
+  // generate new voronoi sites
+  iz1 = _temp->ilaserLoc - _xyz->nZlayer;
+  zloc0 = iz1*_xyz->dX[2];
+  std::vector<double> Xsite(ng2*3);
+  std::uniform_real_distribution<double> xrand(0.0,1.0);
+  Lx=_xyz->nX[0]*_xyz->dX[0];
+  Ly=_xyz->nX[1]*_xyz->dX[1];
+  for (int j=0; j<ng2;++j){
+    Xsite[3*j] = xrand(gen2)*Lx;
+    Xsite[3*j+1] = xrand(gen2)*Ly;
+    Xsite[3*j+2] = xrand(gen2)*_xyz->layerT + zloc0;
+  }
+  // generate grain IDs (goes from nGrain+1...nGrain+ng2)
+  i3=_xyz->nX[0]*_xyz->nX[1];
+  std::vector<int> itmp(ng2,0),gtmp(i3*_xyz->nZlayer,0);
+  jvox0 = i3*iz1;
+  for (int j3a=iz1;j3a<_temp->ilaserLoc;++j3a){
+    for (int j2a=0;j2a<_xyz->nX[1];++j2a){
+      for (int j1a=0;j1a<_xyz->nX[0];++j1a){
+	dsqc=1e6;
+	for (int jz=0;jz<ng2;++jz){
+	  dsq=pow(j1a*_xyz->dX[0]-Xsite[3*jz],2.)+pow(j2a*_xyz->dX[1]-Xsite[3*jz+1],2.)+
+	   pow(j3a*_xyz->dX[2]-Xsite[3*jz+2],2.);
+	if (dsq<dsqc){i2=jz; dsqc=dsq;}
+	}
+	jind=i3*(j3a-iz1)+_xyz->nX[0]*j2a+j1a;
+	gtmp[jind]=i2+1;
+	itmp[i2]=1;
+      }
+    }
+  }
+  // ensures a continuous numbering of grain ids
+  i2=0;
+  for (int j=0;j<ng2;++j){
+    if (itmp[j]==1){
+      itmp[j]=i2;
+      i2+=1;
+    }
+  }
+  ig1=nGrain+ng2;
+  if (i2 != ng2){
+    for (int j=0;j<i3*_xyz->nZlayer;++j){
+      i1=gtmp[j]-1;
+      gtmp[j]=itmp[i1]+1;
+    }
+  }
+  for (int j=0;j<Ntot2;++j){
+    j3 = floor(_part->icellidLoc[j]/i3);
+    if (j3>=iz1 && j3<_temp->ilaserLoc){
+      j2=floor( (_part->icellidLoc[j]-i3*j3)/_xyz->nX[0]);
+      j1=_part->icellidLoc[j]-i3*j3-_xyz->nX[0]*j2;
+      jind=i3*(j3-iz1)+_xyz->nX[0]*j2+j1;
+      gID[j]=nGrain+gtmp[jind];
+      vState[j]=3;
+      if (j<Ntot){
+	centroidOct[3*j]=(double(j1)+.5)*_xyz->dX[0];
+	centroidOct[3*j+1]=(double(j2)+.5)*_xyz->dX[1];
+	centroidOct[3*j+2]=(double(j3)+.5)*_xyz->dX[2];
+      } // if (j<Ntot)
+    } // if (j3>=iz1 && j3<_temp->ilaserLoc ...
+  } // for (int j...
+  nGrain += i2+1;  
+  SampleOrientation sa1;
+  // randomly generate crystallographic orientations
+  std::vector<double> aa;
+  ng2=i2+1;
+  sa1.GenerateSamples(ng2,sdloc,aa);
+  cTheta.insert(cTheta.end(), aa.begin(),aa.end());
+  // assign appropriate vState (including zeroing states above ilaserLoc
+  iz1 = _xyz->nX[0]*_xyz->nX[1]*_temp->ilaserLoc;
+  for (int j=0;j<Ntot2;++j){
+    if (_part->icellidLoc[j] >=iz1){
+      vState[j] = 0;
+      gID[j] = 0;
+    }    
+  } // for j  
+}; // AddLayer1
 
 
 void VoxelsCA::UpdateLayer(std::string &filCSV){

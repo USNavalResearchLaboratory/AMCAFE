@@ -62,6 +62,7 @@ class Grid
   double deltaThresh; // threshold value of pmf for allowing if voxel can be captured
   double mu; // rate for Voronoi tessellation for baseplate
   double bpH; // base plate height
+  double lrate; // layer rate for Voronoi powder microstructure 
   double beamEta,T0targ,bmDelT;
   std::string ntype; // type of neighborhood: Moore or VonNeumann
   std::string neighOrder; // order of neighborhood

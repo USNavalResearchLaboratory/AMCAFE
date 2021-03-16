@@ -21,28 +21,28 @@ BasePlate::BasePlate(const Grid & g, Partition & part)
   _part = &part;
   mu = _xyz->mu;
   height = ceil(_xyz->bpH/_xyz->dX[2])*_xyz->dX[2];
-  Nzh = std::min(_xyz->nX[2],int(ceil(_xyz->bpH/_xyz->dX[2])));
+  Nzh = std::min(_xyz->nX[2],int(ceil(_xyz->bpH*.9999/_xyz->dX[2])));
   height = Nzh*(_xyz->dX[2]);
   // if you want seed to be different every time program runs
   //seed = std::chrono::system_clock::now().time_since_epoch().count();
   seed = 1234567;
   std::default_random_engine generator(seed); 
 } // end constructor
-void BasePlate::GenerateNgrain()
+void BasePlate::GenerateNgrain(int & num_grain)
 {
   double rate = mu* (_xyz->dX[0]*1e6)*(_xyz->dX[1]*1e6)* _xyz->nX[0]*_xyz->nX[1]* (height*1e6);
   std::poisson_distribution<int> ng(rate);
 
-  Ngrain =0;
-  while (Ngrain == 0){
-    Ngrain = ng(generator);
+  num_grain =0;
+  while (num_grain == 0){
+    num_grain = ng(generator);
   } // end while 
 } // end GenerateNgrain()
 void BasePlate::GenerateVoxel()
 {
   // this is a Voronoi tessellation
   int j1,j2,j3;
-  GenerateNgrain();
+  GenerateNgrain(Ngrain);
   std::vector<std::vector<double>> Xsite(Ngrain, std::vector<double>(3));
   unsigned int sdloc;
   std::uniform_real_distribution<double> xrand(0.0,1.0);

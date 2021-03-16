@@ -34,6 +34,7 @@ class VoxelsCA
   void UpdateLayer(std::string &filCSV);
   void CleanLayer();
   void AddLayer();
+  void AddLayer1();
   void NucleateGrains(std::vector<int> &nucInd, std::vector<double> &tnuc);
   void NucleateGrains(std::vector<int> &nucA, std::vector<double> &tnucA,
 		      std::vector<double> &quatnuc,std::vector<int> &iv,
