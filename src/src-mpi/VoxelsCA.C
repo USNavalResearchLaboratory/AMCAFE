@@ -32,6 +32,7 @@ VoxelsCA::VoxelsCA(Grid &g,TempField &tf, Partition &part)
   centroidOct.assign(3*Ntot1,0.0);
   seed0= 2132512;
   seed1=2912351;
+  genlayer.seed(seed1);
   double velY=(5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
 		 (_xyz->Gamma))*( pow((_xyz->tL - _xyz->tS),2.5)/pow(_xyz->c0,1.5));
   
@@ -827,15 +828,14 @@ void VoxelsCA::AddLayer1(){
   Ntot = _part->ncellLoc;
   Ntot2 = _part->ncellLoc + _part->nGhost;
   nVlayer = _xyz->nX[0]*_xyz->nX[1]*_xyz->nZlayer;
-  std::default_random_engine gen1(3134525),gen2(seed1);
   unsigned int sdloc;
-  sdloc = unsigned(double(gen2())/double(gen2.max())*pow(2.0,32.0));
+  sdloc = unsigned(double(genlayer())/double(genlayer.max())*pow(2.0,32.0));
   // generate number of new grains
   double rate = _xyz->lrate* (_xyz->dX[0]*1e6)*(_xyz->dX[1]*1e6)*
     _xyz->nX[0]*_xyz->nX[1]* (_xyz->layerT*1e6);
   std::poisson_distribution<int> ng(rate);
   ng2 =0;
-  while (ng2 == 0){ng2 = ng(gen2);} // end while
+  while (ng2 == 0){ng2 = ng(genlayer);} // end while
   // generate new voronoi sites
   iz1 = _temp->ilaserLoc - _xyz->nZlayer;
   zloc0 = iz1*_xyz->dX[2];
@@ -844,9 +844,9 @@ void VoxelsCA::AddLayer1(){
   Lx=_xyz->nX[0]*_xyz->dX[0];
   Ly=_xyz->nX[1]*_xyz->dX[1];
   for (int j=0; j<ng2;++j){
-    Xsite[3*j] = xrand(gen2)*Lx;
-    Xsite[3*j+1] = xrand(gen2)*Ly;
-    Xsite[3*j+2] = xrand(gen2)*_xyz->layerT + zloc0;
+    Xsite[3*j] = xrand(genlayer)*Lx;
+    Xsite[3*j+1] = xrand(genlayer)*Ly;
+    Xsite[3*j+2] = xrand(genlayer)*_xyz->layerT + zloc0;
   }
   // generate grain IDs (goes from nGrain+1...nGrain+ng2)
   i3=_xyz->nX[0]*_xyz->nX[1];

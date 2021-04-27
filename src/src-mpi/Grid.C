@@ -50,15 +50,19 @@ Grid::Grid(std::string &filIn, int & myidIn, int & nprocsIn)
   T0targ = 1500;
   T0 = 300;
   ictrl = 3;
+  gsize={0,0};
   meltparam = {75e-6,162.75e-6,75e-6,75e-6};
-  bmV = 500e-3;
-  bmDelT = 4.0/3.0*meltparam[0]/bmV;
   bhatch = 1.53*meltparam[2];
+  bmDelT = 4.0/3.0*meltparam[0]/bmV;
+  bmV = 500e-3;
   rNmax = .002;
   offset={0.0,0.0,0.0}; // positive value means starting outside of domain
   outNL = 0;
+  gth0=0.;
+  gth=0.;
   //read data from input file
   readInputFile();
+  if (gsize[0]==0){gsize={nX[0]*dX[0]*2,nX[1]*dX[1]*2};}
   LX = {nX[0]*dX[0],nX[1]*dX[1],nX[2]*dX[2]};
   bpH< std::numeric_limits<double>::epsilon() ? bpH=layerT : bpH=bpH;
   nZlayer = round(layerT/dX[2]);
@@ -66,7 +70,82 @@ Grid::Grid(std::string &filIn, int & myidIn, int & nprocsIn)
   deltaTcheck = pow(deltaXmin,2.0)/dL;
   ethresh = .01; 
   deltaThresh=.95;  
+  isp=0;
+  inewscanflg=1;
+  inewlayerflg=1;
+  indlayer=1;
+  Ntd=int(ceil(gsize[1]/bhatch))+1;
+  Nsd=int(ceil(gsize[0]/(bmV*bmDelT)))+1;
+  NpT=Nsd*Ntd;
+  lcoor.assign(2*NpT,0.);
+  lcoor2.assign(2*NpT,0.);
+  double xlmin=(LX[0]-gsize[0])/2.,ylmin=(LX[1]-gsize[1])/2.;
+  int k;
+  double gmid[2];
+  gmid[0]=LX[0]/2.;
+  gmid[1]=LX[1]/2.;
+  gth+=gth0;
+  for (int j2=0;j2<Ntd;++j2){
+    for (int j1=0;j1<Nsd;++j1){
+      k=Nsd*j2+j1;
+      lcoor[2*k]=j1*bmDelT*bmV+xlmin;
+      lcoor[2*k+1]=j2*bhatch+ylmin;
+      lcoor2[2*k] = cos(gth)*(lcoor[2*k]-gmid[0])-
+	sin(gth)*(lcoor[2*k+1]-gmid[1])+gmid[0];
+      lcoor2[2*k+1] = sin(gth)*(lcoor[2*k]-gmid[0])+
+	cos(gth)*(lcoor[2*k+1]-gmid[1])+gmid[1];
+    } // j1
+  } // j2   
+  //grid box
+  gbox[0]=-bhatch/2.;
+  gbox[1]=LX[0]+bhatch/2.;
+  gbox[2]=-bhatch/2.;
+  gbox[3]=LX[1]+bhatch/2.;               
 } // end constructor
+
+void Grid::UpdateLaser(){
+  int itmp,iflg=0,irep=0;
+  double x,y;
+  while(irep==0 || isp==0){
+    irep+=1;
+    itmp=isp;
+    if (inewscanflg==0 && itmp<(NpT-1)){
+      isp+=1;
+    } else {
+      while (itmp<(NpT-1) && iflg==0){
+	itmp+=1;
+	x=lcoor2[2*itmp];
+	y=lcoor2[2*itmp+1];
+	if (x>gbox[0] && x<gbox[1] && y>gbox[2] && y<gbox[3]){iflg=1;}
+      } // while (itmp< ...
+      if (itmp<(NpT-1)){
+	isp=itmp;
+	inewscanflg=0;
+      } else {
+	inewlayerflg=1;
+	inewscanflg=1;
+	indlayer+=1;
+	isp=0;
+	// update grid 
+	double gmid[2];
+	gmid[0]=LX[0]/2.;
+	gmid[1]=LX[1]/2.;
+	int k;
+	gth+=gth0;
+	for (int j2=0;j2<Ntd;++j2){
+	  for (int j1=0;j1<Nsd;++j1){
+	    k=Nsd*j2+j1;
+	    lcoor2[2*k] = cos(gth)*(lcoor[2*k]-gmid[0])-
+	      sin(gth)*(lcoor[2*k+1]-gmid[1])+gmid[0];
+	    lcoor2[2*k+1] = sin(gth)*(lcoor[2*k]-gmid[0])+
+	      cos(gth)*(lcoor[2*k+1]-gmid[1])+gmid[1];
+	  } // j1
+	} // j2
+      } // if/else (itmp<NpT-1...
+    } // if (inewscanflg==0...
+  } // while(irep==0...
+  if (irep==1){inewlayerflg=0;} 
+} // end UpdateLaser 
 
 void Grid::readInputFile()
 {
@@ -198,6 +277,17 @@ void Grid::readInputFile()
       simInput >> keyword;
       outint=std::stoi(keyword);
     }
+    if (keyword=="gridsize") {
+      simInput >> keyword;
+      gsize[0]=std::stod(keyword);
+      simInput >> keyword;
+      gsize[1]=std::stod(keyword);
+    }
+    if (keyword=="gridtheta") {
+      simInput >> keyword;
+      gth0=std::stod(keyword);
+    }
+
     simInput >> keyword;
   } // while(simInput)
 } // readInputFile

@@ -20,22 +20,10 @@ adioslib=-Wl,-rpath,/usr/local/ADIOS2/lib /usr/local/ADIOS2/lib/libadios2_cxx11_
 
 #SOURCES = $(wildcard *.C)
 SOURCES = main1.C Grid.C BasePlate.C TempField.C Partition.C SampleOrientation.C VoxelsCA.C 
-SOURCES2 = main1Scale.C Grid.C BasePlate.C TempFieldScale.C Partition.C SampleOrientation.C VoxelsCA.C 
-SOURCES3 = main1val1.C Grid.C BasePlateval1.C TempFieldval1.C Partition.C SampleOrientation.C VoxelsCAval1.C
 OBJECTS = $(SOURCES:.C=.o)
-OBJECTS2 = $(SOURCES2:.C=.o)
-OBJECTS3 = $(SOURCES3:.C=.o)
 
 
 cafe: $(OBJECTS)
-	@rm -f $@
-	$(CPP) -o $@ $^ $(METISLIB) $(adioslib)
-
-cafeScale: $(OBJECTS2)
-	@rm -f $@
-	$(CPP) -o $@ $^ $(METISLIB) $(adioslib)
-
-cafeval1: $(OBJECTS3)
 	@rm -f $@
 	$(CPP) -o $@ $^ $(METISLIB) $(adioslib)
 

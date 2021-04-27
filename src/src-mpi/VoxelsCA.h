@@ -120,6 +120,7 @@ class VoxelsCA
   std::vector<double> cTheta,extents,centroidOct;
   double vmax,vXi;
   int nGrain,seed0,seed1,NzhBP;
+  std::default_random_engine genlayer;
  private:
   double extentsInitialValue,extentsInitialValue2;
   Grid *_xyz;

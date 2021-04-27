@@ -15,6 +15,7 @@ class Grid
   void UpdateTime(const double &velo);
   void UpdateTime2(const double &dtIn);
   void UpdateTimeTest1(const double &velo);
+  void UpdateLaser();
   void SkipTime(const double &DelT);
   void ComputeNeighborhood(int &j, std::string & nO,std::vector<int> & nn);
   void ComputeNeighborhoodFirst(int &j, std::string & ntype, std::vector<int> &nn);
@@ -39,10 +40,11 @@ class Grid
     } // for (int i3...
   } // end inline Compute...
   std::string filInput;
-  double deltaXmin,deltaTcheck,dt,time;
-  std::vector<double> dX,meltparam,beamSTD,LX,offset;
+  double deltaXmin,deltaTcheck,dt,time,gth0,gth;
+  std::vector<double> dX,meltparam,beamSTD,LX,offset,lcoor,lcoor2,gsize;
   std::vector<int> nX;
-  int nDim,tInd,nnodePerCell,ictrl,nZlayer,patternID,outint,myid,nprocs,outNL,nTsd;
+  int nDim,tInd,nnodePerCell,ictrl,nZlayer,patternID,outint,myid,nprocs,outNL,nTsd,Nsd,Ntd,NpT,
+    inewscanflg,inewlayerflg,isp,indlayer;
   double bmV,bmP,bhatch; // beam velocity,power, hatch spacing, nucleation rate
   double tL,tS,T0; // liquidus, solidus, room temp (K)
   double mL; // liquidus slope of (K/wt%)
@@ -63,7 +65,7 @@ class Grid
   double mu; // rate for Voronoi tessellation for baseplate
   double bpH; // base plate height
   double lrate; // layer rate for Voronoi powder microstructure 
-  double beamEta,T0targ,bmDelT;
+  double beamEta,T0targ,bmDelT,gbox[4];
   std::string ntype; // type of neighborhood: Moore or VonNeumann
   std::string neighOrder; // order of neighborhood
 }; // end class Grid

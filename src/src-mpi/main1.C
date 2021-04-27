@@ -1,9 +1,3 @@
-/*
-This runs the cellular automata model using a given temperature
-input (obtained from Moose runs) to simulate microstructure
-evolution of AM builds (20190123)
-*/
-// include files here
 #include "Grid.h"
 #include "VoxelsCA.h"
 #include "BasePlate.h"
@@ -28,7 +22,6 @@ int main(int argc, char *argv[])
   int nprocs,myid;
   MPI_Comm_size(MPI_COMM_WORLD,&nprocs);
   MPI_Comm_rank(MPI_COMM_WORLD,&myid);
-  int cc1;
   std::string filbaseOut,filout,filLogOut,filParamIn;
   // schwalbach parameters
   double beamVel,beamPower,wEst,cP,rho,kappa,beamEta,rcut,T0targ;
@@ -41,59 +34,46 @@ int main(int argc, char *argv[])
   TempField TempF(g,part,bp);
   int Ntot=part.ncellLoc+ part.nGhost;
   TempF.InitializeAnalytic();
-  TempF.AnalyticTempCurr(g.time,TempF.TempCurr,part.icellidLoc,Ntot);
   VoxelsCA vox(g,TempF, part);
   vox.InitializeVoxels(bp);
   /*-----------------------------------------------
     execute simulation */
-  cc1=0;
   int indOut,nTmax=TempF.nTTemp[0]*TempF.nTTemp[1]*TempF.nTTemp[2],
-    nFils,iNL;
+    nFils;
   double filSize=(g.nX[0]/1e2*g.nX[1]/1e2*g.nX[2]/1e2*4*(9+3+3+8)+12)/1e3;
   nFils = int(ceil(filSize/1.5 ));
-  std::vector<int> filinds,out2(2,0),j123(3,0);
+  std::vector<int> filinds,out2(2,0);
   std::vector<double> filtime;
-  int icheck = 1,ichecktmp,cc2=0, irep=0;
+  int nlayerTot,icheck = 1,ichecktmp;
   std::ofstream fplog;
+  bool bcheck=0;
   filbaseOut = "CA3D"+filParamIn.substr(0,filParamIn.find("."));
   filLogOut="CA3D"+filParamIn.substr(0,filParamIn.find("."))+".log";
   if (part.myid==0){
     fplog.open(filLogOut.c_str());
     fplog << "Time index= ,Total clock time passed(s)"<<std::endl;
   }
-  while (TempF.tInd<=nTmax){
-    icheck=!std::all_of(vox.vState.begin(),vox.vState.end(),[](int n){return n==3;});
-    ichecktmp = icheck;
-    MPI_Allreduce(&ichecktmp,&icheck,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
-    cc2+=1;
-    j123[2] = floor(TempF.tInd /(TempF.nTTemp[0]*TempF.nTTemp[1]));
-    j123[1] = floor((TempF.tInd - (TempF.nTTemp[0]*TempF.nTTemp[1])*j123[2])/ TempF.nTTemp[0]);
-    j123[0] = TempF.tInd - (TempF.nTTemp[0]*TempF.nTTemp[1])*j123[2] - TempF.nTTemp[0]*j123[1];
-    indOut = (TempF.nTTemp[0]*TempF.nTTemp[1]*j123[2]+TempF.nTTemp[0]*j123[1]+j123[0]) % g.outint;
-    iNL=fmod(TempF.tInd,TempF.nTTemp[0]*TempF.nTTemp[1]);
-    if (iNL==0){vox.CleanLayer();}
-    if (irep==0){
-      irep=1;
-      if (indOut==0 || TempF.tInd ==nTmax || (iNL==0 && g.outNL==0)){
-	filinds.push_back(TempF.tInd);
-	filtime.push_back(g.time);
-	filout = filbaseOut+std::to_string(TempF.tInd);
-	cc1+=1;
-        filout = filbaseOut+std::to_string(TempF.tInd);
-	vox.WriteToHDF1(filout);
-	MPI_Barrier(MPI_COMM_WORLD);
-      } // (indOut==0 ...
-    } // if (irep==0
-    if (iNL==0){vox.AddLayer1();}
-    // update next step for voxels 
-    vox.UpdateVoxels();
-    g.UpdateTime2(TempF.DelT);    
+  nlayerTot=int(ceil( (g.nX[2]-bp.Nzh)/g.nZlayer));
+  while (!bcheck){
+    indOut = TempF.tInd % g.outint;
+    if (g.inewlayerflg==1){vox.CleanLayer();}
+    if (indOut==0 || TempF.tInd ==nTmax || (g.inewlayerflg==1 && g.outNL==0)){
+      filinds.push_back(TempF.tInd);
+      filtime.push_back(g.time);
+      filout = filbaseOut+std::to_string(TempF.tInd);
+      filout = filbaseOut+std::to_string(TempF.tInd);
+      vox.WriteToHDF1(filout);
+      MPI_Barrier(MPI_COMM_WORLD);
+    } // (indOut==0 ...
+    if (g.inewlayerflg==1){vox.AddLayer1();}
     // update temperature field
-    if (TempF.tInd != int(round(g.time/TempF.DelT))){
-      TempF.tInd = int(round(g.time/TempF.DelT));
-      TempF.AnalyticTempCurr(g.time,TempF.TempCurr,part.icellidLoc,Ntot);
-      irep=0;
-    } // if (TempF.tInd !=
+    TempF.tInd = int(round(g.time/TempF.DelT));
+    g.UpdateLaser();
+    TempF.AnalyticTempCurr(g.time,TempF.TempCurr,part.icellidLoc,Ntot);
+    // update next step for voxels 
+//    vox.UpdateVoxels();
+    g.UpdateTime2(TempF.DelT);    
+    bcheck=g.indlayer>nlayerTot;
     auto texec2 = std::chrono::high_resolution_clock::now();
     auto delTexec = std::chrono::duration_cast<std::chrono::seconds>( texec2 - texec1 ).count();
     if (part.myid==0){std::cout << TempF.tInd<<","<<delTexec<< std::endl;}
