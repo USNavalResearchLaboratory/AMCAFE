@@ -38,8 +38,7 @@ int main(int argc, char *argv[])
   vox.InitializeVoxels(bp);
   /*-----------------------------------------------
     execute simulation */
-  int indOut,nTmax=TempF.nTTemp[0]*TempF.nTTemp[1]*TempF.nTTemp[2],
-    nFils;
+  int indOut,nFils;
   double filSize=(g.nX[0]/1e2*g.nX[1]/1e2*g.nX[2]/1e2*4*(9+3+3+8)+12)/1e3;
   nFils = int(ceil(filSize/1.5 ));
   std::vector<int> filinds,out2(2,0);
@@ -53,11 +52,21 @@ int main(int argc, char *argv[])
     fplog.open(filLogOut.c_str());
     fplog << "Time index= ,Total clock time passed(s)"<<std::endl;
   }
-  nlayerTot=int(ceil( (g.nX[2]-bp.Nzh)/g.nZlayer));
+  nlayerTot=int(ceil( (double)(g.nX[2]-bp.Nzh)/(double)g.nZlayer));
   while (!bcheck){
+    if (g.inewlayerflg==1){vox.AddLayer1();}
+    // update temperature field
+    TempF.tInd = int(round(g.time/TempF.DelT));
+    g.UpdateLaser();
+    TempF.AnalyticTempCurr(g.time,TempF.TempCurr,part.icellidLoc,Ntot);
+    bcheck=g.indlayer>nlayerTot;
+
+    // update next step for voxels 
+    vox.UpdateVoxels();
+    //write out
     indOut = TempF.tInd % g.outint;
     if (g.inewlayerflg==1){vox.CleanLayer();}
-    if (indOut==0 || TempF.tInd ==nTmax || (g.inewlayerflg==1 && g.outNL==0)){
+    if (indOut==0 || bcheck || (g.inewlayerflg==1 && g.outNL==0)){
       filinds.push_back(TempF.tInd);
       filtime.push_back(g.time);
       filout = filbaseOut+std::to_string(TempF.tInd);
@@ -65,15 +74,7 @@ int main(int argc, char *argv[])
       vox.WriteToHDF1(filout);
       MPI_Barrier(MPI_COMM_WORLD);
     } // (indOut==0 ...
-    if (g.inewlayerflg==1){vox.AddLayer1();}
-    // update temperature field
-    TempF.tInd = int(round(g.time/TempF.DelT));
-    g.UpdateLaser();
-    TempF.AnalyticTempCurr(g.time,TempF.TempCurr,part.icellidLoc,Ntot);
-    // update next step for voxels 
-//    vox.UpdateVoxels();
     g.UpdateTime2(TempF.DelT);    
-    bcheck=g.indlayer>nlayerTot;
     auto texec2 = std::chrono::high_resolution_clock::now();
     auto delTexec = std::chrono::duration_cast<std::chrono::seconds>( texec2 - texec1 ).count();
     if (part.myid==0){std::cout << TempF.tInd<<","<<delTexec<< std::endl;}

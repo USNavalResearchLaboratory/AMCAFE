@@ -65,7 +65,7 @@ class Grid
   double mu; // rate for Voronoi tessellation for baseplate
   double bpH; // base plate height
   double lrate; // layer rate for Voronoi powder microstructure 
-  double beamEta,T0targ,bmDelT,gbox[4];
+  double beamEta,T0targ,bmDelT,gbox[4],Avel,nvel;
   std::string ntype; // type of neighborhood: Moore or VonNeumann
   std::string neighOrder; // order of neighborhood
 }; // end class Grid

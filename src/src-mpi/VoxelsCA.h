@@ -103,22 +103,26 @@ class VoxelsCA
     rRot[2][1] = ax[2]*ax[1]*(1-cos(omega)) + ax[0]*sin(omega);
     rRot[2][2] = cos(omega) + pow(ax[2],2.0)*(1-cos(omega));
   } // end inline void loadRotMat
-  inline double getVelocity(double &tL,double &mL,double &kP,double &Gamma,double &c0,
-			  double &T)
+/*
+  inline double dendriteVel1(double &tL,double &mL,double &kP,double &Gamma,double &c0,
+			  double &A, double &n, double &T)
   {
-    /*
     double v=(5.51*pow(M_PI,2.0)*pow((-mL)*(1-kP),1.5)*
-       (Gamma))*( pow((tL - T),2.5)/pow(c0,1.5));
-    */
-    double v=(5.51*pow(M_PI,2.0)*pow((-mL)*(1-kP),1.5)*
-       (Gamma))*( pow((tL - T),2.5)/pow(c0,1.5));
+       (Gamma))*( pow((tL - T),2.5)/pow(c0,1.5)); // LGK model
     return v;
-  } // end inline void getVelocity
-
+  } // end inline void dendriteVel1
+  inline double dendriteVel2(double &tL,double &mL,double &kP,double &Gamma,double &c0,
+			  double &A, double &n, double &T)
+  {
+    double v=A*pow(T,n);
+    return v;
+  } // end inline void dendriteVel
+*/
   std::vector<int> gID,gNucleus,ineighID,ineighptr;
   std::vector<int> vState; // 0=uninitialized; 1=liquid; 2=mushy; 3=solid
   std::vector<double> cTheta,extents,centroidOct;
-  double vmax,vXi;
+  double vmax;
+  double (*dendritevelptr)(double &,double &,double &,double &,double &,double &,double &,double & );
   int nGrain,seed0,seed1,NzhBP;
   std::default_random_engine genlayer;
  private:

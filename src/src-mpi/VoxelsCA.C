@@ -16,6 +16,19 @@
 #include <chrono>
 #include <adios2.h>
 
+  inline double dendriteVel1(double &tL,double &mL,double &kP,double &Gamma,double &c0,
+                          double &A, double &n, double &T)
+  {
+    double v=(5.51*pow(M_PI,2.0)*pow((-mL)*(1-kP),1.5)*
+       (Gamma))*( pow((tL - T),2.5)/pow(c0,1.5)); // LGK model                                                                                             
+    return v;
+  } // end inline void dendriteVel1                                                                                                                        
+  inline double dendriteVel2(double &tL,double &mL,double &kP,double &Gamma,double &c0,
+                          double &A, double &n, double &T)
+  {
+    double v=A*pow(tL-T,n);
+    return v;
+  } // end inline void dendriteVel     
 
 // constructor
 VoxelsCA::VoxelsCA(Grid &g,TempField &tf, Partition &part)
@@ -33,10 +46,10 @@ VoxelsCA::VoxelsCA(Grid &g,TempField &tf, Partition &part)
   seed0= 2132512;
   seed1=2912351;
   genlayer.seed(seed1);
-  double velY=(5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
-		 (_xyz->Gamma))*( pow((_xyz->tL - _xyz->tS),2.5)/pow(_xyz->c0,1.5));
-  
-  vXi = 3*_temp->bmV/velY;
+  // determine dendrite velocity model
+  if (_xyz->Avel>0){
+    dendritevelptr=dendriteVel2;} else {
+    dendritevelptr=dendriteVel1;}
   // establishes ineighID and ineighptr for convertSolid1 
   int cc=0;
   std::vector<int> neigh;
@@ -333,9 +346,9 @@ void VoxelsCA::UpdateVoxels()
 	  ax[1]=cTheta[4*(G[i1]-1)+2];
 	  ax[2]=cTheta[4*(G[i1]-1)+3];
 	  loadRotMat(omega,ax,rRot);	    
-	  T[i1]>=_xyz->tL ? velY=0.0: velY=(5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
-		 (_xyz->Gamma))*( pow((_xyz->tL - T[i1]),2.5)/pow(_xyz->c0,1.5));
-	  vhatvec[j] = vXi*velY;
+	  //T[i1]>=_xyz->tL ? vhatvec[j]=0.0: vhatvec[j]=dendritevelptr(_xyz->tL,_xyz->mL,_xyz->kP,_xyz->Gamma,
+	//						_xyz->c0,_xyz->Avel,_xyz->nvel,T[i1]);
+	  T[i1]>=_xyz->tL ? vhatvec[j]=0.0: vhatvec[j]=_xyz->Avel*pow(_xyz->tL-T[i1],_xyz->nvel);
 	  for (int j1=0;j1<i6;++j1){
 	    if (vSneigh[j1] != 1 ){continue;}
             i4 = ineighIDA[i5+j1];

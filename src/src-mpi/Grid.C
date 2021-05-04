@@ -60,6 +60,8 @@ Grid::Grid(std::string &filIn, int & myidIn, int & nprocsIn)
   outNL = 0;
   gth0=0.;
   gth=0.;
+  Avel=0.;
+  nvel=0.;
   //read data from input file
   readInputFile();
   if (gsize[0]==0){gsize={nX[0]*dX[0]*2,nX[1]*dX[1]*2};}
@@ -286,6 +288,12 @@ void Grid::readInputFile()
     if (keyword=="gridtheta") {
       simInput >> keyword;
       gth0=std::stod(keyword);
+    }
+    if (keyword=="dendritegrowth2") {
+      simInput >> keyword;
+      Avel=std::stod(keyword);
+      simInput >> keyword;
+      nvel=std::stod(keyword);
     }
 
     simInput >> keyword;
