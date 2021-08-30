@@ -1,6 +1,17 @@
-Compiling and running the AMCAFE code:
+1. Description
+===============
 
-The personal notes below show compilation notes for 3 systems titled neocortex, gaffney, and onyx (gaffney and onyx are DoD HPC machines), and can serveas guidelines for your system. The code is a C++ code that requires an MPI wrapper as well as external packages ADIOS2 and metis. The notes below give some guidance on how ADIOS2 can be compiled. METIS is a straightforward compilation. A static metis library can easily be compiled following instructions on the website. The variables in makefile in this folder need to specify the paths to the required libraries, executables, and include files. These must be adjusted to your system. After which, the executable can be built by typing "make cafe" in the terminal. The code is run by
+This is an implementation of the Cellular Automata Finite Element (CAFE) algorithm to simulate solidification of additively manufactured metals. Description of the code can be found in
+
+Teferra, Kirubel, and David J. Rowenhorst. "Optimizing the cellular automata finite element model for additive manufacturing to simulate large microstructures." Acta Materialia 213 (2021): 116930
+
+Simulation results in the paper can reproduced using the input files in the examples directory. Below contains compilation instructions for various systems. These instructions mostly serve as guidelines to help compile on your own system. In addition to compilation instructions, the src/ directoriescontain the makefiles used to compile the code.
+
+
+2. Compiling and running the AMCAFE code
+==========================================
+
+The personal notes below show compilation notes for 3 systems titled neocortex, gaffney, and onyx (gaffney and onyx are DoD HPC machines, neocortex is ubuntu OS). The code is a C++ code that requires an MPI wrapper as well as external packages ADIOS2 and metis. The notes below give some guidance on how ADIOS2 can be compiled. METIS is a straightforward compilation. A static metis library can easily be compiled following instructions on the website. The variables in makefile in this folder need to specify the paths to the required libraries, executables, and include files. These must be adjusted to your system. After which, the executable can be built by typing "make cafe" in the terminal. The code is run by
 
 mpirun -n <number_of_processors> ./cafe <input_file_name>
 
@@ -8,17 +19,14 @@ The executation command may need minor adjustments depending on your compiler. T
 
 
 For questions on compiling and running, please email: kirubel.teferra@nrl.navy.mil
-For usage of the code, please cite: XXXX
 
 
 
-20200914:
 
-creating a fork in /opt/cafe that will create branches for others to work on
+2.1 compiling ADIOS2 to be able to output HDF5
+===============================================
 
-20200821: compiling ADIOS2 to be able to output HDF5
-
-adios2 needs, HDF5 parallel and cmake
+dependencies: HDF5 parallel and cmake
 
 neocortex:
 HDF5
@@ -64,29 +72,29 @@ cmake -DCMAKE_INSTALL_PREFIX=/usr/local/ADIOS2 -DADIOS2_USE_Fortran=OFF -DADIOS2
 2) make -j 12
 3) make install
 
-Then had to again give 777 permissions in all folders
+Then had to again give 777 permissions in all created folders
 
 The adios-config file is in the ../ADIOS/bin directory; to determine flags to compile your application with
 4) ./adios-config --cxx-flags
 5) ./adios-config --cxx-libs
 
 gaffney:
+=========
 
 already had a module for cmake and HDF5 parallel so needed to load those modules,
 1) module load Cmake/3.18.1
 2) module load hdf5-parallel/intel-18.1.163/1.10.5
- then I loaded the
 3) module load compiler/intelmpi/2019.5.281 
-but also needed to load the gcc module to provide paths for cmake as
-4) module load gcc/9.2.0
-then i git cloned the ADIOS2, mkdir adios2-build and cd'ed to it
-5) cmake -DCMAKE_INSTALL_PREFIX=/p/home/kteferra/Documents/software/ADIOS2/ -DADIOS2_USE_MPI=ON -DADIOS2_USE_HDF5=ON -DHDF5_ROOT=/app/hdf5-parallel/1.10.5-intel-2018.1.163-intelmpi -DADIOS2_USE_Fortran=NO ../../ADIOS
+4) module load gcc/9.2.0 (necessary to provide paths for cmake)
+5) compile ADIOS2
+5a) make directory for ADIOS2, git cloned to directory, mkdir adios2-build and cd'ed to it
+5b) cmake -DCMAKE_INSTALL_PREFIX=/p/home/kteferra/Documents/software/ADIOS2/ -DADIOS2_USE_MPI=ON -DADIOS2_USE_HDF5=ON -DHDF5_ROOT=/app/hdf5-parallel/1.10.5-intel-2018.1.163-intelmpi -DADIOS2_USE_Fortran=NO ../../ADIOS
 (notice that it only works if I turn off fortran)
-6) Make -j 16
-7) Make install
+5c) Make -j 16
+5d) Make install
 The adios-config file is in the ../ADIOS/bin directory; to determine flags to compile your application with
-8) ./adios-config --cxx-flags
-9) ./adios-config --cxx-libs
+5e) ./adios-config --cxx-flags
+5f) ./adios-config --cxx-libs
 
 
 lastly when compile (AND EXECUTE) an application that uses adios2, you have to make sure you have the following modules loaded
@@ -96,22 +104,26 @@ module load hdf5-parallel/intel-18.1.163/1.10.5
 module load gcc/9.2.0
 
 ONYX:
+===========
+
 As onyx is a CRAY system ADIOS2 compiled as a static library. Here are the steps:
-1) module swap PrgEnv-cray PrgEnv-intel/6.0.5
-2) module load intel/19.0.1.144
-3) module load cray-hdf5-parallel/1.10.5.0
-4) module load gcc/8.3.0
+1) load appropriate system modules
+1a) module swap PrgEnv-cray PrgEnv-intel/6.0.5
+1b) module load intel/19.0.1.144
+1c) module load cray-hdf5-parallel/1.10.5.0
+1d) module load gcc/8.3.0
 
-cmake:
-untared cmake-3.18 then did
-1) ./bootstrap
-2) make -j 12
-3) make install
+2)cmake:
+2a) downloaded and untared cmake-3.18 then did
+2b) ./bootstrap
+2c) make -j 12
+2d) make install
 
-then git cloned adios2, created subdir adios2-build and cc'ed to it
-1) ../../cmake-3.18.2/bin/cmake -DCMAKE_INSTALL_PREFIX=/p/home/kteferra/Documents/software/ADIOS2 -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_MPI=ON -DADIOS2_USE_HDF5=ON ../../ADIOS2
-2) make -j 12
-3) make install
+3) ADIOS2
+3a) created ADIOS2 directroy, git cloned ADIOS2 to directory, created subdir adios2-build and cc'ed to it
+3b) ../../cmake-3.18.2/bin/cmake -DCMAKE_INSTALL_PREFIX=/p/home/kteferra/Documents/software/ADIOS2 -DADIOS2_USE_Fortran=OFF -DADIOS2_USE_MPI=ON -DADIOS2_USE_HDF5=ON ../../ADIOS2
+3c) make -j 12
+3d) make install
 
 you can find compiler flags by running executable adios2-config in ADIOS2/bin
 
@@ -121,8 +133,7 @@ if system does not have MPI wrapper, you can download petsc tar file, untar and 
 CXXOPTFLAGS='-O3 -march=native -mtune=native' FOPTFLAGS='-O3 -march=native -mtune=native'
  --download-mpich --download-metis
 
-That being said, on HPC it probably is better to use an intel compiler rather than GNU and to
-use any MPI library that is compiled already on the system by system administrators. That is likely
-to be more optimized.
+
+On DoD HPC system: better to use intel compiler than gcc and use as many existing modules as possible as they are optimized for system
 
 

@@ -926,8 +926,6 @@ void VoxelsCA::AddLayer1(){
     }    
   } // for j  
 }; // AddLayer1
-
-
 void VoxelsCA::UpdateLayer(std::string &filCSV){
   /*
     Function adds powder to layer by making every voxel in layer a unique grain.

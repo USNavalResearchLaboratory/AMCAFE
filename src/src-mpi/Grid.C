@@ -104,7 +104,6 @@ Grid::Grid(std::string &filIn, int & myidIn, int & nprocsIn)
   gbox[2]=-bhatch/2.;
   gbox[3]=LX[1]+bhatch/2.;               
 } // end constructor
-
 void Grid::UpdateLaser(){
   int itmp,iflg=0,irep=0;
   double x,y;
@@ -148,7 +147,6 @@ void Grid::UpdateLaser(){
   } // while(irep==0...
   if (irep==1){inewlayerflg=0;} 
 } // end UpdateLaser 
-
 void Grid::readInputFile()
 {
   std::ifstream filIn;
