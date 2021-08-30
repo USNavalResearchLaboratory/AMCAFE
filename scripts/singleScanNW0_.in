@@ -1,0 +1,19 @@
+# Format is "keyword data". you must have a space between keyword and data
+# This is for single scan simulations comparing to Northwest 20200809
+dx 0.600000e-06 # voxel spacing in meters 
+bmV 1.000000e+00 # laser velocity in m/s 
+bmP 175.000000 # beam power W 
+nX 320 128 64 # number of voxels in x,y,z 
+r 0.000000 # nucleation rate
+lT 0.000000 # layer thickness in meters 
+tL 1620.0 # liquidus temperature (K) 
+tS 1531.5 # solidification temperature (K) 
+meltparam 2.700000e-05 9.300000e-05 2.700000e-05 2.700000e-05 # beam dimensions a,b,c,d  
+bmDelT 6.750000e-06 # sections 
+mu 0.006954 # rate for Voronoi model for base plate (in #grains/ (\mu m)^3) 
+bpH 4.100000e-05 # base plate height (make higher than LX[2] for entire microstructure) 
+bhatch 8.448000e-05 # just make bigger than domain for single scan 
+offset 0.000000e+00 -3.840000e-05 0.000000e+00  # this is in center of transverse domain 
+patternID 1 # patternID can be 1 or 4 see notes 
+outint 1 # the interval of time steps to print out vtu files 
+# make sure file ends with a space or new line otherwise read error 

@@ -1,0 +1,26 @@
+# this is test param file
+# Format is "keyword data". you must have a space between keyword and data 
+#dx 1.0e-6 # voxel spacing in meters
+dx 4.0e-6 # voxel spacing in meters
+bmV 1.0 # laser velocity in m/s
+bmP 175.0  # beam power W
+nX 50 20 10 
+# nX 192 78 40 # number of voxels in x,y,z
+r 0.0 # nucleation rate
+# lT 0.0 # layer thickness in meters (if 0 then only 1 layer)
+lT 20e-6
+tL 1620 # liquidus temperature (K)
+tS 1531.5 # solidification temperature (K)
+meltparam 35e-6 110e-6 35e-6 35e-6 # beam dimensions a,b,c,d
+bmDelT 50e-6 # seconds
+bhatch 11.475e-5 # just make bigger than domain for single scan
+mu .00695 # rate for Voronoi model for base plate (in #grains/ (\mu m)^3)
+# bpH 41e-6 # base plate height (make higher than LX[2] for entire microstructure)
+bpH 20e-6 # base plate height (make higher than LX[2] for entire microstructure)
+patternID 1 # patternID can be 1 or 4 see notes
+outint 1 # the interval of time steps to print out vtu files
+offset -100.0e-6 -38.5e-6 0.0  # center of TD and 100\mu m into SD
+nTsd 2 # set to 2 to do 1 laser time step. otherwise, anything else or leave blank
+lrate .000695 # rate for Voronoi model for layer powder (#grains/ (\mu m^3))
+# make sure file ends with a space or new line otherwise read error   
+

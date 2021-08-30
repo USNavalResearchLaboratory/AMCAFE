@@ -1,0 +1,27 @@
+# Format is "keyword data". you must have a space between keyword and data
+# This is for SDX1 20200814
+dx 5.625000e-06 # voxel spacing in meters
+bmV 5.000000e-01 # laser velocity in m/s
+bmP 175.000000 # beam power W
+nX 67 67 15 # number of voxels in x,y,z
+r 0.0003 # nucleation rate
+lT 30.00e-6 # layer thickness in meters
+tL 1620.000000 # liquidus temperature (K)
+tS 1531.500000 # solidification temperature (K)
+meltparam 7.500000e-05 2.000000e-04 7.500000e-05 7.500000e-05 # beam dimensions a,b,c,d
+bmDelT 146.0000e-06 # sections
+mu 0.008500 # rate for Voronoi model for base plate (in #grains/ (\mu m)^3)
+bpH 27.00e-06 # base plate height (make higher than LX[2] for entire microstructure)
+bhatch 1.14000e-04 # just make bigger than domain for single scan
+offset 0.0 0.0 0.0  # this is in center of transverse domain
+patternID 1 # patternID can be 1 or 4 see notes
+# outint 1000 # the interval of time steps to print out vtu files
+outint 1 # the interval of time steps to print out vtu files
+lrate .00025 # rate for Voronoi model for layer powder (#grains/ (\mu m^3))
+outNL 0 # set to 1 if do not want to write output info at beginning of new layer
+nTsd 0 # set to 2 if want to run 1 time step, otherwise anything else or even leave blank
+# gridsize .000378 .000378 # size of laser grid (commented out as i'll keep default of 2L)
+gridtheta 0.0 # 1.168 # radians of rotation of laser grid each layer
+dendritegrowth2 0.0001 2.0
+# make sure file ends with a space or new line otherwise read error
+
