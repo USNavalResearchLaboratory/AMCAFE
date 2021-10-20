@@ -64,7 +64,7 @@ Grid::Grid(std::string &filIn, int & myidIn, int & nprocsIn)
   nvel=0.;
   //read data from input file
   readInputFile();
-  if (gsize[0]==0){gsize={nX[0]*dX[0]*2,nX[1]*dX[1]*2};}
+  //if (gsize[0]==0){gsize={nX[0]*dX[0]*2,nX[1]*dX[1]*2};}
   LX = {nX[0]*dX[0],nX[1]*dX[1],nX[2]*dX[2]};
   bpH< std::numeric_limits<double>::epsilon() ? bpH=layerT : bpH=bpH;
   nZlayer = round(layerT/dX[2]);

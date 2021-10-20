@@ -88,7 +88,7 @@ void TempField::AnalyticTempCurr(double tcurr,std::vector<double> & TempOut, std
   std::vector<double> a1m(6);
   for (int j=0;j<6;++j){a1m[j]=a1[j];}
   // x,y,z spatial location of source (in grid reference frame)
-  x=_xyz->lcoor[2*ispvec[_xyz->isp]]-offset[0];
+    x=_xyz->lcoor[2*ispvec[_xyz->isp]]-offset[0];
   y=_xyz->lcoor[2*ispvec[_xyz->isp]+1]-offset[1];
   z=ilaserLoc*_xyz->dX[2]-offset[2];
   for (int j=0;j<Ntot;++j){

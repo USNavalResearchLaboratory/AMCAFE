@@ -15,7 +15,7 @@ The personal notes below show compilation notes for 3 systems titled neocortex, 
 
 mpirun -n <number_of_processors> ./cafe <input_file_name>
 
-The executation command may need minor adjustments depending on your compiler. The *sh files in the folder give examples of how to run. The examples in paper XXXX can be run by input file SDX1_.in (example 1) and SDXY1_.in (example 2)
+The executation command may need minor adjustments depending on your compiler. The *sh files in the folder give examples of how to run. The examples in paper mentioned above can be run by input file SDX1_.in (example 1) and SDXY1_.in (example 2)
 
 
 For questions on compiling and running, please email: kirubel.teferra@nrl.navy.mil
