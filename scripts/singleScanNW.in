@@ -21,6 +21,11 @@ patternID 1 # patternID can be 1 or 4 see notes
 outint 1 # the interval of time steps to print out vtu files
 offset -100.0e-6 -38.5e-6 0.0  # center of TD and 100\mu m into SD
 nTsd 2 # set to 2 to do 1 laser time step. otherwise, anything else or leave blank
+outNL 0 # set to 1 if do not want to write output info at beginning of new layer
 lrate .000695 # rate for Voronoi model for layer powder (#grains/ (\mu m^3))
-# make sure file ends with a space or new line otherwise read error   
+gridsize 1.6e-3 1.6e-3 # size of laser grid (commented out as i'll keep default of 2L)
+gridtheta 1.169 # radians of rotation of laser grid each layer
+dendritegrowth2 0.0001 2.0
+# make sure file ends with a space or new line otherwise read error
+
 

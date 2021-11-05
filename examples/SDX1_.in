@@ -18,5 +18,7 @@ patternID 1 # patternID can be 1 or 4 see notes
 outint 1000 # the interval of time steps to print out vtu files
 outNL 0 # set to 1 if do not want to write output info at beginning of new layer
 nTsd 0 # set to 2 if want to run 1 time step, otherwise anything else or even leave blank
+gridsize 1.6e-3 1.6e-3 # size of laser grid (commented out as i'll keep default of 2L)
+gridtheta 0.0 # radians of rotation of laser grid each layer
+dendritegrowth2 0.0001 2.0
 # make sure file ends with a space or new line otherwise read error
-
