@@ -604,7 +604,7 @@ void VoxelsCA::ConvertSolid(const int &iswitch)
 {
   // if iswitch =0 then converts mushy to solid
   // else converts solid to mushy
-  int Ntot = (_part->ncellLoc),cc,j2,iplay=_xyz->nX[0]*_xyz->nX[1]*_temp->ilaserLoc,
+  int Ntot = (_part->ncellLoc),cc,j2,iplay=_xyz->nX[0]*_xyz->nX[1]*_xyz->ilaserLoc,
     iplay2=_xyz->nX[0]*_xyz->nX[1]*(NzhBP-1);
   std::vector<int> vneigh,neigh,i1(_part->ncellLoc,0);
   if (iswitch==0){
@@ -803,11 +803,11 @@ void VoxelsCA::AddLayer(){
   // ASSIGN GID NGRAIN1+1...NGRAIN TO PROPER VOXELS
   // LOOK INTO WHETHER GNUCLEUS IS IMPORTANT IN WHICH
   // CASE IT WILL BE THE VOXEL CENTERS
-  iz1 = _temp->ilaserLoc - _xyz->nZlayer;
+  iz1 = _xyz->ilaserLoc - _xyz->nZlayer;
   jvox0 = _xyz->nX[0]*_xyz->nX[1]*iz1;
   for (int j=0;j<Ntot2;++j){
     j3 = floor(_part->icellidLoc[j]/(_xyz->nX[0]*_xyz->nX[1]));
-    if (j3>=iz1 && j3<_temp->ilaserLoc){
+    if (j3>=iz1 && j3<_xyz->ilaserLoc){
       j2 = floor( (_part->icellidLoc[j]- _xyz->nX[0]*_xyz->nX[1]*j3)/_xyz->nX[0]);
       j1 = _part->icellidLoc[j] - _xyz->nX[0]*_xyz->nX[1]*j3 - _xyz->nX[0]*j2;
       gID[j] = nGrain + _xyz->nX[0]*_xyz->nX[1]*j3+_xyz->nX[0]*j2+j1 - jvox0 + 1;
@@ -817,11 +817,11 @@ void VoxelsCA::AddLayer(){
 	centroidOct[3*j+1]=(double(j2)+.5)*_xyz->dX[1];
 	centroidOct[3*j+2]=(double(j3)+.5)*_xyz->dX[2];
       } // if (j<Ntot)
-    } // if (j3>=iz1 && j3<_temp->ilaserLoc ...
+    } // if (j3>=iz1 && j3<_xyz->ilaserLoc ...
   } // for (int j...
   nGrain += _xyz->nX[0]*_xyz->nX[1]*_xyz->nZlayer;  
   // assign appropriate vState (including zeroing states above ilaserLoc
-  iz1 = _xyz->nX[0]*_xyz->nX[1]*_temp->ilaserLoc;
+  iz1 = _xyz->nX[0]*_xyz->nX[1]*_xyz->ilaserLoc;
   for (int j=0;j<Ntot2;++j){
     if (_part->icellidLoc[j] >=iz1){
       vState[j] = 0;
@@ -850,7 +850,7 @@ void VoxelsCA::AddLayer1(){
   ng2 =0;
   while (ng2 == 0){ng2 = ng(genlayer);} // end while
   // generate new voronoi sites
-  iz1 = _temp->ilaserLoc - _xyz->nZlayer;
+  iz1 = _xyz->ilaserLoc - _xyz->nZlayer;
   zloc0 = iz1*_xyz->dX[2];
   std::vector<double> Xsite(ng2*3);
   std::uniform_real_distribution<double> xrand(0.0,1.0);
@@ -865,7 +865,7 @@ void VoxelsCA::AddLayer1(){
   i3=_xyz->nX[0]*_xyz->nX[1];
   std::vector<int> itmp(ng2,0),gtmp(i3*_xyz->nZlayer,0);
   jvox0 = i3*iz1;
-  for (int j3a=iz1;j3a<_temp->ilaserLoc;++j3a){
+  for (int j3a=iz1;j3a<_xyz->ilaserLoc;++j3a){
     for (int j2a=0;j2a<_xyz->nX[1];++j2a){
       for (int j1a=0;j1a<_xyz->nX[0];++j1a){
 	dsqc=1e6;
@@ -897,7 +897,7 @@ void VoxelsCA::AddLayer1(){
   }
   for (int j=0;j<Ntot2;++j){
     j3 = floor(_part->icellidLoc[j]/i3);
-    if (j3>=iz1 && j3<_temp->ilaserLoc){
+    if (j3>=iz1 && j3<_xyz->ilaserLoc){
       j2=floor( (_part->icellidLoc[j]-i3*j3)/_xyz->nX[0]);
       j1=_part->icellidLoc[j]-i3*j3-_xyz->nX[0]*j2;
       jind=i3*(j3-iz1)+_xyz->nX[0]*j2+j1;
@@ -908,7 +908,7 @@ void VoxelsCA::AddLayer1(){
 	centroidOct[3*j+1]=(double(j2)+.5)*_xyz->dX[1];
 	centroidOct[3*j+2]=(double(j3)+.5)*_xyz->dX[2];
       } // if (j<Ntot)
-    } // if (j3>=iz1 && j3<_temp->ilaserLoc ...
+    } // if (j3>=iz1 && j3<_xyz->ilaserLoc ...
   } // for (int j...
   nGrain += i2+1;  
   SampleOrientation sa1;
@@ -918,7 +918,7 @@ void VoxelsCA::AddLayer1(){
   sa1.GenerateSamples(ng2,sdloc,aa);
   cTheta.insert(cTheta.end(), aa.begin(),aa.end());
   // assign appropriate vState (including zeroing states above ilaserLoc
-  iz1 = _xyz->nX[0]*_xyz->nX[1]*_temp->ilaserLoc;
+  iz1 = _xyz->nX[0]*_xyz->nX[1]*_xyz->ilaserLoc;
   for (int j=0;j<Ntot2;++j){
     if (_part->icellidLoc[j] >=iz1){
       vState[j] = 0;
@@ -979,11 +979,11 @@ void VoxelsCA::UpdateLayer(std::string &filCSV){
   // LOOK INTO WHETHER GNUCLEUS IS IMPORTANT IN WHICH
   // CASE IT WILL BE THE VOXEL CENTERS
   int j1,j2,j3,iz1,jvox0;
-  iz1 = _temp->ilaserLoc - _xyz->nZlayer;
+  iz1 = _xyz->ilaserLoc - _xyz->nZlayer;
   jvox0 = _xyz->nX[0]*_xyz->nX[1]*iz1;
   for (int j=0;j<Ntot2;++j){
     j3 = floor(_part->icellidLoc[j]/(_xyz->nX[0]*_xyz->nX[1]));
-    if (j3>=iz1 && j3<_temp->ilaserLoc){
+    if (j3>=iz1 && j3<_xyz->ilaserLoc){
       j2 = floor( (_part->icellidLoc[j]- _xyz->nX[0]*_xyz->nX[1]*j3)/_xyz->nX[0]);
       j1 = _part->icellidLoc[j] - _xyz->nX[0]*_xyz->nX[1]*j3 - _xyz->nX[0]*j2;
       gID[j] = nGrain + _xyz->nX[0]*_xyz->nX[1]*j3+_xyz->nX[0]*j2+j1 - jvox0 + 1;
@@ -993,12 +993,12 @@ void VoxelsCA::UpdateLayer(std::string &filCSV){
 	centroidOct[3*j+1]=(double(j2)+.5)*_xyz->dX[1];
 	centroidOct[3*j+2]=(double(j3)+.5)*_xyz->dX[2];
       } // if (j<Ntot)
-    } // if (j3>=iz1 && j3<_temp->ilaserLoc ...
+    } // if (j3>=iz1 && j3<_xyz->ilaserLoc ...
   } // for (int j...
   nGrain += _xyz->nX[0]*_xyz->nX[1]*_xyz->nZlayer;
   
   // assign appropriate vState (including zeroing states above ilaserLoc
-  iz1 = _xyz->nX[0]*_xyz->nX[1]*_temp->ilaserLoc;
+  iz1 = _xyz->nX[0]*_xyz->nX[1]*_xyz->ilaserLoc;
   for (int j=0;j<Ntot2;++j){
     if (_part->icellidLoc[j] >=iz1){
       vState[j] = 0;
@@ -1047,7 +1047,7 @@ void VoxelsCA::SetLiquid3(){
   int Ntot1 = _part->ncellLoc;
   n1 = _xyz->nX[0]*_xyz->nX[1];
   nZlayer = round(_xyz->layerT/_xyz->dX[2]);
-  iz1 = _temp->ilaserLoc*_xyz->nX[0]*_xyz->nX[1];
+  iz1 = _xyz->ilaserLoc*_xyz->nX[0]*_xyz->nX[1];
   for (int j=0;j<Ntot;++j){
     if (_temp->TempCurr[j] >= _xyz->tL ) { 
       if (_part->icellidLoc[j]<n1){
@@ -1083,7 +1083,7 @@ void VoxelsCA::SetLiquid5(){
   double tcheck = .99*_temp->tBeg0;
   n1 = _xyz->nX[0]*_xyz->nX[1];
   nZlayer = round(_xyz->layerT/_xyz->dX[2]);
-  iz1 = _temp->ilaserLoc*_xyz->nX[0]*_xyz->nX[1];
+  iz1 = _xyz->ilaserLoc*_xyz->nX[0]*_xyz->nX[1];
   for (int j=0;j<Ntot;++j){
     if (_temp->tBeg[j] < tcheck) {
       if (_part->icellidLoc[j]<n1){
@@ -1103,7 +1103,7 @@ void VoxelsCA::SetLiquid6(){
   double tcheck1=1.01*_temp->tBeg0;
   n1 = _xyz->nX[0]*_xyz->nX[1];
   nZlayer = round(_xyz->layerT/_xyz->dX[2]);
-  iz1 = _temp->ilaserLoc*_xyz->nX[0]*_xyz->nX[1];
+  iz1 = _xyz->ilaserLoc*_xyz->nX[0]*_xyz->nX[1];
   for (int j=0;j<Ntot;++j){
     if (_temp->tBeg[j] > tcheck1) {
       if (_part->icellidLoc[j]<n1){
@@ -1153,7 +1153,7 @@ void VoxelsCA::ZeroVoxels(){
     y = floor(fmod(_temp->tInd,(_temp->nTTemp[0]*_temp->nTTemp[1]))/_temp->nTTemp[0])*_temp->bmDX[1]-_temp->offset[1];
     j1 = int(floor(std::max(x,0.0)/_xyz->dX[0]));
     j2 = int(floor(std::max(y,0.0)/_xyz->dX[1]));
-    j3 = _temp->ilaserLoc;
+    j3 = _xyz->ilaserLoc;
     n1 = _xyz->nX[0]*_xyz->nX[1]*j3 + _xyz->nX[0]*j2 + j1;
     for (int j=0;j<Ntot;++j){
       if (_part->icellidLoc[j] <n1){continue;}
@@ -1167,7 +1167,7 @@ void VoxelsCA::ZeroVoxels1(){
   int j,j1b,j2b,j3b,j2,j3;
   int Ntot = _part->ncellLoc + _part->nGhost,n1; 
   double x,y;
-  n1 = _xyz->nX[0]*_xyz->nX[1]*_temp->ilaserLoc;
+  n1 = _xyz->nX[0]*_xyz->nX[1]*_xyz->ilaserLoc;
   for (int j=0;j<Ntot;++j){
     if (_part->icellidLoc[j] >=n1){
       vState[j] = 0;

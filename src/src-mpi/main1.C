@@ -54,6 +54,7 @@ int main(int argc, char *argv[])
     fplog << "Time index= ,Total clock time passed(s)"<<std::endl;
   }
   nlayerTot=int(ceil( (double)(g.nX[2]-bp.Nzh)/(double)g.nZlayer));
+  vox.AddLayer1();
   g.UpdateLaser(); // initiate first laser location
   while (!bcheck){
     // update temperature field

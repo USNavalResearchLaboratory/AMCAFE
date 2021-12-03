@@ -22,7 +22,7 @@ class TempField
   std::vector<std::vector<double>> Temp;
   std::vector<double> DDtTemp,dXM,TempCurr,lamXYZ,bmSTD,bmLx,bmX0,bmDX,bmPeriod,offset,shiftL;
   std::vector<int> nXM,nTTemp,ispvec;
-  int NtM,indexM,patternID,nSource,ilaserLoc,tInd;
+  int NtM,indexM,patternID,nSource,tInd;
   double dtM,bmV,bmP,bmEta,rcut,tcut,T0,Ci,DelT,alpha,T0targ,zlaserOff,tBeg0;
   std::vector<double> a1,a2,Qp,tBeg; // 
  private:

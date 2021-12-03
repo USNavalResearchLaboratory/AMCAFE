@@ -44,7 +44,7 @@ class Grid
   std::vector<double> dX,meltparam,beamSTD,LX,offset,lcoor,lcoor2,gsize;
   std::vector<int> nX;
   int nDim,tInd,nnodePerCell,ictrl,nZlayer,patternID,outint,myid,nprocs,outNL,nTsd,Nsd,Ntd,NpT,
-    inewscanflg,inewlayerflg,isp,indlayer;
+    inewscanflg,inewlayerflg,isp,indlayer,ilaserLoc,Nzhg;
   double bmV,bmP,bhatch; // beam velocity,power, hatch spacing, nucleation rate
   double tL,tS,T0; // liquidus, solidus, room temp (K)
   double mL; // liquidus slope of (K/wt%)

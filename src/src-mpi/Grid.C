@@ -75,7 +75,9 @@ Grid::Grid(std::string &filIn, int & myidIn, int & nprocsIn)
   isp=0;
   inewscanflg=1;
   inewlayerflg=1;
+  Nzhg = std::min(nX[2],int(ceil(bpH*.9999/dX[2])));
   indlayer=1;
+  ilaserLoc= Nzhg + indlayer*nZlayer;
   Ntd=int(ceil(gsize[1]/bhatch))+1;
   Nsd=int(ceil(gsize[0]/(bmV*bmDelT)))+1;
   NpT=Nsd*Ntd;
@@ -126,6 +128,7 @@ void Grid::UpdateLaser(){
 	inewlayerflg=1;
 	inewscanflg=1;
 	indlayer+=1;
+	ilaserLoc= Nzhg + indlayer*nZlayer;
 	isp=0;
 	// update grid 
 	double gmid[2];
