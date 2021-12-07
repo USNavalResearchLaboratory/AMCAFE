@@ -40,6 +40,7 @@ VoxelsCA::VoxelsCA(Grid &g,TempField &tf, Partition &part)
   int Ntot1 = _part->ncellLoc;
   gID.resize(Ntot,0);
   vState.resize(Ntot,0);
+  Build.resize(Ntot,0);
   extentsInitialValue = 0.0; //(xyz->dx)/2.0
   extents.assign(Ntot1,extentsInitialValue);
   centroidOct.assign(3*Ntot1,0.0);
@@ -71,6 +72,50 @@ VoxelsCA::VoxelsCA(Grid &g,TempField &tf, Partition &part)
   }
 
 } // end constructor
+
+void VoxelsCA::SetBuild(std::vector<int> jlist, int Ntot){
+
+  std::vector<int> BuildgID(Ntot);
+  for (int j=0; j < Ntot; j++){ //Here we store the gID of any voxel that melted                                                                                                           
+    if (jlist[j] == 1){
+      if (gID[j] > 0)
+        BuildgID[j] = gID[j];
+    } // if jlist[j]                                                                                                                                                                       
+  } // for int j=0                                                                                                                                                                          
+  std::vector<int>::iterator ip;
+  ip = std::unique(BuildgID.begin(), BuildgID.begin() + Ntot);
+  BuildgID.resize(std::distance(BuildgID.begin(), ip));
+
+  for (int j=0; j<Ntot; j++){
+    if (std::find(BuildgID.begin(), BuildgID.end(), gID[j]) != BuildgID.end()){
+      if (gID[j] > 0)
+	Build[j] = 1;
+    }
+  }//for int j=0
+  _part->PassInformation(Build);
+
+  BuildgID.clear();
+  BuildgID.resize(Ntot);
+
+  for (int j=0; j<Ntot;j++){
+    if (Build[j] == 1)
+      if (gID[j] > 0)
+	BuildgID[j] = gID[j];
+  }//for int j
+
+  ip = std::unique(BuildgID.begin(), BuildgID.begin() + Ntot);
+  BuildgID.resize(std::distance(BuildgID.begin(), ip));
+
+  for (int j=0; j<Ntot; j++){
+    if (std::find(BuildgID.begin(), BuildgID.end(), gID[j]) != BuildgID.end()){
+      if (gID[j] > 0)
+	Build[j] = 1;
+    }
+  }//for int j=0                                                                                                                                                                           
+}// SetBuild
+
+
+
 
 void VoxelsCA::InitializeVoxels(BasePlate &bp){
   // generate baseplate and add to voxel data
@@ -104,6 +149,10 @@ void VoxelsCA::InitializeVoxels(BasePlate &bp){
     centroidOct[3*j+1]=(double(jn[1])+.5)*_xyz->dX[1];
     centroidOct[3*j+2]=(double(jn[2])+.5)*_xyz->dX[2];
   } // for (int j ...
+  for (int k=0; k < Ntot; k++){
+    if (gID[k] != 0)
+      Build[k] = 1;
+    }
 } // end InitializeVoxles
 
 void VoxelsCA::InitializeTest2()
@@ -1773,6 +1822,8 @@ void VoxelsCA::WriteToHDF1(const std::string &filename)
 	      "gID", {nVoxT}, {js}, {jc});
   adios2::Variable<int> vStatea = hdf5IO.DefineVariable<int>(
 	      "vState", {nVoxT}, {js}, {jc});
+  adios2::Variable<int> Builda = hdf5IO.DefineVariable<int>(
+              "Build", {nVoxT}, {js}, {jc});
   adios2::Variable<float> TempOuta = hdf5IO.DefineVariable<float>(
 	      "Temperature", {nVoxT}, {js}, {jc});
   adios2::Variable<float> IPFmapBDa = hdf5IO.DefineVariable<float>(
@@ -1789,6 +1840,7 @@ void VoxelsCA::WriteToHDF1(const std::string &filename)
   hdf5Writer.Put<float>(dxa, dX.data());
   hdf5Writer.Put<int>(gida, gID.data());
   hdf5Writer.Put<int>(vStatea, vState.data());
+  hdf5Writer.Put<int>(Builda, Build.data());
   hdf5Writer.Put<float>(TempOuta, TempOut.data());
   hdf5Writer.Put<float>(IPFmapBDa, IPFmapBD.data());
   hdf5Writer.Put<float>(IPFmapxa, IPFmapx.data());

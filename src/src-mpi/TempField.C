@@ -20,6 +20,7 @@ TempField::TempField(Grid &g, Partition & part, BasePlate &bp, Utilities &ut)
   _bp = &bp;
   _ut = &ut;
   TempCurr.resize(_part->ncellLoc+_part->nGhost,0.0);
+  BuildjID.resize(_part->ncellLoc+_part->nGhost,0);  //jlist;                                                                                                                              
   DDtTemp.assign(_part->ncellLoc+_part->nGhost,0.0);
   tInd = 0;
   bmV = _xyz->bmV;
@@ -103,7 +104,14 @@ void TempField::EASM(std::vector<double> &TempOut, std::vector<int> &icellid, in
     if (x0 > x+0.00020){continue;}
 
     TempOut[j] = _ut->EASM_Temp_LG(L, R, TempOut[j]);
-    }//
+    //
+    if (TempOut[j] > _xyz->tL){
+      BuildjID[j] = 1;
+    } // if Melted save j                                                                                                                                                                 
+    else if (TempOut[j] < T0){
+      BuildjID[j] = 0;
+    }// else do not save j
+  }
   // check if last simulation of scan
   
   double tmelt=_xyz->tL;

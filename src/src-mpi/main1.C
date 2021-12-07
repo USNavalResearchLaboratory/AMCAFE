@@ -76,6 +76,7 @@ int main(int argc, char *argv[])
       filtime.push_back(g.time);
       filout = filbaseOut+std::to_string(TempF.tInd);
       filout = filbaseOut+std::to_string(TempF.tInd);
+      vox.SetBuild(TempF.BuildjID, Ntot);
       vox.WriteToHDF1(filout);
       MPI_Barrier(MPI_COMM_WORLD);
     } // (indOut==0 ...

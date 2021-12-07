@@ -14,6 +14,7 @@ class VoxelsCA
 {
  public:
   VoxelsCA(Grid &, TempField &, Partition &);
+  void SetBuild(std::vector<int> jlist, int Ntot);
   void ConvertSolid(const int &iswitch);
   void ConvertSolid1(const int &iswitch);
   void InitializeVoxels(BasePlate &bp);
@@ -119,7 +120,7 @@ class VoxelsCA
   } // end inline void dendriteVel
 */
   std::vector<int> gID,gNucleus,ineighID,ineighptr;
-  std::vector<int> vState; // 0=uninitialized; 1=liquid; 2=mushy; 3=solid
+  std::vector<int> vState, Build; // 0=uninitialized; 1=liquid; 2=mushy; 3=solid
   std::vector<double> cTheta,extents,centroidOct;
   double vmax;
   double (*dendritevelptr)(double &,double &,double &,double &,double &,double &,double &,double & );
