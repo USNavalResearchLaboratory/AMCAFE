@@ -7,16 +7,18 @@
 #include "math.h"
 #include "Partition.h"
 #include "BasePlate.h"
+#include "Utilities.h"
 #include "numeric"
 #include <algorithm>
 #include "mpi.h"
 
 // constructor
-TempField::TempField(Grid &g, Partition & part, BasePlate &bp)
+TempField::TempField(Grid &g, Partition & part, BasePlate &bp, Utilities &ut)
 {
   _xyz = &g;
   _part = &part;
   _bp = &bp;
+  _ut = &ut;
   TempCurr.resize(_part->ncellLoc+_part->nGhost,0.0);
   DDtTemp.assign(_part->ncellLoc+_part->nGhost,0.0);
   tInd = 0;
@@ -72,6 +74,59 @@ void TempField::InitializeAnalytic()
   a1[4] = a1[1];
   a1[5] = a1[2];
 } // end InitializeAnalytic 
+
+void TempField::EASM(std::vector<double> &TempOut, std::vector<int> &icellid, int Ntot){
+  int j1, j2, j3, iplay;
+  double x0,y0,x,y,z,dsq,dsq2,bx,by,xi,xp,yp,dirp,zp;
+  //  ilaserLoc = _bp->Nzh + (_xyz->indlayer)*_xyz->nZlayer;
+  iplay = _xyz->nX[0]*_xyz->nX[1]*_xyz->ilaserLoc;
+  TempOut.assign(Ntot,0);
+  xi = _xyz->tL*(1+std::numeric_limits<double>::epsilon() );
+  int js1,js2;
+  x=_xyz->lcoor[2*ispvec[_xyz->isp]]-offset[0];  // Laser x  
+  y=_xyz->lcoor[2*ispvec[_xyz->isp]+1]-offset[1];  // Laser y                                                                                                                           
+  z=_xyz->ilaserLoc*_xyz->dX[2]-offset[2]; // Laser z                                                                                                                                            
+  for (int j=0;j<Ntot;++j){
+    j3 = floor(icellid[j]/(_xyz->nX[0]*_xyz->nX[1]));
+    j2 = floor( (icellid[j]- _xyz->nX[0]*_xyz->nX[1]*j3)/_xyz->nX[0]);
+    j1 = icellid[j] - _xyz->nX[0]*_xyz->nX[1]*j3 - _xyz->nX[0]*j2;
+    x0 = (double(j1)+.5)*(_xyz->dX[0]);
+    y0 = (double(j2)+.5)*(_xyz->dX[1]);
+    zp = (double(j3)+.5)*(_xyz->dX[2]);
+    if (zp>z){continue;}
+    //    if (zp < 90.0e-6){continue;}
+    xp=cos(_xyz->gth)*(x0-_xyz->LX[0]/2.) + sin(_xyz->gth)*(y0-_xyz->LX[1]/2.)+_xyz->LX[0]/2.;
+    yp=-sin(_xyz->gth)*(x0-_xyz->LX[0]/2.) + cos(_xyz->gth)*(y0-_xyz->LX[1]/2.)+_xyz->LX[1]/2.; 
+
+    std::vector<double> R = {xp, yp, zp};
+    std::vector<double> L = {x, y, z};
+    if (x0 > x+0.00020){continue;}
+
+    TempOut[j] = _ut->EASM_Temp_LG(L, R, TempOut[j]);
+    }//
+  // check if last simulation of scan
+  
+  double tmelt=_xyz->tL;
+  int n1=_part->ncellLoc,icheck,ichecktmp;
+  x=_xyz->lcoor2[2*ispvec[_xyz->isp]]-offset[0];
+  y=_xyz->lcoor2[2*ispvec[_xyz->isp]+1]-offset[1];
+  if (x<_xyz->gbox[0] || x>_xyz->gbox[1] || y<_xyz->gbox[2] || y>_xyz->gbox[3]){
+    ichecktmp=std::any_of(TempOut.begin(),TempOut.begin()+n1,[&tmelt]
+                          (double tchk){return tchk >= tmelt;});
+    MPI_Allreduce(&ichecktmp,&icheck,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
+    if (icheck==0 || fmod(_xyz->isp+1,_xyz->Nsd)==0){
+      _xyz->inewscanflg=1;
+    } // if (icheck==0...                                                                                                                                                                 
+    if (_xyz->isp==(_xyz->NpT-1)){
+      _xyz->inewscanflg=1;
+      _xyz->inewlayerflg=1;
+      _xyz->isp=0;
+      _xyz->indlayer+=1;
+    }
+  } // if (x<box[0...
+}
+  
+
 
 void TempField::AnalyticTempCurr(double tcurr,std::vector<double> & TempOut, std::vector<int> &icellid, int Ntot)
 {
