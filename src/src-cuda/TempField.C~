@@ -1,0 +1,146 @@
+// member functions for TempField
+
+#include "Grid.h"
+#include "TempField.h"
+#include "fstream"
+// #include "iostream"
+#include "math.h"
+#include "Partition.h"
+#include "BasePlate.h"
+#include "numeric"
+#include <algorithm>
+#include "mpi.h"
+
+// constructor
+TempField::TempField(Grid &g, Partition & part, BasePlate &bp)
+{
+  _xyz = &g;
+  _part = &part;
+  _bp = &bp;
+  tInd = 0;
+  bmV = _xyz->bmV;
+  patternID = _xyz->patternID;
+  T0 = _xyz->T0;
+  DelT = _xyz->bmDelT;
+  bmDX = {DelT*bmV,_xyz->bhatch,_xyz->layerT}; // (SD, TD, BD) per layer
+  offset=_xyz->offset;
+  ispvec.assign(_xyz->NpT,0);
+  if (patternID==1 || patternID==3){
+    std::iota(ispvec.begin(),ispvec.end(),0);
+  } // if (patternID==1...
+  if (patternID==2 || patternID==4){
+    int k;
+    for (int j=0;j<_xyz->Ntd;++j){
+      k=_xyz->Nsd*j;
+      if (fmod(j,2)==0){
+	std::iota(ispvec.begin()+k,ispvec.begin()+k+_xyz->Nsd,k);
+      } // if (fmod(j,2)==0...
+      else {
+	for (int j1=0;j1<_xyz->Nsd;++j1){
+	  ispvec[k+j1]=k+_xyz->Nsd-1-j1;
+	} // for (int j1=0...
+      } // else (fmod(j,2)==0...
+    } // for (int j=0...
+  } // if (patternID==2...
+} // end TempField
+
+void TempField::InitializeAnalytic()
+{
+  /*
+    This this 2 double ellipsoids (one encompassing another) to represent the temperature
+    field. This approach is used in Rogers_Madison_Tikare, Comp Mat Sci, 2017.
+    SCAN INFORMATION
+    patternID=0: scan in +X direction only
+    patternID=1: scan in alternating +/- X direction (same direction in
+		 layer above and below
+    patternID=2: scan in alternating +/- X direction (different direction 
+		 in layer above and below
+    patternID=3: scan in +X direction for layer i and +Y direction for 
+		 layer i+1 ...
+    patternID=4: scan in alternating +/- X direction for layer i and 
+		 alternating +/- Y direction for layer i+1
+   */
+  a1.resize(6);
+  Qp.resize(2);
+  a1[0] = _xyz->meltparam[0];
+  a1[1] = _xyz->meltparam[2];
+  a1[2] = _xyz->meltparam[3];
+  a1[3] = _xyz->meltparam[1];
+  a1[4] = a1[1];
+  a1[5] = a1[2];
+} // end InitializeAnalytic 
+
+void TempField::AnalyticTempCurr(double tcurr,std::vector<double> & TempOut, std::vector<int> &icellid, int Ntot)
+{
+  //computes temp field based on Schwalbach et al
+  int j1,j2,j3,iplay;
+  double x0,y0,x,y,z,dsq,dsq2,bx,by,xi,xp,yp,dirp,zp;
+  std::vector<double> rij1(3),xs1(3),xs2(3);
+  iplay=_xyz->nX[0]*_xyz->nX[1]*_xyz->ilaserLoc;
+  TempOut.assign(Ntot,T0);
+  xi = _xyz->tL*(1+std::numeric_limits<double>::epsilon() );
+  int js1, js2;
+  std::vector<double> a1m(6);
+  for (int j=0;j<6;++j){a1m[j]=a1[j];}
+  // x,y,z spatial location of source (in grid reference frame)
+    x=_xyz->lcoor[2*ispvec[_xyz->isp]]-offset[0];
+  y=_xyz->lcoor[2*ispvec[_xyz->isp]+1]-offset[1];
+  z=_xyz->ilaserLoc*_xyz->dX[2]-offset[2];
+  for (int j=0;j<Ntot;++j){
+    j3 = floor(icellid[j]/(_xyz->nX[0]*_xyz->nX[1]));
+    j2 = floor( (icellid[j]- _xyz->nX[0]*_xyz->nX[1]*j3)/_xyz->nX[0]);
+    j1 = icellid[j] - _xyz->nX[0]*_xyz->nX[1]*j3 - _xyz->nX[0]*j2;
+    x0 = (double(j1)+.5)*(_xyz->dX[0]);
+    y0 = (double(j2)+.5)*(_xyz->dX[1]);
+    zp = (double(j3)+.5)*(_xyz->dX[2]);
+    if (zp>z){continue;}
+    xp=cos(_xyz->gth)*(x0-_xyz->LX[0]/2.)+
+      sin(_xyz->gth)*(y0-_xyz->LX[1]/2.)+_xyz->LX[0]/2.;
+    yp=-sin(_xyz->gth)*(x0-_xyz->LX[0]/2.) + 
+      cos(_xyz->gth)*(y0-_xyz->LX[1]/2.)+_xyz->LX[1]/2.;
+    if (fmod(_xyz->isp,_xyz->Nsd)==0){
+      dirp=(_xyz->lcoor[2*ispvec[_xyz->isp+1]]-_xyz->lcoor[2*ispvec[_xyz->isp]]);
+    } else {
+      dirp=(_xyz->lcoor[2*ispvec[_xyz->isp]]-_xyz->lcoor[2*ispvec[_xyz->isp-1]]);
+    }
+    rij1[0] = xp-x;
+    rij1[1] = yp-y;
+    rij1[2] = zp-z;
+    if (dirp*rij1[0]>0){ 
+      //xp,yp is in front of laser
+      dsq = pow(rij1[1]/a1m[1],2.0)+pow(rij1[2]/a1m[2],2.0);
+      if (dsq<1.0 && (fabs(rij1[0])<bmDX[0]) ){
+	TempOut[j]=xi;
+      } else {
+	TempOut[j] = _xyz->tS;
+      }
+    } else {
+      dsq = pow(rij1[0]/a1m[3],2.0)+pow(rij1[1]/a1m[4],2.0)+pow(rij1[2]/a1m[5],2.0);
+      if (dsq<1.0){
+	TempOut[j]=xi;
+      } else {
+	TempOut[j] = _xyz->tS;
+      }
+    } // if (dirp*rij1[0]>0...
+  } // for (int j=0...
+  // check if last simulation of scan
+  double tmelt=_xyz->tL;
+  int n1=_part->ncellLoc,icheck,ichecktmp;
+  x=_xyz->lcoor2[2*ispvec[_xyz->isp]]-offset[0];
+  y=_xyz->lcoor2[2*ispvec[_xyz->isp]+1]-offset[1];
+  if (x<_xyz->gbox[0] || x>_xyz->gbox[1] || y<_xyz->gbox[2] || y>_xyz->gbox[3]){
+    ichecktmp=std::any_of(TempOut.begin(),TempOut.begin()+n1,[&tmelt]
+			  (double tchk){return tchk >= tmelt;});
+    MPI_Allreduce(&ichecktmp,&icheck,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
+    if (icheck==0 || fmod(_xyz->isp+1,_xyz->Nsd)==0){ 
+      _xyz->inewscanflg=1;
+    } // if (icheck==0...
+    if (_xyz->isp==(_xyz->NpT-1)){
+      _xyz->inewscanflg=1;
+      _xyz->inewlayerflg=1;
+      _xyz->isp=0;
+      _xyz->indlayer+=1;
+    }
+  } // if (x<box[0...
+} // end AnalyticTempCurr()            
+

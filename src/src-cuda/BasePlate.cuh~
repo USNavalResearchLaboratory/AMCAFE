@@ -1,0 +1,26 @@
+// grid class that contains dx,dy,Nx,Ny
+
+#ifndef BASEPLATE_CUH
+#define BASEPLATE_CUH
+
+#include "vector"
+#include "Grid.cuh"
+#include <random>
+//#include <math.h>
+
+class BasePlate
+{
+ public:
+  // default constructor: 
+  BasePlate(const Grid &g);
+  void GenerateVoxel();
+  double height;  // height_of_base_plate
+  double mu; // rate of Poisson process for determining # of grains
+  int Ngrain,Nzh;
+  std::vector<int> X;
+ private:
+  std::default_random_engine generator;
+  unsigned seed; // random number generator seed
+}; // end class BasePlate
+
+#endif
