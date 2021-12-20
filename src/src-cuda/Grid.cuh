@@ -9,7 +9,7 @@ class Grid
 {
  public:
   // default constructor
-  Grid(std::string & filIn, int & myid, int & nprocs);  
+  Grid(std::string & filIn);  
   // any functions added here
   void readInputFile(std::string &filInput);
   void UpdateTime(const double &velo);
@@ -39,9 +39,9 @@ class Grid
       } // for (int i2...
     } // for (int i3...
   } // end inline Compute...
-  double time,dX[3],meltparam[4],beamSTD[3],lX[3],offset[3],gsize[2],gth,gth0,*lcoor,*lcoor2,gbox[4], &
+  double time,dX[3],meltparam[4],beamSTD[3],lX[3],offset[3],gsize[2],gth,gth0,*lcoor,*lcoor2,gbox[4],
     Avel,nvel,bmDelT;
-  int nDim,tInd,nnodePerCell,ictrl,nZlayer,patternID,outint,myid,nprocs,outNL,nTsd,Nsd,Ntd,NpT,
+  int nDim,tInd,nnodePerCell,ictrl,nZlayer,patternID,outint,outNL,nTsd,Nsd,Ntd,NpT,
     inewscanflg,inewlayerflg,isp,indlayer,ilaserLoc,Nzhg,nX[3],ntype;
   double bmV,bmP,bhatch; // beam velocity,power, hatch spacing, nucleation rate
   double tL,tS,T0; // liquidus, solidus, room temp (K)
@@ -50,6 +50,7 @@ class Grid
   double mu; // rate for Voronoi tessellation for baseplate
   double bpH; // base plate height
   double lrate; // layer rate for Voronoi powder microstructure 
+  bool bcheck=0;
 }; // end class Grid
 
 #endif

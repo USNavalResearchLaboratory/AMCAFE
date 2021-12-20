@@ -6,6 +6,7 @@
 #include "BasePlate.cuh"
 #include "vector"
 #include "string"
+
 // #include <math.h>
 
 
@@ -13,7 +14,7 @@ class VoxelsCA
 {
  public:
   VoxelsCA(Grid &);
-  void WriteToHDF1(const std::string &filname);
+  void WriteToHDF1(const std::string &filname, const Grid &, const double *);
   inline void loadS(std::vector<std::vector<double>>&S,std::vector<std::vector<int>> &sInd)
   {
     // this is for decentered octahedron method: 
@@ -66,11 +67,9 @@ class VoxelsCA
     rRot[2][1] = ax[2]*ax[1]*(1-cos(omega)) + ax[0]*sin(omega);
     rRot[2][2] = cos(omega) + pow(ax[2],2.0)*(1-cos(omega));
   } // end inline void loadRotMat
-  std::vector<int> gID,gNucleus,ineighID,ineighptr;
-  std::vector<int> vState; // 0=uninitialized; 1=liquid; 2=mushy; 3=solid
-  std::vector<double> cTheta,extents,centroidOct;
+  int *gID,*ineighID,*ineighptr,*vState;
+  double *cTheta,*extents,*centroidOct;
   double vmax;
   int nGrain,seed0,seed1,NzhBP;
-  std::default_random_engine genlayer;
 }; // end class VoxelCA
 #endif

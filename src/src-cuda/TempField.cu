@@ -22,14 +22,14 @@ TempField::TempField(const Grid &g)
   offset[2]=g.offset[2];
   ispvec = (int*)malloc(g.NpT*sizeof(int));
   if (patternID==1 || patternID==3){
-    std::iota(ispvec.begin(),ispvec.end(),0);
+    std::iota(ispvec,ispvec+g.NpT,0);
   } // if (patternID==1...
   if (patternID==2 || patternID==4){
     int k;
     for (int j=0;j<g.Ntd;++j){
       k=g.Nsd*j;
       if (fmod(j,2)==0){
-	std::iota(ispvec.begin()+k,ispvec.begin()+k+g.Nsd,k);
+	std::iota(ispvec+k,ispvec+k+g.Nsd,k);
       } // if (fmod(j,2)==0...
       else {
 	for (int j1=0;j1<g.Nsd;++j1){
@@ -38,6 +38,8 @@ TempField::TempField(const Grid &g)
       } // else (fmod(j,2)==0...
     } // for (int j=0...
   } // if (patternID==2...
+  int Ntot = g.nX[0]*g.nX[1]*g.nX[2];
+  TempCurr = (double*)malloc(Ntot*sizeof(double));
 } // end TempField
 
 void TempField::InitializeAnalytic(const Grid &g)

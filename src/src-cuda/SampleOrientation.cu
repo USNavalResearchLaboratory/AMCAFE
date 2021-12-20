@@ -1,6 +1,6 @@
 // member function definitions for Grid.C
 
-#include "SampleOrientation.h"
+#include "SampleOrientation.cuh"
 #include "random"
 #include <numeric>
 #include <algorithm>
@@ -9,7 +9,7 @@
 #include <math_constants.h>
 
 
-__device__ inline void GetPermutation(const double *xyz, double *P)
+__device__ void GetPermutation(const double *xyz, int *P)
 {
   double x,y,z;
   x= xyz[0];
@@ -18,26 +18,26 @@ __device__ inline void GetPermutation(const double *xyz, double *P)
   // the 6 if statements refer to the 6 pyramids in rosca2014new 
   // (in AM literature folder). Order is C1,C2,C3,C4,C5,C6
   if ( (fabs(x) <= z) && (fabs(y) <= z) ){ 
-    P = {1,2,3};
+    P[0]= 1; P[1]= 2; P[2]= 3;
   }
   if ( (z <= -fabs(x)) && (z<= -fabs(y)) ){ 
-    P = {-1,2,-3};
+    P[0]= -1; P[1]= 2; P[2]= -3;
   }
   if ( (fabs(x)<=y) && (fabs(z)<=y)){
-    P = {1,-3,2};
+    P[0]= 1; P[1]= -3; P[2]= 2;
   }
   if ( (y<=-fabs(x)) && (y<= -fabs(z))){
-    P = {1,3,-2};
+    P[0]= 1; P[1]= 3; P[2]= -2;
   }
   if ( (fabs(z)<x) && (fabs(y)<= x)){
-    P = {-3,2,1};
+    P[0]= -3; P[1]= 2; P[2]= 1;
   }
   if ((x<=-fabs(z)) && (x<=-fabs(y)) ){
-    P = {3,2,-1};
+    P[0]= 3; P[1]= 2; P[2]= -1;
   }
 } // end GetPermutation
 
-__device__ inline void ComputeMap1(const double &a, const double& aprime, const double *xyz, double *map1)
+__device__ void ComputeMap1(const double &a, const double& aprime, const double *xyz, double *map1)
 {
  
   map1[0] = a/aprime*xyz[0];
@@ -45,7 +45,7 @@ __device__ inline void ComputeMap1(const double &a, const double& aprime, const 
   map1[2] = a/aprime*xyz[2];
 } // end ComputeMap1
 
-__device__ inline void ComputeMap2(const double &beta,const double *xyz, double *map2)
+__device__ void ComputeMap2(const double &beta,const double *xyz, double *map2)
 {
   double x,y,z,Tcurv1,Tcurv2;
   x=xyz[0];
@@ -76,7 +76,7 @@ __device__ inline void ComputeMap2(const double &beta,const double *xyz, double 
   map2[0] = Tcurv1; map2[1] = Tcurv2; map2[2] = z;
 } // end ComputeMap2
 
-__device__ inline void ComputeMap3(const double *xyz, double *map3)
+__device__ void ComputeMap3(const double *xyz, double *map3)
 {
   double x,y,z,m1,m2,m3;
   x=xyz[0];
@@ -92,7 +92,7 @@ __device__ inline void ComputeMap3(const double *xyz, double *map3)
   }
 } // end ComputeMap3
 
-__device__ inline void ComputeMeasure(const double &t,double & f)
+__device__  void ComputeMeasure(const double &t,double & f)
 {
   float r=1.;
   if ( fabs((fabs(t)-1.0)) <1e-10){
@@ -110,28 +110,23 @@ __device__ inline void ComputeMeasure(const double &t,double & f)
 
 __device__ void GenerateSamples(const int Nsample,unsigned int seedL, int subsq, curandState_t &s1, double *axisAngle)
 {
-
-  
-
-  double a,rhoP,dx,t,omega,fmeas,tnorm,pmax,coeffA[7],beta,aprime,
+  double a,rhoP,t,omega,tnorm,pmax,coeffA[7],beta,aprime,
     xyz0[3],xyz[3],xyz2[3],xyzb[3],map1[3],map2[3],map3[3];
   float r=1.;
   double R1 = pow(3.0*CUDART_PI/4.0,1.0/3.0)*r;
-  int Ngrid = 100, Perm[]={1,2,3},stride;
-  stride = blockDimx.x*gridDim.x;
+  int Perm[]={1,2,3};
   a  = pow(2.0*CUDART_PI/3.0,1.0/2.0)*R1;
   aprime = pow(4.0*CUDART_PI/3.0,1.0/3.0)*R1;
-  coeffA = {-0.500009615, -0.024866061,-0.004549382,0.000511867,
-	    -0.001650083, 0.000759335,-0.000204042};
+  coeffA[0]= -0.500009615; coeffA[1]= -0.024866061; coeffA[2]= -0.004549382;
+  coeffA[3]= 0.000511867; coeffA[4]= -0.001650083; coeffA[5]=  0.000759335; coeffA[6]= -0.000204042;
   beta = pow(CUDART_PI/6.0,1.0/2.0);
-  dx = aprime/2.0/Ngrid;
-  curand_init(seedL,subsq,0,s1);
+  curand_init(seedL,subsq,0,&s1);
 
 
-  for (int jn=gid;jn<Nsample;jn+=stride){
-    xyz0[0]= curand_uniform(s1)-.5;
-    xyz0[1]= curand_uniform(s1)-.5;
-    xyz0[2]= curand_uniform(s1)-.5;
+  for (int jn=0;jn<Nsample;++jn){
+    xyz0[0]= curand_uniform(&s1)-.5;
+    xyz0[1]= curand_uniform(&s1)-.5;
+    xyz0[2]= curand_uniform(&s1)-.5;
     xyz[0] = aprime*xyz0[0];
     xyz[1] = aprime*xyz0[1];
     xyz[2] = aprime*xyz0[2];
@@ -140,7 +135,7 @@ __device__ void GenerateSamples(const int Nsample,unsigned int seedL, int subsq,
     xyz2[1] = Perm[1]/abs(Perm[1])*xyz[abs(Perm[1])-1];
     xyz2[2] = Perm[2]/abs(Perm[2])*xyz[abs(Perm[2])-1];
     // line below is equivalent to ComputeMap1
-    ComputeMap1(a,aprime,xyz2,map1)
+    ComputeMap1(a,aprime,xyz2,map1);
     ComputeMap2(beta,map1,map2);
     ComputeMap3(map2,map3);
     xyzb[abs(Perm[0])-1] = Perm[0]/abs(Perm[0])*map3[0];
@@ -151,7 +146,6 @@ __device__ void GenerateSamples(const int Nsample,unsigned int seedL, int subsq,
     t = 1;
     for (int j=1;j<8;++j){t+=coeffA[j-1]*pow(rhoP,2.0*j);}
     omega = 2.0*acos(t);    
-    // dont think fmeas always produces normalized axis
     //t=pow(xyzb[0],2.0)+pow(xyzb[1],2.0)+pow(xyzb[2],2.0);
     tnorm = pow(pow(xyzb[0],2.0)+pow(xyzb[1],2.0)+pow(xyzb[2],2.0),.5);
     axisAngle[4*jn] = omega;

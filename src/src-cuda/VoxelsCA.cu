@@ -16,9 +16,7 @@
 // constructor
 VoxelsCA::VoxelsCA(Grid &g)
 { 
-  _xyz = &g;
   int Ntot = g.nX[0]*g.nX[1]*g.nX[2];
-  int Ntot1 = _part->ncellLoc;
   gID = (int*)malloc(Ntot*sizeof(int));
   vState = (int*)malloc(Ntot*sizeof(int));
   extents = (double*)malloc(Ntot*sizeof(double));
@@ -30,8 +28,11 @@ VoxelsCA::VoxelsCA(Grid &g)
   seed0= 2132512;
   seed1=2912351;
   // establishes ineighID and ineighptr for convertSolid1 
+  /*
   int cc=0;
   std::vector<int> neigh;
+
+  
   ineighptr.assign(Ntot1+1,0);
   for (int j=0; j < Ntot1;++j){
     g.ComputeNeighborhood(_part->icellidLoc[j],g.neighOrder,neigh);
@@ -48,16 +49,16 @@ VoxelsCA::VoxelsCA(Grid &g)
       cc+=1;
     }
   }
-
+  */
 } // end constructor
 
-void VoxelsCA::WriteToHDF1(const std::string &filename)
+void VoxelsCA::WriteToHDF1(const std::string &filename, const Grid &g, const double *tempcurr)
 {
   // writes gID, vState, cTheta per voxel
-  int Ntot=_part->ncellLoc, i1,i2,i3,icase;
+  int Ntot = g.nX[0]*g.nX[1]*g.nX[2],icase;
   std::string hdf5Filename = filename + ".h5";
   std::vector< float> TempOut(Ntot,0),IPFmapBD(3*Ntot,0), IPFmapx(3*Ntot,0), IPFmapy(3*Ntot,0),cth(4*nGrain,0);
-  double vBD[3]={0.0,0.0,1.0},omega,ax[3],vCD[3],mxAng,blue,green,red,rRot[3][3],mscale,
+  double vBD[3]={0.0,0.0,1.0},omega,ax[3],vCD[3],rRot[3][3],
     vX[3]={1.0,0.0,0.0},vY[3]={0.0,1.0,0.0},xp,yp,x0,y0,m,a,b,c,H,S,V,sMax,ff,p,q,t;
   std::vector<std::vector<double>> triPts(2,std::vector<double>(3,0));
   triPts[0][0]=0.0;
@@ -74,7 +75,7 @@ void VoxelsCA::WriteToHDF1(const std::string &filename)
   x0=y0/m;
   sMax=pow(pow(x0,2.)+pow(y0,2.),.5);
   for (int j=0;j<Ntot;++j){
-    TempOut[j] = _temp->TempCurr[j];
+    TempOut[j] = tempcurr[j];
     if (gID[j]<1){
       IPFmapBD[3*j] = 0.0;
       IPFmapBD[3*j+1] = 0.0;
@@ -274,8 +275,8 @@ void VoxelsCA::WriteToHDF1(const std::string &filename)
   unsigned int nVoxT, js,jc,ncth;
   nVoxT = g.nX[0]*g.nX[1]*g.nX[2];
   ncth=4*nGrain;
-  js = _part->icellidLoc[0];
-  jc = _part->icellidLoc[Ntot-1]-js + 1;
+  js = 0;
+  jc = nVoxT;
   std::vector<float> dX(g.dX,g.dX+3);
   adios2::ADIOS adios;
   adios2::IO hdf5IO = adios.DeclareIO("HDFFileIO");
@@ -301,10 +302,10 @@ void VoxelsCA::WriteToHDF1(const std::string &filename)
 	      "angleAxis", {ncth}, {0}, {ncth});
   adios2::Engine hdf5Writer =
       hdf5IO.Open(hdf5Filename, adios2::Mode::Write);
-  hdf5Writer.Put<int>(dimsa, _xyz->nX.data());
+  hdf5Writer.Put<int>(dimsa, g.nX);
   hdf5Writer.Put<float>(dxa, dX.data());
-  hdf5Writer.Put<int>(gida, gID.data());
-  hdf5Writer.Put<int>(vStatea, vState.data());
+  hdf5Writer.Put<int>(gida, gID);
+  hdf5Writer.Put<int>(vStatea, vState);
   hdf5Writer.Put<float>(TempOuta, TempOut.data());
   hdf5Writer.Put<float>(IPFmapBDa, IPFmapBD.data());
   hdf5Writer.Put<float>(IPFmapxa, IPFmapx.data());

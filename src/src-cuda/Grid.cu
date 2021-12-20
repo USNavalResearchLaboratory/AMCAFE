@@ -16,8 +16,7 @@ Grid::Grid(std::string &filInput)
   // initialize default settings which will change if specified input file
   time =0.0;
   tInd =0;
-  dt=0;
-  nX[0]128;nX[1]=128;nX[2]=64;
+  nX[0]=128; nX[1]=128; nX[2]=64;
   dX[0]=1e-6; dX[1]=1e-6;dX[2]=1e-6;
   nDim = 3;
   outint = 1;
@@ -32,7 +31,7 @@ Grid::Grid(std::string &filInput)
   mu = .01; // note that this is rate/ (\mu m)^3 for base plate tessellation
   T0 = 300;
   ictrl = 3;
-  gsize[0]; gsize[1]=0;
+  gsize[0]=0; gsize[1]=0;
   meltparam[0]=75e-6; meltparam[1]=162.75e-6;meltparam[2]=75e-6; meltparam[4]=75e-6;
   bhatch = 1.53*meltparam[2];
   bmDelT = 4.0/3.0*meltparam[0]/bmV;
@@ -110,8 +109,8 @@ void Grid::UpdateLaser(){
 	isp=0;
 	// update grid 
 	double gmid[2];
-	gmid[0]=LX[0]/2.;
-	gmid[1]=LX[1]/2.;
+	gmid[0]=lX[0]/2.;
+	gmid[1]=lX[1]/2.;
 	int k;
 	gth+=gth0;
 	for (int j2=0;j2<Ntd;++j2){
@@ -133,28 +132,26 @@ void Grid::readInputFile(std::string &filInput)
   std::ifstream filIn;
   std::string inputData,keyword;
   int k=0,n=0;
-  if (myid==0){
-    filIn.open(filInput.c_str());
-    while (!filIn.eof()){
-      char c;
-      filIn.get(c);
-      if (c == '#') {
-        // skip comments indicated by "#" in input file
-	while (filIn && c != '\n') {
-          filIn.get(c);
-        }
+  filIn.open(filInput.c_str());
+  while (!filIn.eof()){
+    char c;
+    filIn.get(c);
+    if (c == '#') {
+      // skip comments indicated by "#" in input file
+      while (filIn && c != '\n') {
+	filIn.get(c);
       }
-      if (k >= n) {
-        n = 2*n;
-        const int m = 10000;
-        if (n < m) n = m;
-        inputData.resize(n);
-      }
-      inputData[k++] = c;
     }
-    filIn.close();
-    inputData.resize(k);
+    if (k >= n) {
+      n = 2*n;
+      const int m = 10000;
+      if (n < m) n = m;
+      inputData.resize(n);
+    }
+    inputData[k++] = c;
   }
+  filIn.close();
+  inputData.resize(k);  
   std::istringstream simInput(inputData);
   simInput >> keyword;
   while(simInput){
