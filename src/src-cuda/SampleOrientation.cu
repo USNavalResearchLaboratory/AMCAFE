@@ -121,8 +121,6 @@ __device__ void GenerateSamples(const int Nsample,unsigned int seedL, int subsq,
   coeffA[3]= 0.000511867; coeffA[4]= -0.001650083; coeffA[5]=  0.000759335; coeffA[6]= -0.000204042;
   beta = pow(CUDART_PI/6.0,1.0/2.0);
   curand_init(seedL,subsq,0,&s1);
-
-
   for (int jn=0;jn<Nsample;++jn){
     xyz0[0]= curand_uniform(&s1)-.5;
     xyz0[1]= curand_uniform(&s1)-.5;

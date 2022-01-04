@@ -5,6 +5,7 @@
 #include "iostream"
 #include <math.h>
 #include <vector>
+#include <curand_kernel.h>
 class Grid
 {
  public:
@@ -51,6 +52,7 @@ class Grid
   double bpH; // base plate height
   double lrate; // layer rate for Voronoi powder microstructure 
   bool bcheck=0;
+  curandState_t s1;
 }; // end class Grid
 
 #endif

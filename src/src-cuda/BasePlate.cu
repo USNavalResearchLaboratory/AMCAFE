@@ -48,18 +48,16 @@ __global__ void createBasePlateGrains(VoxelsCA *vx, int *gD, int *vs,
   } // whil (js < Ntot
 }
 
-__global__ void createBasePlateOrientations(VoxelsCA *vx, double *cTheta)
+__global__ void createBasePlateOrientations(VoxelsCA *vx, double *cTheta,Grid *gg)
 {
   int tid = threadIdx.x + blockIdx.x*blockDim.x,ng=vx->nGrain, 
     nsamp=1,subsq=0,jc,stride=blockDim.x*gridDim.x;
 
-
-  curandState_t s1;
   unsigned int seedL = vx->seed0 + tid*1000;
   double axAng[4];
   jc=tid;
   while (jc<ng){
-    GenerateSamples(nsamp,seedL,subsq,s1, axAng);
+    GenerateSamples(nsamp,seedL,subsq,gg->s1, axAng);
     cTheta[4*jc]=axAng[0];
     cTheta[4*jc+1]=axAng[1];
     cTheta[4*jc+2]=axAng[2];

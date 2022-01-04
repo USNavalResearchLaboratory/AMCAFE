@@ -6,6 +6,7 @@
 #include "BasePlate.cuh"
 #include "vector"
 #include "string"
+#include <random>
 
 // #include <math.h>
 
@@ -67,9 +68,35 @@ class VoxelsCA
     rRot[2][1] = ax[2]*ax[1]*(1-cos(omega)) + ax[0]*sin(omega);
     rRot[2][2] = cos(omega) + pow(ax[2],2.0)*(1-cos(omega));
   } // end inline void loadRotMat
+  inline void getNumPowderGrains(const Grid &g,int &numPG)
+  {
+    double rate = g.lrate* (g.dX[0]*1e6)*(g.dX[1]*1e6)*
+      g.nX[0]*g.nX[1]* (g.layerT*1e6);
+    std::poisson_distribution<int> ng(rate);
+    numPG =0;
+    while (numPG == 0){numPG = ng(genlayer);} // end while
+  } // end getNumPowderGrains
   int *gID,*ineighID,*ineighptr,*vState;
   double *cTheta,*extents,*centroidOct;
   double vmax;
   int nGrain,seed0,seed1,NzhBP;
+  std::default_random_engine genlayer;
 }; // end class VoxelCA
+
+
+__global__ void addlayer1part1(Grid *g,VoxelsCA *vx,double *xs, double *troids,
+                          int *gD, int *vs, int *itmp, int numPG);
+
+__global__ void addlayer1part2(Grid *g,VoxelsCA *vx, double *cTheta,
+                          int *gD, int *itmp, int numPG);
+
+__global__ void addlayer1part3(const Grid *g,int *gD, int *vs);
+
+__global__ void copyGlobal(double *x1,double *x0, int n);
+
+__global__ void getSites(Grid *g,VoxelsCA *vx,double *xs, int numPG);
+
+void resizeGlobalArray(double **y, int &n0, int &n1);
+void resizeArray(double **y, int &n);
+
 #endif

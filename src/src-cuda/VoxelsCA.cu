@@ -12,6 +12,173 @@
 #include "SampleOrientation.cuh"
 #include <chrono>
 #include <adios2.h>
+#include <curand_kernel.h>
+
+static void HandleError(cudaError_t err) {
+    if (err != cudaSuccess) {
+        printf("%s \n", cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+}
+
+__global__ void getSites(Grid *g,VoxelsCA *vx,double *xs, int numPG)
+{
+// calculates sites for Voronoi (done in own global function to avoid 
+// inter-block race condition)
+  int tid=threadIdx.x+blockDim.x*blockIdx.x, subsq=0,iz1,js,
+    stride=blockDim.x*gridDim.x;
+  unsigned int seedL = (vx->seed0+tid*100+g->tInd*10) % 4294967295;
+  curandState_t s1;
+  curand_init(seedL,subsq,0,&s1);
+  double Lx=g->nX[0]*g->dX[0], Ly=g->nX[1]*g->dX[1],
+    lt=g->layerT,zloc0;
+  iz1 = g->ilaserLoc - g->nZlayer;
+  zloc0 = iz1*g->dX[0];
+  js=tid;
+  while (js <numPG){
+    xs[3*js]= curand_uniform(&s1)*Lx;
+    xs[3*js+1]= curand_uniform(&s1)*Ly;
+    xs[3*js+2]= curand_uniform(&s1)*lt+zloc0;
+    js+=stride;
+  }
+}
+__global__ void addlayer1part1(Grid *g,VoxelsCA *vx,double *xs, double *troids,
+			  int *gD, int *vs, int *itmp, int numPG)
+{
+  int tid=threadIdx.x+blockDim.x*blockIdx.x,iz1,js,
+    stride=blockDim.x*gridDim.x,j1,j2,j3,nX1=g->nX[0],
+    iz2=g->ilaserLoc,i3=g->nX[0]*g->nX[1],i2,ng1=vx->nGrain;
+  double dx=g->dX[0],dsqc,dsq,xc,yc,zc;
+  iz1 = g->ilaserLoc - g->nZlayer;
+  js=tid+i3*iz1;
+
+
+if (tid==0){for (int j=0;j<numPG;++j){printf("%10.7f,%10.7f,%10.7f\n",xs[3*j],xs[3*j+1],xs[3*j+2]);}}
+
+
+  while (js < i3*iz2){
+    j3 = js/i3; // note that int/int is equivalent to floor                                                                         
+    j2 = (js - i3*j3)/(nX1);
+    j1 = js - i3*j3 - nX1*j2;
+    zc = (j3+.5)*dx;;
+    yc = (j2+.5)*dx;
+    xc = (j1+.5)*dx;
+    dsqc=1e6;
+    for (int jz=0;jz<numPG;++jz){
+      dsq = pow(xc - xs[3*jz],2.)+pow(yc-xs[3*jz+1],2.)+pow(zc-xs[3*jz+2],2.);
+      if (dsq<dsqc){i2=jz; dsqc=dsq;}
+    } // for (int jz
+    gD[js] = i2+1+ng1;
+    itmp[i2]=1;
+    vs[js] = 3;
+    troids[3*js] = xc;
+    troids[3*js+1] = yc;
+    troids[3*js+2] = zc;
+    js+=stride;
+  } // while (js < i3*...
+} // end addlayer1part1
+
+__global__ void addlayer1part2(Grid *g,VoxelsCA *vx, double *cTheta,
+			  int *gD, int *itmp, int numPG)
+{
+
+  // !!***************************************************
+  // FUNCTION CAN ONLY RUN WITH 1 BLOCK. OTHERWISE, BUG
+  // !!***************************************************
+
+  int tid=threadIdx.x+blockDim.x*blockIdx.x, subsq=0,iz1,js,
+    stride=blockDim.x*gridDim.x,ng1=vx->nGrain;
+  unsigned int seedL = (vx->seed0+tid*100+g->tInd*10) % 4294967295;
+  curandState_t s1;
+  curand_init(seedL,subsq,0,&s1);
+  double lt=g->layerT;
+  iz1 = g->ilaserLoc - g->nZlayer;
+  int i3=g->nX[0]*g->nX[1],i2,i1;
+  // ensures a continuous numbering of grain ids
+  __shared__ int i2s;
+  if (tid==0){
+    i2=0;
+    for (int j=0;j<numPG;++j){
+      if (itmp[j]==1){
+	itmp[j]=i2;
+	i2+=1;
+      }
+    }
+    i2s=i2;
+    vx->nGrain += i2+1;
+  } // if (tid==0
+  __syncthreads();
+  if (i2s != numPG){
+    js=tid+i3*iz1;
+    while (js < i3*(lt+iz1)){
+      i1=gD[js]-1;
+      gD[js]=itmp[i1]+1+ng1;
+      js+=stride;
+    }
+  }
+  // randomly generate crystallographic orientations 
+  double axAng[4];
+  i2s+=1;
+  js=tid;
+  while (js<i2s){
+    GenerateSamples(1,seedL,subsq,s1, axAng);
+    cTheta[4*(js+ng1)]=axAng[0];
+    cTheta[4*(js+ng1)+1]=axAng[1];
+    cTheta[4*(js+ng1)+2]=axAng[2];
+    cTheta[4*(js+ng1)+3]=axAng[3];
+    js+=stride;
+  }
+} // __global__ void addlayer1part2
+
+__global__ void addlayer1part3(const Grid *g,int *gD, int *vs) 
+{
+  int tid=threadIdx.x+blockDim.x*blockIdx.x,js,i1,ntot,stride;
+  stride=blockDim.x*gridDim.x;
+  i1=g->nX[0]*g->nX[1]*g->ilaserLoc;
+  js=tid+i1;
+  ntot=g->nX[0]*g->nX[1]*g->nX[2];
+  while (js<ntot){
+    vs[js]=0;
+    gD[js]=0;
+    js+=stride;
+  }
+} // __global__ void addlayer1par3
+
+
+__global__ void copyGlobal(double *x1,double *x0, int n)
+{
+  int tid=threadIdx.x + blockDim.x*blockIdx.x,js,stride;
+  js=tid;
+  stride=blockDim.x*gridDim.x;
+  while (js < n){
+    x1[js] = x0[js];
+    js +=stride;
+  }
+}
+
+void resizeGlobalArray(double **y, int &n0, int &n1)
+{
+  double *d_ctmp;
+  HandleError(cudaMallocManaged((void**)&d_ctmp,n0*sizeof(double)));
+  int nThreads=512;
+  int nBlocks=n0/nThreads;
+  copyGlobal<<<nBlocks,nThreads>>>(d_ctmp,*y, n0);
+  cudaFree(*y);
+  HandleError(cudaMallocManaged((void**)y,n1*sizeof(double)));
+  copyGlobal<<<nBlocks,nThreads>>>(*y,d_ctmp, n0);
+  cudaFree(d_ctmp);
+}
+
+void resizeArray(double **y, int &n)
+{
+  double *tmp;
+  tmp=(double*)malloc(n*sizeof(double));
+  free(*y);
+  *y=tmp;
+  tmp=NULL;
+  free(tmp);
+
+}
 
 // constructor
 VoxelsCA::VoxelsCA(Grid &g)
@@ -27,6 +194,8 @@ VoxelsCA::VoxelsCA(Grid &g)
   memset(centroidOct,0,3*Ntot*sizeof(double));
   seed0= 2132512;
   seed1=2912351;
+  genlayer.seed(seed1);
+
   // establishes ineighID and ineighptr for convertSolid1 
   /*
   int cc=0;

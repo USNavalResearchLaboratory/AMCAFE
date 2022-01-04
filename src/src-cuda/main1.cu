@@ -1,4 +1,5 @@
 
+
 #include "Grid.cuh"
 #include "VoxelsCA.cuh"
 #include "BasePlate.cuh"
@@ -11,12 +12,20 @@
 #include <algorithm>
 #include "fstream"
 
-static void HandleError(cudaError_t err) {
+
+
+static void HandleError( cudaError_t err,
+                         const char *file,
+                         int line ) {
     if (err != cudaSuccess) {
-        printf("%s \n", cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
+        printf( "%s in %s at line %d\n", cudaGetErrorString( err ),
+                file, line );
+        exit( EXIT_FAILURE );
     }
 }
+
+#define HandleError( err ) (HandleError( err, __FILE__, __LINE__ ))
+
 
 int main(int argc, char *argv[])
 {
@@ -25,7 +34,7 @@ int main(int argc, char *argv[])
   // set up all pointers for arrays in class
   double *d_lcoor,*d_lcoor2;
   // voxels
-  int *d_gID,*d_ineighID,*d_neighptr,*d_vState,nBlocks,nThreads;
+  int *d_gID,*d_ineighID,*d_neighptr,*d_vState,*d_itmp,nBlocks,nThreads;
   double *d_cTheta,*d_extents,*d_centroidOct;
   // tempfield
   double *d_Temp,*d_ispvec;
@@ -48,13 +57,13 @@ int main(int argc, char *argv[])
   HandleError(cudaMemcpy(d_TempF, &TempF, sizeof(TempField), cudaMemcpyHostToDevice));
   HandleError(cudaMallocManaged((void**)&d_ispvec,g.NpT*sizeof(int)));
   HandleError(cudaMemcpy(d_ispvec,(TempF.ispvec), g.NpT*sizeof(int), cudaMemcpyHostToDevice));
-  std::vector<double> bpSites;
-  GenerateGrainSites(g,bpSites);
+  std::vector<double> Sites;
+  GenerateGrainSites(g,Sites);
   VoxelsCA vox(g);
-  vox.nGrain = bpSites.size()/3;
-  double *d_bpSites;
-  HandleError(cudaMallocManaged((void**)&d_bpSites,vox.nGrain*3*sizeof(double)));
-  HandleError(cudaMemcpy(d_bpSites,bpSites.data(), vox.nGrain*3*sizeof(double), cudaMemcpyHostToDevice));
+  vox.nGrain = Sites.size()/3;
+  double *d_Sites;
+  HandleError(cudaMallocManaged((void**)&d_Sites,vox.nGrain*3*sizeof(double)));
+  HandleError(cudaMemcpy(d_Sites,Sites.data(), vox.nGrain*3*sizeof(double), cudaMemcpyHostToDevice));
   vox.cTheta=(double*)malloc(vox.nGrain*4*sizeof(double));
   VoxelsCA *d_vox;
   HandleError(cudaMallocManaged((void**)&d_vox,sizeof(VoxelsCA)));
@@ -71,35 +80,68 @@ int main(int argc, char *argv[])
   HandleError(cudaMemset(d_centroidOct,0,3*Ntot*sizeof(double)));
   HandleError(cudaMallocManaged((void**)&d_cTheta,4*vox.nGrain*sizeof(double)));
   nBlocks=Ntot/nThreads;  
-  createBasePlateGrains<<<nBlocks,nThreads>>>(d_vox,d_gID,d_vState,d_g,d_bpSites,d_extents, 
+  createBasePlateGrains<<<nBlocks,nThreads>>>(d_vox,d_gID,d_vState,d_g,d_Sites,d_extents, 
 					    d_centroidOct,Ntot);
   nThreads=128;
   nBlocks=vox.nGrain/nThreads;
   cudaDeviceSynchronize();
-  createBasePlateOrientations<<<nBlocks,nThreads>>>(d_vox,d_cTheta);
+  createBasePlateOrientations<<<nBlocks,nThreads>>>(d_vox,d_cTheta,d_g);
   HandleError( cudaPeekAtLastError() );
   cudaDeviceSynchronize();
-  cudaFree(d_bpSites);
-  bpSites.clear();
-  bpSites.shrink_to_fit();
+  cudaFree(d_Sites);
+  Sites.clear();
+  Sites.shrink_to_fit();
   // end initialize and create baseplate
   //-----------------------------------------------
-
-  HandleError(cudaMemcpy(vox.gID, d_gID, Ntot*sizeof(int), cudaMemcpyDeviceToHost));
-  HandleError(cudaMemcpy(vox.cTheta, d_cTheta, 4*vox.nGrain*sizeof(double), cudaMemcpyDeviceToHost));
-  filout="tmp";
-  vox.WriteToHDF1(filout, g, TempF.TempCurr);
 
 
   //-----------------------------------------------
   // run simulation loop 
-  int indout,nlayerTot;
+  int indout,nlayerTot,npg,nbuf1,nbuf2;
   nlayerTot=int(ceil( (double)(g.nX[2]-g.Nzhg)/(double)g.nZlayer));
 
 
-  // call addlayer and add flg to call updatelaser within
 
-  while (!g.bcheck){
+
+  // call addlayer and add flg to call updatelaser within
+  vox.getNumPowderGrains(g,npg);
+  HandleError(cudaMallocManaged((void**)&d_Sites,npg*3*sizeof(double)));
+  HandleError(cudaMallocManaged((void**)&d_itmp,npg*sizeof(int)));
+  // below is buffer for size of cTheta to account for nucleation: 100*expected # of new grains in 3 layers
+  nbuf2 = 4*(vox.nGrain+ npg + int(ceil(g.nX[0]*g.nX[1]*(g.layerT/g.dX[2])*3*g.rNmax*pow(g.dX[0]*1e6,3.)*100)));
+  nbuf1=4*(vox.nGrain);
+  resizeGlobalArray(&d_cTheta,nbuf1,nbuf2);
+  cudaDeviceSynchronize();
+  resizeArray(&vox.cTheta,nbuf2);
+  nThreads=512;
+  nBlocks = npg/nThreads;
+  getSites<<<nBlocks,nThreads>>>(d_g,d_vox,d_Sites,npg);
+
+  nBlocks=(g.nZlayer*g.nX[0]*g.nX[1])/nThreads;
+  addlayer1part1<<<nBlocks,nThreads>>>(d_g,d_vox,d_Sites,d_centroidOct,d_gID,d_vState,d_itmp,npg);
+  HandleError( cudaPeekAtLastError() );
+  nBlocks=1;
+  nThreads=256;
+  addlayer1part2<<<nBlocks,nThreads>>>(d_g,d_vox,d_cTheta,d_gID,d_itmp,npg);
+  HandleError( cudaPeekAtLastError() );
+  nThreads=512;
+  nBlocks=Ntot/nThreads;
+  addlayer1part3<<<nBlocks,nThreads>>>(d_g,d_gID,d_vState);
+  HandleError( cudaPeekAtLastError() );
+
+
+
+
+  HandleError(cudaMemcpy(&(vox.nGrain), &(d_vox->nGrain), sizeof(int), cudaMemcpyDeviceToHost));
+  HandleError(cudaMemcpy(vox.gID, d_gID, Ntot*sizeof(int), cudaMemcpyDeviceToHost));
+  HandleError(cudaMemcpy(vox.cTheta, d_cTheta, nbuf2*sizeof(double), cudaMemcpyDeviceToHost));
+  filout="tmp";
+  vox.WriteToHDF1(filout, g, TempF.TempCurr);
+
+
+
+
+  //while (!g.bcheck){
     // instead of temp.tind use cpu tind (its only used for outputting)
     // call global temp analytic
     // call global updatevoxels; within update voxels call updatelaser
@@ -117,7 +159,7 @@ int main(int argc, char *argv[])
 
     // if (g.inewlayerflg==1){call global vox.AddLayer1();}
 
-  }
+  //}
 
 
 
@@ -132,10 +174,10 @@ int main(int argc, char *argv[])
 
   cudaFree(d_lcoor);
   cudaFree(d_lcoor2);
-  cudaFree(d_neighID);
-  cudaFree(d_neighptr);
-  cudaFree(d_Temp);
-  cudaFree(d_sipvec);
+  //cudaFree(d_neighID);
+  //cudaFree(d_neighptr);
+  //cudaFree(d_Temp);
+  //cudaFree(d_sipvec);
   cudaFree(d_gID);
   cudaFree(d_vState);
   cudaFree(d_extents);

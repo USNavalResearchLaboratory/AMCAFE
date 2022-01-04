@@ -11,7 +11,7 @@
 class VoxelsCA;
 
 __global__ void createBasePlateGrains(VoxelsCA* vx, int *gid, int *vs,Grid *g,double *site,double *ext, double *centroids,const int ntot);
-__global__ void createBasePlateOrientations(VoxelsCA *vx, double *ctheta);
+__global__ void createBasePlateOrientations(VoxelsCA *vx, double *ctheta, Grid *gg);
 
 void GenerateGrainSites(const Grid &, std::vector<double> & );
 
