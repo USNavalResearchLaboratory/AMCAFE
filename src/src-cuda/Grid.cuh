@@ -16,7 +16,7 @@ class Grid
   void UpdateTime(const double &velo);
   void UpdateTime2(const double &dtIn);
   void UpdateTimeTest1(const double &velo);
-  void UpdateLaser();
+  __device__ void UpdateLaser(double *lasercoor,double *lasercoor2);
   void SkipTime(const double &DelT);
   void ComputeNeighborhood(int &j, std::string & nO,std::vector<int> & nn);
   void ComputeNeighborhoodFirst(int &j, int & ntype, std::vector<int> &nn);
@@ -43,7 +43,7 @@ class Grid
   double time,dX[3],meltparam[4],beamSTD[3],lX[3],offset[3],gsize[2],gth,gth0,*lcoor,*lcoor2,gbox[4],
     Avel,nvel,bmDelT;
   int nDim,tInd,nnodePerCell,ictrl,nZlayer,patternID,outint,outNL,nTsd,Nsd,Ntd,NpT,
-    inewscanflg,inewlayerflg,isp,indlayer,ilaserLoc,Nzhg,nX[3],ntype;
+    inewscanflg,inewlayerflg,isp,indlayer,ilaserLoc,Nzhg,nX[3],ntype,nlayerTot;
   double bmV,bmP,bhatch; // beam velocity,power, hatch spacing, nucleation rate
   double tL,tS,T0; // liquidus, solidus, room temp (K)
   double rNmax; // nucleation density (m^{-3})
@@ -54,5 +54,8 @@ class Grid
   bool bcheck=0;
   curandState_t s1;
 }; // end class Grid
+
+__global__ void UpdateLaserGlobal(Grid *gg,double *lasercoor,double *lasercoor2);
+__global__ void UpdateTime2Global(Grid *dg, const double &dt);
 
 #endif

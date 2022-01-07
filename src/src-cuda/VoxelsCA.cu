@@ -42,7 +42,7 @@ __global__ void getSites(Grid *g,VoxelsCA *vx,double *xs, int numPG)
     js+=stride;
   }
 }
-__global__ void addlayer1part1(Grid *g,VoxelsCA *vx,double *xs, double *troids,
+__global__ void addLayer1Part1(Grid *g,VoxelsCA *vx,double *xs, double *troids,
 			  int *gD, int *vs, int *itmp, int numPG)
 {
   int tid=threadIdx.x+blockDim.x*blockIdx.x,iz1,js,
@@ -51,11 +51,6 @@ __global__ void addlayer1part1(Grid *g,VoxelsCA *vx,double *xs, double *troids,
   double dx=g->dX[0],dsqc,dsq,xc,yc,zc;
   iz1 = g->ilaserLoc - g->nZlayer;
   js=tid+i3*iz1;
-
-
-if (tid==0){for (int j=0;j<numPG;++j){printf("%10.7f,%10.7f,%10.7f\n",xs[3*j],xs[3*j+1],xs[3*j+2]);}}
-
-
   while (js < i3*iz2){
     j3 = js/i3; // note that int/int is equivalent to floor                                                                         
     j2 = (js - i3*j3)/(nX1);
@@ -78,7 +73,7 @@ if (tid==0){for (int j=0;j<numPG;++j){printf("%10.7f,%10.7f,%10.7f\n",xs[3*j],xs
   } // while (js < i3*...
 } // end addlayer1part1
 
-__global__ void addlayer1part2(Grid *g,VoxelsCA *vx, double *cTheta,
+__global__ void addLayer1Part2(Grid *g,VoxelsCA *vx, double *cTheta,
 			  int *gD, int *itmp, int numPG)
 {
 
@@ -130,7 +125,7 @@ __global__ void addlayer1part2(Grid *g,VoxelsCA *vx, double *cTheta,
   }
 } // __global__ void addlayer1part2
 
-__global__ void addlayer1part3(const Grid *g,int *gD, int *vs) 
+__global__ void addLayer1Part3(const Grid *g,int *gD, int *vs) 
 {
   int tid=threadIdx.x+blockDim.x*blockIdx.x,js,i1,ntot,stride;
   stride=blockDim.x*gridDim.x;
@@ -155,6 +150,68 @@ __global__ void copyGlobal(double *x1,double *x0, int n)
     js +=stride;
   }
 }
+
+__global__ void cleanLayerPart1(VoxelsCA *dvx,int *dgid,int *gvolflg, int *itmp,int Ntot)
+{
+  int tid=threadIdx.x+blockIdx.x*blockDim.x,nr,js,i1,stride,ng=dvx->nGrain,i2;
+  extern __shared__ int  gvoltmp[];
+  nr = ng/blockDim.x + 1;
+  stride = blockDim.x*gridDim.x;
+  for (int j=0; j<nr;++j){
+    gvoltmp[threadIdx.x]=0;
+    __syncthreads();
+    js = tid;
+    while (js < Ntot){
+      i1=dgid[js]-1;
+      if ( (i1>= j*blockDim.x) & (i1<(j+1)*blockDim.x)){
+	i2 = i1 - j*blockDim.x;
+	atomicAdd(&gvoltmp[i2],1);
+	js+=stride;
+      }
+    }
+    __syncthreads();
+    i2 = threadIdx.x + j*blockDim.x;
+    if (i2<ng){atomicAdd(&(gvolflg[i2]),gvoltmp[threadIdx.x]);}
+    __syncthreads();
+  } // for (int j=0...
+  i2=0;
+  if (tid==0){
+      for (int j=0;j<ng;++j){
+	if (gvolflg[j]>0){
+	  itmp[j] = i2+1;
+	  i2+=1;
+	}
+      }
+      gvolflg[ng]=i2;
+  }
+}
+
+__global__ void cleanLayerPart2(VoxelsCA *dvx,int *dgid,int *gvolflg, int *itmp,
+				double *ctmp, double *ctheta,int Ntot)
+{
+  int ng=dvx->nGrain,tid=threadIdx.x+blockIdx.x*blockDim.x,js,stride,i1;
+  stride=blockDim.x*gridDim.x;
+  js=tid;
+  while(js<ng){
+    if (gvolflg[js]>0){
+      ctmp[4*(itmp[js]-1)] = ctheta[4*js];
+      ctmp[4*(itmp[js]-1)+1] = ctheta[4*js+1];
+      ctmp[4*(itmp[js]-1)+2] = ctheta[4*js+2];
+      ctmp[4*(itmp[js]-1)+3] = ctheta[4*js+3];
+    }
+    js+=stride;
+  }
+  js=tid;
+  while (js<Ntot){
+    if (dgid[js]!=0){
+      i1 = itmp[dgid[js]-1];
+      dgid[js]=i1;
+    }
+    js+=stride;
+  }
+  dvx->nGrain = gvolflg[ng];
+}
+
 
 void resizeGlobalArray(double **y, int &n0, int &n1)
 {
@@ -220,6 +277,65 @@ VoxelsCA::VoxelsCA(Grid &g)
   }
   */
 } // end constructor
+void VoxelsCA::AddLayer1Macro(VoxelsCA *d_vx,Grid &g,Grid *d_g,double **d_cthptr,
+		    double *d_troids, int *d_gid, int *d_vst,int &nbuf2)
+{
+  int npg, nThreads,nBlocks,nbuf1, *d_itmp,Ntot;
+  double *d_Sites;
+  Ntot=g.nX[0]*g.nX[1]*g.nX[2];
+  getNumPowderGrains(g,npg);
+  HandleError(cudaMallocManaged((void**)&d_Sites,npg*3*sizeof(double)));
+  HandleError(cudaMallocManaged((void**)&d_itmp,npg*sizeof(int)));
+  // below is buffer for size of cTheta to account for nucleation: 100*expected # of new grains in 3 layers
+  nbuf2 = 4*(nGrain+ npg + int(ceil(g.nX[0]*g.nX[1]*(g.layerT/g.dX[2])*3*g.rNmax*pow(g.dX[0]*1e6,3.)*100)));
+  nbuf1=4*(nGrain);
+  resizeGlobalArray(d_cthptr,nbuf1,nbuf2);
+  cudaDeviceSynchronize();
+  resizeArray(&(cTheta),nbuf2);
+  nThreads=512;
+  nBlocks = npg/nThreads;
+  getSites<<<nBlocks,nThreads>>>(d_g,d_vx,d_Sites,npg);
+  nBlocks=(g.nZlayer*g.nX[0]*g.nX[1])/nThreads;
+  addLayer1Part1<<<nBlocks,nThreads>>>(d_g,d_vx,d_Sites,d_troids,d_gid,d_vst,d_itmp,npg);
+  HandleError( cudaPeekAtLastError() );
+  nBlocks=1;
+  nThreads=256;
+  addLayer1Part2<<<1,nThreads>>>(d_g,d_vx,*d_cthptr,d_gid,d_itmp,npg);
+  HandleError( cudaPeekAtLastError() );
+  nThreads=512;
+  nBlocks=Ntot/nThreads;
+  addLayer1Part3<<<nBlocks,nThreads>>>(d_g,d_gid,d_vst);
+  HandleError( cudaPeekAtLastError() );
+  cudaFree(d_Sites);
+  cudaFree(d_itmp);
+}
+
+void VoxelsCA::CleanLayerMacro(Grid &g,VoxelsCA *dvx,int *dgid,double **dcthetaptr)
+{
+  int nThreads,nBlocks, *dgidtmp, *dgvflg,nTot;
+  HandleError(cudaMalloc((void**)&dgidtmp,nGrain*sizeof(int)));
+  HandleError(cudaMalloc((void**)&dgvflg,(nGrain+1)*sizeof(int)));
+  HandleError(cudaMemset(dgidtmp,0,nGrain*sizeof(int)));
+  HandleError(cudaMemset(dgvflg,0,(nGrain+1)*sizeof(int)));
+
+  nThreads=512;
+  nBlocks=nGrain/nThreads+1;
+  nTot = g.nX[0]*g.nX[1]*g.nX[2];
+  cleanLayerPart1<<<nBlocks,nThreads,nThreads*sizeof(int)>>>(dvx,dgid,dgvflg,dgidtmp,nTot);
+  double *dcthtmp;
+  HandleError(cudaMalloc((void**)&dcthtmp,4*(nGrain)*sizeof(int)));
+  cleanLayerPart2<<<nBlocks,nThreads>>>(dvx,dgid,dgvflg,dgidtmp,
+					dcthtmp, *dcthetaptr,nTot);
+  cudaFree(*dcthetaptr);
+
+  HandleError(cudaMemcpy(&nGrain, &(dvx->nGrain), sizeof(int), cudaMemcpyDeviceToHost));
+  HandleError(cudaMalloc((void**)dcthetaptr,4*(nGrain)*sizeof(int)));
+
+  copyGlobal<<<nBlocks,nGrain>>>(*dcthetaptr,dcthtmp, nGrain);
+  cudaFree(dgidtmp);
+  cudaFree(dgvflg);
+  cudaFree(dcthtmp);
+}
 
 void VoxelsCA::WriteToHDF1(const std::string &filename, const Grid &g, const double *tempcurr)
 {

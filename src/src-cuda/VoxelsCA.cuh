@@ -16,6 +16,9 @@ class VoxelsCA
  public:
   VoxelsCA(Grid &);
   void WriteToHDF1(const std::string &filname, const Grid &, const double *);
+  void AddLayer1Macro(VoxelsCA *d_vx,Grid &g,Grid *d_g,double **d_cthptr,
+                    double *d_troids, int *d_gid, int *d_vst, int &nbuf2);
+  void CleanLayerMacro(Grid &g,VoxelsCA *dvx,int *dgid,double **dcthetaptr);
   inline void loadS(std::vector<std::vector<double>>&S,std::vector<std::vector<int>> &sInd)
   {
     // this is for decentered octahedron method: 
@@ -84,13 +87,13 @@ class VoxelsCA
 }; // end class VoxelCA
 
 
-__global__ void addlayer1part1(Grid *g,VoxelsCA *vx,double *xs, double *troids,
+__global__ void addLayer1Part1(Grid *g,VoxelsCA *vx,double *xs, double *troids,
                           int *gD, int *vs, int *itmp, int numPG);
 
-__global__ void addlayer1part2(Grid *g,VoxelsCA *vx, double *cTheta,
+__global__ void addLayer1Part2(Grid *g,VoxelsCA *vx, double *cTheta,
                           int *gD, int *itmp, int numPG);
 
-__global__ void addlayer1part3(const Grid *g,int *gD, int *vs);
+__global__ void addLayer1Part3(const Grid *g,int *gD, int *vs);
 
 __global__ void copyGlobal(double *x1,double *x0, int n);
 
@@ -98,5 +101,4 @@ __global__ void getSites(Grid *g,VoxelsCA *vx,double *xs, int numPG);
 
 void resizeGlobalArray(double **y, int &n0, int &n1);
 void resizeArray(double **y, int &n);
-
 #endif

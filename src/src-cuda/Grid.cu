@@ -10,6 +10,23 @@
 #include "sstream"
 #include "numeric"
 
+__global__ void UpdateLaserGlobal(Grid *g, double *laser_coor, double *laser_coor2){
+  //********************************************************
+  // NOTE: ONLY RUN WITH 1 BLOCK AND 1 THREAD (THI IS SERIAL 
+  // CODE THAT UPDATES GLOBAL VARIABLES)
+  //********************************************************
+  int tid=threadIdx.x + blockDim.x*blockIdx.x;
+  if (tid==0){g->UpdateLaser(laser_coor,laser_coor2);}
+} // end UpdateLaserGlobal
+
+__global__ void UpdateTime2Global(Grid *dg, const double &dt)
+{
+  dg->time+=dt;
+  dg->tInd+=1;
+}
+
+
+
 //constructor
 Grid::Grid(std::string &filInput)
 {
@@ -82,8 +99,14 @@ Grid::Grid(std::string &filInput)
   gbox[1]=lX[0]+bhatch/2.;
   gbox[2]=-bhatch/2.;
   gbox[3]=lX[1]+bhatch/2.;               
+  nlayerTot=int(ceil( (double)(nX[2]-Nzhg)/(double)nZlayer));
 } // end constructor
-void Grid::UpdateLaser(){
+__device__ void Grid::UpdateLaser(double *laser_coor, double *laser_coor2){
+  //********************************************************
+  // NOTE: ONLY RUN WITH 1 BLOCK AND 1 THREAD (THI IS SERIAL 
+  // CODE THAT UPDATES GLOBAL VARIABLES)
+  //********************************************************
+
   int itmp,iflg=0,irep=0;
   double x,y;
   while(irep==0 || isp==0){
@@ -94,8 +117,8 @@ void Grid::UpdateLaser(){
     } else {
       while (itmp<(NpT-1) && iflg==0){
 	itmp+=1;
-	x=lcoor2[2*itmp];
-	y=lcoor2[2*itmp+1];
+	x=laser_coor2[2*itmp];
+	y=laser_coor2[2*itmp+1];
 	if (x>gbox[0] && x<gbox[1] && y>gbox[2] && y<gbox[3]){iflg=1;}
       } // while (itmp< ...
       if (itmp<(NpT-1)){
@@ -107,6 +130,7 @@ void Grid::UpdateLaser(){
 	indlayer+=1;
 	ilaserLoc= Nzhg + indlayer*nZlayer;
 	isp=0;
+	bcheck=indlayer>nlayerTot;
 	// update grid 
 	double gmid[2];
 	gmid[0]=lX[0]/2.;
@@ -116,9 +140,9 @@ void Grid::UpdateLaser(){
 	for (int j2=0;j2<Ntd;++j2){
 	  for (int j1=0;j1<Nsd;++j1){
 	    k=Nsd*j2+j1;
-	    lcoor2[2*k] = cos(gth)*(lcoor[2*k]-gmid[0])-
-	      sin(gth)*(lcoor[2*k+1]-gmid[1])+gmid[0];
-	    lcoor2[2*k+1] = sin(gth)*(lcoor[2*k]-gmid[0])+
+	    laser_coor2[2*k] = cos(gth)*(laser_coor[2*k]-gmid[0])-
+	      sin(gth)*(laser_coor[2*k+1]-gmid[1])+gmid[0];
+	    laser_coor2[2*k+1] = sin(gth)*(laser_coor[2*k]-gmid[0])+
 	      cos(gth)*(lcoor[2*k+1]-gmid[1])+gmid[1];
 	  } // j1
 	} // j2
@@ -127,6 +151,7 @@ void Grid::UpdateLaser(){
   } // while(irep==0...
   if (irep==1){inewlayerflg=0;} 
 } // end UpdateLaser 
+
 void Grid::readInputFile(std::string &filInput)
 {
   std::ifstream filIn;
@@ -269,4 +294,9 @@ void Grid::readInputFile(std::string &filInput)
     simInput >> keyword;
   } // while(simInput)
 } // readInputFile
+void Grid::UpdateTime2(const double &dtIn)
+{
+  time +=dtIn;
+  tInd +=1;
+} // end UpdateTime2
 
