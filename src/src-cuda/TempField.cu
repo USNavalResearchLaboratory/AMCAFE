@@ -102,12 +102,6 @@ __global__ void analyticTempCalcPart2(Grid *dg, TempField *dtempF,int *ispv,doub
     }
     js = (dg->isp+1) - ((dg->isp+1)/(dg->Nsd)) * (dg->Nsd); // equiv to fmod
     if (!icheck[threadIdx.x] || js==0 ){dg->inewscanflg=1;} 
-    if (dg->isp==(dg->NpT-1)){
-      dg->inewscanflg=1;
-      dg->inewlayerflg=1;
-      dg->isp=0;
-      dg->indlayer+=1;
-    }
   } // if (x<box[0...
 }
 
@@ -176,6 +170,6 @@ void TempField::AnalyticalTempCalcMacro(Grid *dg,TempField *dtempF, double *dtem
 {
 
   analyticTempCalcPart1<<<nBlocks,nThreads>>>(dg,dtempF,ispv,dlcoor,dtempOut,Ntot);
-  analyticTempCalcPart2<<<nBlocks,nThreads>>>(dg,dtempF,ispv,dlcoor2,dtempOut,Ntot);
+//  analyticTempCalcPart2<<<nBlocks,nThreads>>>(dg,dtempF,ispv,dlcoor2,dtempOut,Ntot);
 					
 }

@@ -10,16 +10,16 @@
 #include "sstream"
 #include "numeric"
 
-__global__ void UpdateLaserGlobal(Grid *g, double *laser_coor, double *laser_coor2){
+__global__ void UpdateLaserGlobal(Grid *dg, double *laser_coor, double *laser_coor2){
   //********************************************************
   // NOTE: ONLY RUN WITH 1 BLOCK AND 1 THREAD (THI IS SERIAL 
   // CODE THAT UPDATES GLOBAL VARIABLES)
   //********************************************************
   int tid=threadIdx.x + blockDim.x*blockIdx.x;
-  if (tid==0){g->UpdateLaser(laser_coor,laser_coor2);}
+  if (tid==0){dg->UpdateLaser(laser_coor,laser_coor2);}
 } // end UpdateLaserGlobal
 
-__global__ void UpdateTime2Global(Grid *dg, const double &dt)
+__global__ void UpdateTime2Global(Grid *dg, const double dt)
 {
   dg->time+=dt;
   dg->tInd+=1;
@@ -65,7 +65,7 @@ Grid::Grid(std::string &filInput)
   //if (gsize[0]==0){gsize={nX[0]*dX[0]*2,nX[1]*dX[1]*2};}
   lX[0] = nX[0]*dX[0];lX[1]=nX[1]*dX[1];lX[2]=nX[2]*dX[2];
   bpH< std::numeric_limits<double>::epsilon() ? bpH=layerT : bpH=bpH;
-  nZlayer = round(layerT/dX[2]);
+  nZlayer = int(round(layerT/dX[2]));
   isp=0;
   inewscanflg=1;
   inewlayerflg=1;
@@ -101,14 +101,25 @@ Grid::Grid(std::string &filInput)
   gbox[3]=lX[1]+bhatch/2.;               
   nlayerTot=int(ceil( (double)(nX[2]-Nzhg)/(double)nZlayer));
 } // end constructor
+
 __device__ void Grid::UpdateLaser(double *laser_coor, double *laser_coor2){
   //********************************************************
   // NOTE: ONLY RUN WITH 1 BLOCK AND 1 THREAD (THI IS SERIAL 
   // CODE THAT UPDATES GLOBAL VARIABLES)
   //********************************************************
+  int itmp,iflg=0,irep=0,k;
+  double x,y,gmid[2];
 
-  int itmp,iflg=0,irep=0;
-  double x,y;
+
+  itmp = (isp+1) - ((isp+1)/Nsd)*Nsd;
+  if (itmp==0){inewscanflg=1;}
+
+  if (isp==(NpT-1)){
+      inewscanflg=1;
+      inewlayerflg=1;
+      isp=0;
+      indlayer+=1;
+  }
   while(irep==0 || isp==0){
     irep+=1;
     itmp=isp;
@@ -128,30 +139,55 @@ __device__ void Grid::UpdateLaser(double *laser_coor, double *laser_coor2){
 	inewlayerflg=1;
 	inewscanflg=1;
 	indlayer+=1;
-	ilaserLoc= Nzhg + indlayer*nZlayer;
-	isp=0;
+	ilaserLoc= Nzhg + indlayer*nZlayer;	
+	isp=0;	
 	bcheck=indlayer>nlayerTot;
 	// update grid 
-	double gmid[2];
 	gmid[0]=lX[0]/2.;
-	gmid[1]=lX[1]/2.;
-	int k;
-	gth+=gth0;
+	gmid[1]=lX[1]/2.;	
+	gth+=gth0;		
 	for (int j2=0;j2<Ntd;++j2){
 	  for (int j1=0;j1<Nsd;++j1){
 	    k=Nsd*j2+j1;
 	    laser_coor2[2*k] = cos(gth)*(laser_coor[2*k]-gmid[0])-
 	      sin(gth)*(laser_coor[2*k+1]-gmid[1])+gmid[0];
 	    laser_coor2[2*k+1] = sin(gth)*(laser_coor[2*k]-gmid[0])+
-	      cos(gth)*(lcoor[2*k+1]-gmid[1])+gmid[1];
+	      cos(gth)*(laser_coor[2*k+1]-gmid[1])+gmid[1];
 	  } // j1
-	} // j2
+	} // j2	
+
       } // if/else (itmp<NpT-1...
     } // if (inewscanflg==0...
   } // while(irep==0...
+
   if (irep==1){inewlayerflg=0;} 
 } // end UpdateLaser 
 
+__device__ void Grid::GetNeighbors(int &jvox, int *ineigh)
+{
+  // ineigh is static array length 27 where 
+  // ineigh[26] is # of neighbors for voxel jvox
+  int j3,j2,j1,jst, itmp[3]={-1,0,1},nx0=nX[0],nx1=nX[1],cc;
+  j3 = jvox /( nx0*nx1) ;
+  j2 = (jvox - nx0*nx1*j3)/nx0 ;
+  j1 = jvox - nx0*nx1*j3 - nx0*j2;
+  cc=0;
+  for (int i3 =0;i3<3;++i3){
+    if ( (j3+itmp[i3]<0) || (j3+itmp[i3]>=nX[2])){continue;}
+    for (int i2 =0;i2<3;++i2){
+      if ( (j2+itmp[i2]<0) || (j2+itmp[i2]>=nx1)){continue;}
+      for (int i1 =0;i1<3;++i1){
+	if ( (j1+itmp[i1]<0) || (j1+itmp[i1]>=nx0)){continue;}
+	jst = nx0*nx1*(j3+itmp[i3])+nx0*(j2+itmp[i2])+j1+itmp[i1];
+	if (jst !=jvox){
+	  ineigh[cc] = jst;
+	  cc+=1;
+	}
+      }
+    }
+  }
+  ineigh[26]=cc;
+}
 void Grid::readInputFile(std::string &filInput)
 {
   std::ifstream filIn;

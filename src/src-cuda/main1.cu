@@ -32,17 +32,19 @@ int main(int argc, char *argv[])
   //-----------------------------------------------
   // initialize and create base plate
   // set up all pointers for arrays in class
+  auto texec1 = std::chrono::high_resolution_clock::now();
   double *d_lcoor,*d_lcoor2;
   // voxels
-  int *d_gID,*d_ineighID,*d_neighptr,*d_vState,*d_itmp,nBlocks,
+  int *d_gID,*d_vState,nBlocks,
     nThreads,*d_ispvec;
   double *d_cTheta,*d_extents,*d_centroidOct;
   // tempfield
   double *d_Tempvals;
   // initialize class variables
-  auto texec1 = std::chrono::high_resolution_clock::now();
   std::string filbaseOut,filout,filLogOut,filParamIn;
   filParamIn = argv[1];
+  filbaseOut = "CA3D"+filParamIn.substr(0,filParamIn.find("."));
+  filLogOut="CA3D"+filParamIn.substr(0,filParamIn.find("."))+".log";
   Grid g(filParamIn);
   Grid *d_g;
   int Ntot=g.nX[0]*g.nX[1]*g.nX[2];
@@ -99,56 +101,69 @@ int main(int argc, char *argv[])
 
   //-----------------------------------------------
   // run simulation loop 
-  int indout,nlayerTot,npg,nbuf1,nbuf2;
-  nlayerTot=int(ceil( (double)(g.nX[2]-g.Nzhg)/(double)g.nZlayer));
-
+  int indOut,nbuf;
+  std::ofstream fplog;
+  fplog.open(filLogOut.c_str());
+  fplog << "Time index= ,Total clock time passed(s)"<<std::endl;
   // addlayer and update laser
-  vox.AddLayer1Macro(d_vox,g,d_g,&d_cTheta,d_centroidOct,d_gID,d_vState,nbuf2);
+  cudaDeviceSynchronize();
+  vox.AddLayer1Macro(d_vox,g,d_g,&d_cTheta,d_centroidOct,d_gID,d_vState,nbuf);
+  HandleError( cudaPeekAtLastError() );
   UpdateLaserGlobal<<<1,1>>>(d_g,d_lcoor,d_lcoor2);
-
-  
-  HandleError(cudaMemcpy(&(vox.nGrain), &(d_vox->nGrain), sizeof(int), cudaMemcpyDeviceToHost));
-  HandleError(cudaMemcpy(vox.gID, d_gID, Ntot*sizeof(int), cudaMemcpyDeviceToHost));
-  HandleError(cudaMemcpy(vox.cTheta, d_cTheta, nbuf2*sizeof(double), cudaMemcpyDeviceToHost));
-  filout="tmp";
-  vox.WriteToHDF1(filout, g, TempF.TempCurr);
-
-
-
-  
-  //while (!g.bcheck){
+  HandleError( cudaPeekAtLastError() );
+  int cc=0;
+  while (!g.bcheck){
   TempF.tInd = int(round(g.time/TempF.DelT));
   calcTemptInd<<<1,1>>>(d_g,d_TempF);
+  HandleError( cudaPeekAtLastError() );
   nThreads=512; nBlocks=Ntot/nThreads;
+  // call global temp analytic
+  cudaDeviceSynchronize();
   TempF.AnalyticalTempCalcMacro(d_g,d_TempF, d_Tempvals,d_lcoor,d_lcoor2,d_ispvec,
                                         nThreads, nBlocks, Ntot);
-  // call global temp analytic
-  // call global updatevoxels; 
+  HandleError( cudaPeekAtLastError() );
+  // call global updatevoxels;
   UpdateLaserGlobal<<<1,1>>>(d_g,d_lcoor,d_lcoor2);
-  HandleError(cudaMemcpy(&g.bcheck,&(d_g->bcheck),sizeof(int),cudaMemcpyDeviceToHost));
+  HandleError( cudaPeekAtLastError() );
+  HandleError(cudaMemcpy(&g.bcheck,&(d_g->bcheck),sizeof(bool),cudaMemcpyDeviceToHost));
   HandleError(cudaMemcpy(&g.inewlayerflg,&(d_g->inewlayerflg),sizeof(int),cudaMemcpyDeviceToHost));
-
-
   if (g.inewlayerflg==1){ 
     HandleError(cudaMemcpy(&(vox.nGrain), &(d_vox->nGrain), sizeof(int), cudaMemcpyDeviceToHost));
-    vox.CleanLayerMacro(g,d_vox,d_gID,&d_cTheta);
+    cudaDeviceSynchronize();
+    vox.CleanLayerMacro(d_vox,d_gID,&d_cTheta,Ntot);
+    HandleError( cudaPeekAtLastError() );
   }    
-    // cpu: assign indoutput and if statement 
+  
+  indOut = TempF.tInd % g.outint;
+
+  if (indOut==0 || g.bcheck || (g.inewlayerflg==1 && g.outNL==0)){
     // if true, then do memcpy of necessary arrays and write out hdf5
-
-
-    // right now g.updatetime is here, think about putting it in update laser
-  g.UpdateTime2(TempF.DelT);
+    // (note nGrain is copied over from device in CleanLayerMacro
+    nbuf=4*vox.nGrain;
+    resizeArray(&(vox.cTheta),nbuf);
+    HandleError(cudaMemcpy(vox.gID, d_gID, Ntot*sizeof(int), cudaMemcpyDeviceToHost));
+    HandleError(cudaMemcpy(vox.vState, d_vState, Ntot*sizeof(int), cudaMemcpyDeviceToHost));
+    HandleError(cudaMemcpy(TempF.TempCurr, d_Tempvals, Ntot*sizeof(double), cudaMemcpyDeviceToHost));
+    HandleError(cudaMemcpy(vox.cTheta, d_cTheta, 4*vox.nGrain*sizeof(double), cudaMemcpyDeviceToHost));
+    filout = filbaseOut+std::to_string(TempF.tInd);
+    cudaDeviceSynchronize();
+    vox.WriteToHDF1(filout, g, TempF.TempCurr);
+  } // if (indOut==0 ...
+    g.UpdateTime2(TempF.DelT);
   UpdateTime2Global<<<1,1>>>(d_g,TempF.DelT);
+  HandleError( cudaPeekAtLastError() ); 
   if (g.inewlayerflg==1){
-    vox.AddLayer1Macro(d_vox,g,d_g,&d_cTheta,d_centroidOct,d_gID,d_vState,nbuf2);
+    cudaDeviceSynchronize();
+    vox.AddLayer1Macro(d_vox,g,d_g,&d_cTheta,d_centroidOct,d_gID,d_vState,nbuf);
+    HandleError( cudaPeekAtLastError() );
   }
+  auto texec2 = std::chrono::high_resolution_clock::now();
+  auto delTexec = std::chrono::duration_cast<std::chrono::seconds>( texec2 - texec1 ).count();
+  fplog << TempF.tInd<<","<<delTexec<<std::endl;
 
-
-
-  //}
-
-
+  }
+  cudaDeviceSynchronize();
+  fplog.close();
 
 
 

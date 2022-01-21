@@ -17,6 +17,7 @@ class Grid
   void UpdateTime2(const double &dtIn);
   void UpdateTimeTest1(const double &velo);
   __device__ void UpdateLaser(double *lasercoor,double *lasercoor2);
+  __device__ void GetNeighbors(int &jvox, int *ineigh);
   void SkipTime(const double &DelT);
   void ComputeNeighborhood(int &j, std::string & nO,std::vector<int> & nn);
   void ComputeNeighborhoodFirst(int &j, int & ntype, std::vector<int> &nn);
@@ -56,6 +57,6 @@ class Grid
 }; // end class Grid
 
 __global__ void UpdateLaserGlobal(Grid *gg,double *lasercoor,double *lasercoor2);
-__global__ void UpdateTime2Global(Grid *dg, const double &dt);
+__global__ void UpdateTime2Global(Grid *dg, const double dt);
 
 #endif
