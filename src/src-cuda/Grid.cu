@@ -167,13 +167,13 @@ __device__ void Grid::GetNeighbors(int &jvox, int *ineigh)
 {
   // ineigh is static array length 27 where 
   // ineigh[26] is # of neighbors for voxel jvox
-  int j3,j2,j1,jst, itmp[3]={-1,0,1},nx0=nX[0],nx1=nX[1],cc;
+  int j3,j2,j1,jst, itmp[3]={-1,0,1},nx0=nX[0],nx1=nX[1],nx2=nX[2],cc;
   j3 = jvox /( nx0*nx1) ;
   j2 = (jvox - nx0*nx1*j3)/nx0 ;
   j1 = jvox - nx0*nx1*j3 - nx0*j2;
   cc=0;
   for (int i3 =0;i3<3;++i3){
-    if ( (j3+itmp[i3]<0) || (j3+itmp[i3]>=nX[2])){continue;}
+    if ( (j3+itmp[i3]<0) || (j3+itmp[i3]>=nx2)){continue;}
     for (int i2 =0;i2<3;++i2){
       if ( (j2+itmp[i2]<0) || (j2+itmp[i2]>=nx1)){continue;}
       for (int i1 =0;i1<3;++i1){

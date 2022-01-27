@@ -15,12 +15,16 @@
 #include <curand_kernel.h>
 #include <math_constants.h>
 
-static void HandleError(cudaError_t err) {
+static void HandleError( cudaError_t err,
+                         const char *file,
+                         int line ) {
     if (err != cudaSuccess) {
-        printf("%s \n", cudaGetErrorString(err));
-        exit(EXIT_FAILURE);
+        printf( "%s in %s at line %d\n", cudaGetErrorString( err ),
+                file, line );
+        exit( EXIT_FAILURE );
     }
 }
+#define HandleError( err ) (HandleError( err, __FILE__, __LINE__ ))
 
 __global__ void getSites(Grid *g,VoxelsCA *vx,double *xs, int numPG)
 {
@@ -232,7 +236,7 @@ __global__ void convertSolid1Part1(Grid *dg,int *vst,double *exts,int ntot)
 	  jz+=1;
 	}
 	if (issol){
-	  i1[threadIdx.x]=1;
+	  i1[tid]=1;
 	  exts[js]=0.0;
 	}
       }
@@ -246,12 +250,10 @@ __global__ void convertSolid1Part2(Grid *dg,int *vst,int ntot)
   // ONLY RUN WITH 1 BLOCK 
   int inei[27],vnei[26],js,nb,
     tid=threadIdx.x,stride=blockDim.x;
-  extern __shared__ bool i1[];
   nb=ntot/stride+1;
   for (int j=0;j<nb;++j){
     js=tid+j*stride;
     __syncthreads();
-    i1[threadIdx.x]=0;
     inei[26]=0;
     if (js<ntot){
       if (vst[js]==1){
@@ -287,24 +289,36 @@ __global__ void setLiquid3(Grid *dg,int *dgid,int *dvstate,double *dtempval, dou
     js+=stride;
   }
 }
-__global__ void updateVoxelsPart1(int *vstate,int *vs2cc,int ntot)
+__global__ void updateVoxelsPart1(Grid *dg,int *vstate,double *tempval,int *vs2cc,int ntot)
 {
+  // first part of calculating total number of voxels in active region
   int tid=threadIdx.x+blockIdx.x*blockDim.x,js,stride=blockDim.x*gridDim.x,s,
-    tidL=threadIdx.x,bidL=blockIdx.x,nthread=blockDim.x;
+    tidL=threadIdx.x,bidL=blockIdx.x,nthread=blockDim.x,inei[27];
+  double tmelt=dg->tL;
+  bool issl;
   extern __shared__ volatile int sh[];
   js=tid;
   sh[tidL]=0;
   while (js<ntot){
-    if (vstate[js]==2){sh[tidL]+=1;}
+    if (vstate[js]==2 || (vstate[js]==1 && tempval[js]<tmelt)){
+      sh[tidL]+=1;
+    }
+    if (tempval[js]>=tmelt){
+      dg->GetNeighbors(js,inei);
+      issl=0;
+      for (int j1=0;j1<inei[26];++j1){
+	issl=issl || vstate[inei[j1]]==2 || 
+	  (vstate[inei[j1]]==1 && tempval[inei[j1]]<tmelt);
+      }
+      if (issl){sh[tidL]+=1;}
+    }
     js+=stride;
-  }
+  } // while (js<ntot..
   __syncthreads();
   s=nthread;
   while (s>=128){
-    if (nthread >= s){
-      if (tidL<s/2){sh[tidL] += sh[tidL+s/2];}
-      __syncthreads();
-    }
+    if (tidL<s/2){sh[tidL] += sh[tidL+s/2];}
+    __syncthreads();    
     s/=2;
   }
   if (tidL<32) {
@@ -320,32 +334,300 @@ __global__ void updateVoxelsPart1(int *vstate,int *vs2cc,int ntot)
   }
 }
 
-__global__ void updateVoxelsPart2(int *vs2cc, int *vs2, bool *disf,double *dtinc)
+__global__ void updateVoxelsPart1a(Grid *dg, int *vstate,double *tempval,
+			      int *vs2cc,int n0,int ntot);
 {
-  vs2[0]=vs2cc[0];
-  vs2[1]=0;
-  dtinc[0]=0.0;
-  disf[0]=1; // initialize to true (false exits voxel growth loop)
+  // fills up index  array ida (contains indices of voxels in active region)
+  // part1a determines how many hits per block
+  int tid=threadIdx.x+blockIdx.x*blockDim.x,js,s,
+    tidL=threadIdx.x,bidL=blockIdx.x,nthread=blockDim.x,inei[27];
+  double tmelt=dg->tL;
+  bool issl;
+  extern __shared__ volatile int sh[];
+  js=tid+n0;
+  sh[tidL]=0;
+  if (js<ntot){
+    if (vstate[js]==2 || (vstate[js]==1 && tempval[js]<tmelt)){
+      sh[tidL]=1;
+    }
+    if (tempval[js]>=tmelt){
+      dg->GetNeighbors(js,inei);
+      issl=0;
+      for (int j1=0;j1<inei[26];++j1){
+	issl=issl || vstate[inei[j1]]==2 || 
+	  (vstate[inei[j1]]==1 && tempval[inei[j1]]<tmelt);
+      }
+      if (issl){sh[tidL]=1;}
+    }
+  }
+  __syncthreads();
+  s=nthread;
+  while (s>=128){
+    if (tidL<s/2){sh[tidL] += sh[tidL+s/2];}
+    __syncthreads();    
+    s/=2;
+  }
+  if (tidL<32) {
+    if (nthread >=64) {sh[tidL] += sh[tidL+32];}
+    if (nthread >=32) {sh[tidL] += sh[tidL+16];}
+    if (nthread >=16) {sh[tidL] += sh[tidL+8];}
+    if (nthread >= 8) {sh[tidL] += sh[tidL+4];}
+    if (nthread >= 4) {sh[tidL] += sh[tidL+2];}
+    if (nthread >= 2) {sh[tidL] += sh[tidL+1];}
+  }
+  if (tidL==0) {
+    vs2cc[bidL] = sh[tidL];
+  }
 }
 
-__global__ void updateVoxelsPart3(Grid *dg,int *dgid,int *dvstate, double *dctheta,double *dtempval,
-				  double *dctroid,double *dexts,double *dtinc,int *vs2,bool *disf,
+__global__ void updateVoxelsPart1b(Grid *dg, int *vstate,double *tempval,
+			      int *vs2cc,int *ida,int n0,int ntot);
+{
+  // fills up index  array ida (contains indices of voxels in active region)
+  int tid=threadIdx.x+blockIdx.x*blockDim.x,js,s,i1,i2,i3,
+    tidL=threadIdx.x,bidL=blockIdx.x,nthread=blockDim.x,inei[27];
+  double tmelt=dg->tL;
+  bool issl;
+  extern __shared__ volatile int sh[];
+  i1 = 0;
+  js=0;
+  while (js<bidL){
+    sh[tidL]=0;
+    if ((js+tidL)<bidL){sh[tidL]=vs2cc[js+tidL];}
+    __syncthreads();
+    s=nthread;
+    while (s>=128){
+      if (tidL<s/2){sh[tidL] += sh[tidL+s/2];}
+      __syncthreads();    
+      s/=2;
+    }
+    if (tidL<32) {
+      if (nthread >=64) {sh[tidL] += sh[tidL+32];}
+      if (nthread >=32) {sh[tidL] += sh[tidL+16];}
+      if (nthread >=16) {sh[tidL] += sh[tidL+8];}
+      if (nthread >= 8) {sh[tidL] += sh[tidL+4];}
+      if (nthread >= 4) {sh[tidL] += sh[tidL+2];}
+      if (nthread >= 2) {sh[tidL] += sh[tidL+1];}
+    }
+    __syncthreads();
+    i1+=sh[0];
+    js+=nthread;
+  } // while (js<bidL...
+  __syncthreads();
+  js=tid+n0;
+  sh[tidL]=0;
+  if (js<ntot){
+    if (vstate[js]==2 || (vstate[js]==1 && tempval[js]<tmelt)){
+      sh[tidL]=1;
+    }
+    if (tempval[js]>=tmelt){
+      dg->GetNeighbors(js,inei);
+      issl=0;
+      for (int j1=0;j1<inei[26];++j1){
+	issl=issl || vstate[inei[j1]]==2 || 
+	  (vstate[inei[j1]]==1 && tempval[inei[j1]]<tmelt);
+      }
+    }
+    if (issl){sh[tidL]=1;}
+  }
+  __syncthreads();
+  i2 = -1;
+  for (int j=0;j<(tidL+1);++j){if(sh[j]==1){i2+=1;}}
+  i3 = i1+i2;
+  if (sh[tidL]==1){ida[i3]=js;}
+}
+
+__global__ void  updateVoxelsPart1c(Grid *dg,int *idaG,int *ineiG,int nA)
+{
+  // establish neighborhood indicies for every voxel in active region
+  int tid=threadIdx.x+blockIdx.x*blockDim.x,inei[27],jI,js,
+    stride=blockDim.x*gridDim.x;
+  jI=tid;
+  while (jI<nA){
+    js=idaG[jI];
+    dg->GetNeighbors(js,inei);
+    for (int j1=0;j1<inei[26];++j1){
+      ineiG[32*jI+j1]=inei[j1];
+    }
+    ineiG[32*jI+26]=inei[26];
+    jI+=stride;
+  }
+}
+
+__global__ void  updateVoxelsPart1d(Grid *dg,int *vstate,int *idaG,int *ineiG,bool *iaG,
+				    double *tempval,bool *disf, double *dtinc,int nA)
+{
+  int gid=threadIdx.x+blockIdx.x*blockDim.x,inei[27],js,
+    stride=gridDim.x*blockDim.x,ji;
+  double tmelt=dg->tL;
+  bool isaxt,isaxv;
+  js=gid;
+  while (js<32*nA){
+    iaG[js]=false;
+    js+=stride;
+  }
+  js=gid;
+  while (js<nA){
+    if (vstate[js]==2){
+      for (int j=0;j<ineiG[32*js+26];++j){
+	inei[j]=ineiG[32*js+j];
+      }
+      inei[26]=ineiG[32*js+26];
+      isaxt=1;
+      isaxv=1;
+      for (int j=0;j<inei[26];++j){
+	isaxt=isaxt && dtempval[inei[j]]<tmelt;
+	isaxv=isaxv && dvstate[inei[j]]!=1;
+      }
+      if ( (!isaxv) && isaxt){
+	for (int j=0;j<inei[26];++j){
+	  if (vstate[inei[j]]!=1){continue;}
+	  ji = 32*js+j;
+	  iaG[ji]=true;
+	}
+      }
+    }
+    js+=stride;
+  }
+  // initialize parameters
+  dtinc[0]=0.0;
+  disf[0]=true;
+}								 
+
+__global__ void updateVoxelsPart3a(Grid *dg,bool *disf,float *dtminG, double *dtinc)
+{
+  dtinc+=dtminG[0];
+  disf[0] = dtminG[0]<1e6 && dtinc<dg->bmDelT;
+}
+
+__global__ void updateVoxelsPart3(Grid *dg,int *dgid,int *dvstate, int *idG,int *ineiG,bool *iaG,
+				  double *dctheta,double *dtempval,double *dctroid,
+				  double *dexts,double *dtinc,bool *disf,
+				  float *dtminG,int *j1indG,int nA)
+{
+  int tid=threadIdx.x,gid=threadIdx.x+blockIdx.x*blockDim.x,inei,js,
+    stride=gridDim.x*blockDim.x,jx[3],i3=dg->nX[0]*dg->nX[1],jI,
+    i2=dg->nX[0],s,nthread=blockDim.x;
+  double vhat=0.0,dnx[3],dlocX[3],omega,ax[3],rRot[3][3],th,ph,tmelt=dg->tL,
+    Avel=dg->Avel,nvel=dg->nvel,dx=dg->dX[0],timeUntil,dr;
+  bool isaxt,isaxv;
+  extern __shared__ volatile int sh[];
+  volatile int *j1vec=sh;
+  volatile float *dtminv=(float*)&j1vec[nthread];
+  __syncthreads();
+  dtminv[tid]=1e6;
+  if (disf[0]){
+    jI=gid;
+    while (jI<32*nA){
+      if (iaG[jI]){
+	js = idG[jI/32];
+	inei = ineiG[jI];
+	omega=dctheta[4*(dgid[js]-1)];
+	ax[0]=dctheta[4*(dgid[js]-1)+1];
+	ax[1]=dctheta[4*(dgid[js]-1)+2];
+	ax[2]=dctheta[4*(dgid[js]-1)+3];
+	loadRotMat(omega,ax,rRot);
+	dtempval[js]>=tmelt ? vhat=0. : vhat = Avel*pow(tmelt-dtempval[js],nvel);
+	jx[2] = inei/i3;
+	jx[1] = (inei- i3*jx[2])/i2;
+	jx[0] = inei - i3*jx[2] - i2*jx[1];      
+	dnx[0] = (double(jx[0])+.5)*dx - dctroid[3*js];
+	dnx[1] = (double(jx[1])+.5)*dx - dctroid[3*js+1];
+	dnx[2] = (double(jx[2])+.5)*dx - dctroid[3*js+2];
+	th = atan2(fabs(dnx[1]),fabs(dnx[0]));
+	th > CUDART_PI/4.0 ? th= CUDART_PI/2.0 - th: th ;
+	ph = atan2(pow(pow(dnx[0],2.0)+pow(dnx[1],2.0),.5),fabs(dnx[2]));
+	ph < CUDART_PI/4.0 ? ph = CUDART_PI/2.0 - ph: ph ;
+	// matrix is local->global; need to multiply by transpose for global->local
+	// put into 1st quadrant b/c of symmetry
+	dlocX[0] = fabs(rRot[0][0]*dnx[0]+rRot[1][0]*dnx[1]+rRot[2][0]*dnx[2]);
+	dlocX[1] = fabs(rRot[0][1]*dnx[0]+rRot[1][1]*dnx[1]+rRot[2][1]*dnx[2]);
+	dlocX[2] = fabs(rRot[0][2]*dnx[0]+rRot[1][2]*dnx[1]+rRot[2][2]*dnx[2]);
+	dr = pow(cos(th)*sin(ph),.5)*(dlocX[0]+dlocX[1]+dlocX[2]) - dexts[js];
+	timeUntil = dr/vhat;
+	if (timeUntil<dtminv[tid]){
+	  dtminv[tid] = timeUntil;
+	  j1vec[tid] = jI;
+	}
+      } // if(iaG[jI]...
+      jI+=stride;
+    } // while (jI<32*nA...
+    // reduce within block    
+    __syncthreads();
+    s=nthread;
+    while (s>=128){
+      if (nthread >= s){
+	if (tid<s/2){
+	  if (dtminv[tid]>dtminv[tid+s/2]){
+	    dtminv[tid] = dtminv[tid+s/2];
+	    j1vec[tid] = j1vec[tid+s/2];
+	  }
+	}
+	__syncthreads();
+      }
+      s/=2;
+    }
+    if (tid<32) {
+      if (nthread >=64) {
+	if (dtminv[tid]> dtminv[tid+32]){
+	  dtminv[tid] = dtminv[tid+32];
+	  j1vec[tid] = j1vec[tid+32];
+	}
+      }
+      if (nthread >=32) {
+	if (dtminv[tid]> dtminv[tid+16]){
+	  dtminv[tid] = dtminv[tid+16];
+	  j1vec[tid] = j1vec[tid+16];
+	}
+      }
+      if (nthread >=16) {
+	if (dtminv[tid]> dtminv[tid+8]){
+	  dtminv[tid] = dtminv[tid+8];
+	  j1vec[tid] = j1vec[tid+8];
+	}
+      }
+      if (nthread >= 8) {
+	if (dtminv[tid]> dtminv[tid+4]){
+	  dtminv[tid] = dtminv[tid+4];
+	  j1vec[tid] = j1vec[tid+4];
+	}
+      }
+      if (nthread >= 4) {
+	if (dtminv[tid]> dtminv[tid+2]){
+	  dtminv[tid] = dtminv[tid+2];
+	  j1vec[tid] = j1vec[tid+2];
+	}
+      }
+      if (nthread >= 2) {
+	if (dtminv[tid]> dtminv[tid+1]){
+	  dtminv[tid] = dtminv[tid+1];
+	  j1vec[tid] = j1vec[tid+1];
+	}
+      }
+    }  // if (tid<32) ...
+    if (tid==0) {
+      dtminG[blockIdx.x] = dtminv[tid];
+      j1indG[blockIdx.x] = j1vec[tid];
+    }
+  } // if (disf[0])
+}
+__global__ void updateVoxelsPart3back(Grid *dg,int *dgid,int *dvstate, double *dctheta,double *dtempval,
+				  double *dctroid,double *dexts,double *dtinc,bool *disf,
 				  float *dtminG,int *jindG,int *j1indG,int ntot)
 {
   int tid=threadIdx.x,gid=threadIdx.x+blockIdx.x*blockDim.x,inei[27],js,
-    stride=gridDim.x*blockDim.x,jx[3],timeUntil,dr,i3=dg->nX[0]*dg->nX[1],
+    stride=gridDim.x*blockDim.x,jx[3],i3=dg->nX[0]*dg->nX[1],
     i2=dg->nX[0],s,nthread=blockDim.x;
-  double vhat,dnx[3],dlocX[3],omega,ax[3],rRot[3][3],th,ph,tmelt=dg->tL,
-    Avel=dg->Avel,nvel=dg->nvel,dx=dg->dX[0];
+  double vhat=0.0,dnx[3],dlocX[3],omega,ax[3],rRot[3][3],th,ph,tmelt=dg->tL,
+    Avel=dg->Avel,nvel=dg->nvel,dx=dg->dX[0],timeUntil,dr;
   bool isaxt,isaxv;
   extern __shared__ volatile int sh[];
   volatile int *jvec=sh;
   volatile int *j1vec=&jvec[nthread];
   volatile float *dtminv=(float*)&j1vec[nthread];
-  disf[0]=(vs2[0]!=vs2[1] && dtinc[0]<dg->bmDelT);
+  __syncthreads();
+  dtminv[tid]=1e6;
   if (disf[0]){
-    dtminv[tid]=1e6;
-    if (tid==0){vs2[1]=vs2[0];}
     js=gid;
     while (js<ntot){
       if (dvstate[js]==2){
@@ -460,20 +742,18 @@ __global__ void updateVoxelsPart3(Grid *dg,int *dgid,int *dvstate, double *dcthe
   } // if (disf[0])
 }
 
-__global__ void reduceVoxelCapture(float *dtminG,int *jindG, int *j1indG, int n)
+__global__ void reduceVoxelCapture(float *dtminG,int *j1indG, int n)
 {
   int js,tid=threadIdx.x+blockDim.x*blockIdx.x,stride=blockDim.x*gridDim.x,s,
     nthread=blockDim.x,tidL=threadIdx.x,bidL=blockIdx.x;
   extern __shared__ volatile int sh[];
-  volatile int *jvec=sh;
-  volatile int *j1vec=&jvec[nthread];
+  volatile int *j1vec=sh;
   volatile float *dtminv=(float*)&j1vec[nthread];
   js=tid;
   dtminv[tidL]=1e6;
   while (js<n){
     if (dtminv[tidL]>dtminG[js]){
       dtminv[tidL] = dtminG[js];
-      jvec[tidL] = jindG[js];
       j1vec[tidL] = j1indG[js];
     }      
     js+=stride;
@@ -485,7 +765,6 @@ __global__ void reduceVoxelCapture(float *dtminG,int *jindG, int *j1indG, int n)
       if (tidL<s/2){
 	if (dtminv[tidL]>dtminv[tidL+s/2]){
 	  dtminv[tidL] = dtminv[tidL+s/2];
-	  jvec[tidL] = jvec[tidL+s/2];
 	  j1vec[tidL] = j1vec[tidL+s/2];
 	}
       }
@@ -497,55 +776,48 @@ __global__ void reduceVoxelCapture(float *dtminG,int *jindG, int *j1indG, int n)
     if (nthread >=64) {
       if (dtminv[tidL]>dtminv[tidL+32]){
 	dtminv[tidL] = dtminv[tidL+32];
-	jvec[tidL] = jvec[tidL+32];
 	j1vec[tidL] = j1vec[tidL+32];
       }
     }
     if (nthread >=32) {
       if (dtminv[tidL]>dtminv[tidL+16]){
 	dtminv[tidL] = dtminv[tidL+16];
-	jvec[tidL] = jvec[tidL+16];
 	j1vec[tidL] = j1vec[tidL+16];
       }
     }
     if (nthread >=16) {
       if (dtminv[tidL]>dtminv[tidL+8]){
 	dtminv[tidL] = dtminv[tidL+8];
-	jvec[tidL] = jvec[tidL+8];
 	j1vec[tidL] = j1vec[tidL+8];
       }
     }
     if (nthread >= 8) {
       if (dtminv[tidL]>dtminv[tidL+4]){
 	dtminv[tidL] = dtminv[tidL+4];
-	jvec[tidL] = jvec[tidL+4];
 	j1vec[tidL] = j1vec[tidL+4];
       }
     }
     if (nthread >= 4) {
       if (dtminv[tidL]>dtminv[tidL+2]){
 	dtminv[tidL] = dtminv[tidL+2];
-	jvec[tidL] = jvec[tidL+2];
 	j1vec[tidL] = j1vec[tidL+2];
       }
     }
     if (nthread >= 2) {
       if (dtminv[tidL]>dtminv[tidL+1]){
 	dtminv[tidL] = dtminv[tidL+1];
-	jvec[tidL] = jvec[tidL+1];
 	j1vec[tidL] = j1vec[tidL+1];
       }
     }
   } // if (tid<32 ...
   if (tidL==0) {
     dtminG[bidL] = dtminv[tidL];
-    jindG[bidL] = jvec[tidL];
     j1indG[bidL] = j1vec[tidL];
   }
 }
 
-__global__ void updateVoxelsPart4(Grid *dg,VoxelsCA *dvox,int *dgid,int *dvstate, double *dctheta,
-				  double *dctroid,double *dexts,int *vs2,
+__global__ void updateVoxelsPart4(Grid *dg,VoxelsCA *dvox,int *dgid,int *dvstate, int *ineiG,
+				  double *dctheta,double *dctroid,double *dexts,bool *disf
 				  float *dtminG,int *j1indG)
 {
   // ONLY RUN WITH 1 THREAD: SERIAL PROCESS
@@ -557,12 +829,11 @@ __global__ void updateVoxelsPart4(Grid *dg,VoxelsCA *dvox,int *dgid,int *dvstate
   double dtmin,axAng[4],dx=dg->dX[0];
   dtmin=dtminG[0]; 
   __syncthreads();
-  if (dtmin<1e6){
+  if (disf[0]){
     curand_init(seedL,subsq,0,&s1);
-    js1=j1indG[0];
+    js1=ineiG[j1indG[0]];
     GenerateSamples(nsamp,seedL,subsq,s1,axAng);
     dvstate[js1] = 2;
-    vs2[1]+=1;
     dvox->nGrain+=1;
     dctheta[4*ng]=axAng[0];
     dctheta[4*ng+1]=axAng[1];
@@ -578,41 +849,33 @@ __global__ void updateVoxelsPart4(Grid *dg,VoxelsCA *dvox,int *dgid,int *dvstate
     dexts[js1]=0.0;
   }
 }
-__global__ void updateVoxelsPart5(Grid *dg,int *dvstate, double *dtempval,
-				  double *dexts,float *dtminG,int ntot)
+__global__ void updateVoxelsPart5(Grid *dg,int *dvstate, int *idG,int *ineiG,
+				  bool *iaG,double *dtempval,bool *disf
+				  double *dexts,float *dtminG,int nA)
 {
   // UPDATES EXTENTS 
-  int tid=threadIdx.x+blockIdx.x*blockDim.x,js,
-    stride=blockDim.x*gridDim.x,inei[27];
+  int tid=threadIdx.x+blockIdx.x*blockDim.x,js,jI,
+    stride=blockDim.x*gridDim.x;
   double dtmin,Avel=dg->Avel,nvel=dg->nvel,vhat,tmelt=dg->tL;
   bool isaxt,isaxv;
   dtmin=dtminG[0];
   __syncthreads();
-  if (dtmin<1e6){
-    js=tid;
-    while (js<ntot){
-      vhat=0.;
-      if (dvstate[js]==2){
-	dg->GetNeighbors(js,inei);
-	isaxt=1;
-	isaxv=1;
-	for (int j=0;j<inei[26];++j){
-	  isaxt=isaxt && dtempval[inei[j]]<tmelt;
-	  isaxv=isaxv && dvstate[inei[j]]!=1;
-	}
-      	if ( (!isaxv) && isaxt){
-	  dtempval[js]>=tmelt ? vhat=0. : vhat = Avel*pow(tmelt-dtempval[js],nvel);
-	}	
-      }
-      dexts[js]+=vhat*dtmin;
-      js+=stride;
-    }
-  }
+  if (disf[0]){
+    jI=tid;
+    while (jI<32*nA){
+      if (iaG[jI]){
+	js=idG[jI/32];
+	dtempval[js]>=tmelt ? vhat=0. : vhat = Avel*pow(tmelt-dtempval[js],nvel);
+	dexts[js]+=vhat*dtmin;
+      } // if (iaG[jI]...
+      jI+=stride;
+    } // while (jI<nA
+  } // if (disf[0]...
 }
 
-__global__ void updateVoxelsPart6(Grid *dg,VoxelsCA *dvox,int *dgid,int *dvstate, double *dctheta,
-				  double *dctroid,double *dexts,int *vs2,double *dtinc,
-				  float *dtminG,int *jindG,int *j1indG)
+__global__ void updateVoxelsPart6(Grid *dg,VoxelsCA *dvox,int *dgid,int *dvstate,int *idG,
+				  int *ineiG,double *dctheta,double *dctroid,double *dexts,bool *disf
+				  float *dtminG,int *j1indG)
 {
   // capture voxel **ONLY USE 1 THREAD - this is serial operation**
   int js,js1,jInd,i3=dg->nX[0]*dg->nX[1],
@@ -622,11 +885,10 @@ __global__ void updateVoxelsPart6(Grid *dg,VoxelsCA *dvox,int *dgid,int *dvstate
     dnx[3],omega,ax[3],locX[3];
       
   dtmin=dtminG[0];
-  if (dtmin<1e6){
-    js=jindG[0];
-    js1=j1indG[0];
+  if (disf[0]){
+    js=idG[j1indG[0]/32];
+    js1=ineiG[j1indG[0]];
     dvstate[js1]=2;
-    vs2[1]+=1;
     dgid[js1]=dgid[js];
     jx[2] = js1/i3;
     jx[1] = (js1- i3*jx[2])/i2;
@@ -636,79 +898,131 @@ __global__ void updateVoxelsPart6(Grid *dg,VoxelsCA *dvox,int *dgid,int *dvstate
     jy[0] = js - i3*jy[2] - i2*jy[1];
     l = pow( pow((jx[0]-jy[0])*dx,2)+ pow((jx[1]-jy[1])*dx,2)+
 	     pow((jx[2]-jy[2])*dx,2),.5);
-      dnx[0] = (double(jx[0])+.5)*dx - dctroid[3*js];
-      dnx[1] = (double(jx[1])+.5)*dx - dctroid[3*js+1];
-      dnx[2] = (double(jx[2])+.5)*dx - dctroid[3*js+2];
-      omega = dctheta[4*(dgid[js]-1)];
-      ax[0] = dctheta[4*(dgid[js]-1)+1];
-      ax[1] = dctheta[4*(dgid[js]-1)+2];
-      ax[2] = dctheta[4*(dgid[js]-1)+3];
-      loadRotMat(omega,ax,rRot);    
-      // matrix is local->global; need to multiply by transpose for global->local
-      locX[0] = rRot[0][0]*dnx[0]+rRot[1][0]*dnx[1]+rRot[2][0]*dnx[2];
-      locX[1] = rRot[0][1]*dnx[0]+rRot[1][1]*dnx[1]+rRot[2][1]*dnx[2];
-      locX[2] = rRot[0][2]*dnx[0]+rRot[1][2]*dnx[1]+rRot[2][2]*dnx[2];
-      th = atan2(fabs(dnx[1]),fabs(dnx[0]));
-      th > CUDART_PI/4.0 ? th= CUDART_PI/2.0 - th: th;
-      ph = atan2(pow(pow(dnx[0],2.0)+pow(dnx[1],2.0),.5),fabs(dnx[2]));
-      ph < CUDART_PI/4.0 ? ph = CUDART_PI/2.0 - ph: ph;
-      // signbit returns 0 if positive and 1 if negative
-      dr = fabs(locX[0])+fabs(locX[1])+fabs(locX[2]);
-      loadS(sdiag0,sInd); 
-      for (int j1=0;j1<6;++j1){
-	sdiag[j1][0]=sdiag0[j1][0]*dr;
-	sdiag[j1][1]=sdiag0[j1][1]*dr;
-	sdiag[j1][2]=sdiag0[j1][2]*dr;
+    dnx[0] = (double(jx[0])+.5)*dx - dctroid[3*js];
+    dnx[1] = (double(jx[1])+.5)*dx - dctroid[3*js+1];
+    dnx[2] = (double(jx[2])+.5)*dx - dctroid[3*js+2];
+    omega = dctheta[4*(dgid[js]-1)];
+    ax[0] = dctheta[4*(dgid[js]-1)+1];
+    ax[1] = dctheta[4*(dgid[js]-1)+2];
+    ax[2] = dctheta[4*(dgid[js]-1)+3];
+    loadRotMat(omega,ax,rRot);    
+    // matrix is local->global; need to multiply by transpose for global->local
+    locX[0] = rRot[0][0]*dnx[0]+rRot[1][0]*dnx[1]+rRot[2][0]*dnx[2];
+    locX[1] = rRot[0][1]*dnx[0]+rRot[1][1]*dnx[1]+rRot[2][1]*dnx[2];
+    locX[2] = rRot[0][2]*dnx[0]+rRot[1][2]*dnx[1]+rRot[2][2]*dnx[2];
+    th = atan2(fabs(dnx[1]),fabs(dnx[0]));
+    th > CUDART_PI/4.0 ? th= CUDART_PI/2.0 - th: th;
+    ph = atan2(pow(pow(dnx[0],2.0)+pow(dnx[1],2.0),.5),fabs(dnx[2]));
+    ph < CUDART_PI/4.0 ? ph = CUDART_PI/2.0 - ph: ph;
+    // signbit returns 0 if positive and 1 if negative
+    dr = fabs(locX[0])+fabs(locX[1])+fabs(locX[2]);
+    loadS(sdiag0,sInd); 
+    for (int j1=0;j1<6;++j1){
+      sdiag[j1][0]=sdiag0[j1][0]*dr;
+      sdiag[j1][1]=sdiag0[j1][1]*dr;
+      sdiag[j1][2]=sdiag0[j1][2]*dr;
+    }
+    if (locX[2]<0){jx[2]=1;} else{jx[2]=0;}
+    if (locX[1]<0){jx[1]=1;} else{jx[1]=0;}
+    if (locX[0]<0){jx[0]=1;} else{jx[0]=0;}
+    jInd = 4*jx[2]+ 2*jx[1]+ jx[0];
+    for (int j1=0;j1<3;++j1){
+      dnorm[j1] = pow(locX[0]-sdiag[sInd[jInd][j1]][0],2.0)+
+	pow(locX[1]-sdiag[sInd[jInd][j1]][1],2.0)+pow(locX[2]-sdiag[sInd[jInd][j1]][2],2.0);
+    } // for (int j1...                                                                                                                                     
+    jy[0]=0; jy[2]=0;
+    if (dnorm[0]<=dnorm[1] && dnorm[0]<=dnorm[2]){jy[0]=0;}
+    if (dnorm[1]<=dnorm[0] && dnorm[1]<=dnorm[2]){jy[0]=1;}
+    if (dnorm[2]<=dnorm[0] && dnorm[2]<=dnorm[1]){jy[0]=2;}
+    if (dnorm[0]>=dnorm[1] && dnorm[0]>=dnorm[2]){jy[2]=0;}
+    if (dnorm[1]>=dnorm[0] && dnorm[1]>=dnorm[2]){jy[2]=1;}
+    if (dnorm[2]>=dnorm[0] && dnorm[2]>=dnorm[1]){jy[2]=2;}
+    if (jy[0]==jy[2]){
+      jy[0]=0; jy[1]=1; jy[2]=2;
+    } else {
+      jy[1] = 3 - jy[0] - jy[2];
+    }
+    projectPointLine(locX,&(sdiag[sInd[jInd][jy[0]]][0]),&(sdiag[sInd[jInd][jy[1]]][0]),xI);
+    projectPointLine(locX,&(sdiag[sInd[jInd][jy[0]]][0]),&(sdiag[sInd[jInd][jy[2]]][0]),xJ);
+    d1I = pow(pow(sdiag[sInd[jInd][jy[0]]][0]-xI[0],2.0) +
+	      pow(sdiag[sInd[jInd][jy[0]]][1]-xI[1],2.0) +
+	      pow(sdiag[sInd[jInd][jy[0]]][2]-xI[2],2.0),.5);
+    dI2 = pow(pow(sdiag[sInd[jInd][jy[1]]][0]-xI[0],2.0) +
+	      pow(sdiag[sInd[jInd][jy[1]]][1]-xI[1],2.0) +
+	      pow(sdiag[sInd[jInd][jy[1]]][2]-xI[2],2.0),.5);
+    d1J = pow(pow(sdiag[sInd[jInd][jy[0]]][0]-xJ[0],2.0) +
+	      pow(sdiag[sInd[jInd][jy[0]]][1]-xJ[1],2.0) +
+	      pow(sdiag[sInd[jInd][jy[0]]][2]-xJ[2],2.0),.5);
+    dJ3 = pow(pow(sdiag[sInd[jInd][jy[2]]][0]-xJ[0],2.0) +
+	      pow(sdiag[sInd[jInd][jy[2]]][1]-xJ[1],2.0) +
+	      pow(sdiag[sInd[jInd][jy[2]]][2]-xJ[2],2.0),.5);
+    L12 = .5*(fmin(d1I,pow(3.0,.5)*l) + fmin(dI2,pow(3.0,.5)*l) );
+    L13 = .5*(fmin(d1J,pow(3.0,.5)*l) + fmin(dJ3,pow(3.0,.5)*l) );
+    Lmud =  pow(3.0,.5)* (pow(2.0/3.0,.5)*fmax(L12,L13));
+    xiL = 1.0;
+    dexts[js1] = pow(cos(th)*sin(ph),.5)*Lmud*xiL;
+    dnx[0] = sdiag[sInd[jInd][jy[0]]][0] - Lmud*sdiag0[sInd[jInd][jy[0]]][0];
+    dnx[1] = sdiag[sInd[jInd][jy[0]]][1] - Lmud*sdiag0[sInd[jInd][jy[0]]][1];
+    dnx[2] = sdiag[sInd[jInd][jy[0]]][2] - Lmud*sdiag0[sInd[jInd][jy[0]]][2];
+    locX[0] = rRot[0][0]*dnx[0]+rRot[0][1]*dnx[1]+rRot[0][2]*dnx[2];
+    locX[1] = rRot[1][0]*dnx[0]+rRot[1][1]*dnx[1]+rRot[1][2]*dnx[2];
+    locX[2] = rRot[2][0]*dnx[0]+rRot[2][1]*dnx[1]+rRot[2][2]*dnx[2];
+    dctroid[3*js1] = dctroid[3*js] + locX[0];
+    dctroid[3*js1+1] = dctroid[3*js+1] + locX[1];
+    dctroid[3*js1+2] = dctroid[3*js+2] + locX[2];
+  }
+}
+
+__global__ void updateVoxelsPart7a(int *idG,int *ineiG,int *iaj,int *j1ind,int nA)
+{
+  int gid=threadIdx.x+blockIdx.x*blockDim.x,stride=blockDim.x*gridDim.x,
+    js,j1s=ineiG[j1ind[0]];
+  js=gid;
+  while (js<nA){
+    if (idG[js]==j1s){iaj[0]=js;}
+    js+=stride;
+  }
+}
+
+__global__ void updateVoxelsPart7b(Grid *dg,int *idG, int *ineiG, int *iaG,int *j1ind,
+				   int *iaj,int *vstate, double *tempval,int nA)
+{
+  // adjusts boolean iaG for newly captured voxel and its neighbors
+  int gid=threadIdx.x+blockIdx.x*blockDim.x,js,jc=iaj[0],inei,
+    stride=gridDim.x*blockDim.x,jI,s,j1s=ineiG[j1ind[0]];
+  double tmelt=dg->tL;
+  __shared__ int vs[32];
+  __shared__ double temp[32];
+
+  if (gid<32){
+    // adjust boolean values for the neighborhood of the captured grain
+    vs[gid]=10;
+    temp[gid]=0;
+    if (gid< ineiG[32*jc+26]){
+      inei = ineiG[32*jc+gid];
+      vs[gid] = vstate[inei];
+      temp[gid] = tempval[inei];
+    }
+    s=16;
+    while (s>0){
+      if (gid<s){
+	if (temp[gid]<temp[gid+s]){temp[gid]=temp[gid+s];}
       }
-      if (locX[2]<0){jx[2]=1;} else{jx[2]=0;}
-      if (locX[1]<0){jx[1]=1;} else{jx[1]=0;}
-      if (locX[0]<0){jx[0]=1;} else{jx[0]=0;}
-      jInd = 4*jx[2]+ 2*jx[1]+ jx[0];
-      for (int j1=0;j1<3;++j1){
-        dnorm[j1] = pow(locX[0]-sdiag[sInd[jInd][j1]][0],2.0)+
-          pow(locX[1]-sdiag[sInd[jInd][j1]][1],2.0)+pow(locX[2]-sdiag[sInd[jInd][j1]][2],2.0);
-      } // for (int j1...                                                                                                                                     
-      jy[0]=0; jy[2]=0;
-      if (dnorm[0]<=dnorm[1] && dnorm[0]<=dnorm[2]){jy[0]=0;}
-      if (dnorm[1]<=dnorm[0] && dnorm[1]<=dnorm[2]){jy[0]=1;}
-      if (dnorm[2]<=dnorm[0] && dnorm[2]<=dnorm[1]){jy[0]=2;}
-      if (dnorm[0]>=dnorm[1] && dnorm[0]>=dnorm[2]){jy[2]=0;}
-      if (dnorm[1]>=dnorm[0] && dnorm[1]>=dnorm[2]){jy[2]=1;}
-      if (dnorm[2]>=dnorm[0] && dnorm[2]>=dnorm[1]){jy[2]=2;}
-      if (jy[0]==jy[2]){
-          jy[0]=0; jy[1]=1; jy[2]=2;
-      } else {
-        jy[1] = 3 - jy[0] - jy[2];
+      s/=2;
+    }
+    if (temp[0]<tmelt && vs[gid]==1){iaG[32*jc+gid]=true;}
+    }    
+  } else {
+    // adjust boolean value for any voxel that has the captured grain as a neighbor
+    jI = gid-32;
+    while (jI<32*nA){
+      js = idG[jI/32];
+      inei = ineiG[jI];
+      if (inei==j1s){
+	iaG[jI]=false;
       }
-      projectPointLine(locX,&(sdiag[sInd[jInd][jy[0]]][0]),&(sdiag[sInd[jInd][jy[1]]][0]),xI);
-      projectPointLine(locX,&(sdiag[sInd[jInd][jy[0]]][0]),&(sdiag[sInd[jInd][jy[2]]][0]),xJ);
-      d1I = pow(pow(sdiag[sInd[jInd][jy[0]]][0]-xI[0],2.0) +
-                pow(sdiag[sInd[jInd][jy[0]]][1]-xI[1],2.0) +
-                pow(sdiag[sInd[jInd][jy[0]]][2]-xI[2],2.0),.5);
-      dI2 = pow(pow(sdiag[sInd[jInd][jy[1]]][0]-xI[0],2.0) +
-                pow(sdiag[sInd[jInd][jy[1]]][1]-xI[1],2.0) +
-                pow(sdiag[sInd[jInd][jy[1]]][2]-xI[2],2.0),.5);
-      d1J = pow(pow(sdiag[sInd[jInd][jy[0]]][0]-xJ[0],2.0) +
-                pow(sdiag[sInd[jInd][jy[0]]][1]-xJ[1],2.0) +
-                pow(sdiag[sInd[jInd][jy[0]]][2]-xJ[2],2.0),.5);
-      dJ3 = pow(pow(sdiag[sInd[jInd][jy[2]]][0]-xJ[0],2.0) +
-                pow(sdiag[sInd[jInd][jy[2]]][1]-xJ[1],2.0) +
-                pow(sdiag[sInd[jInd][jy[2]]][2]-xJ[2],2.0),.5);
-      L12 = .5*(fmin(d1I,pow(3.0,.5)*l) + fmin(dI2,pow(3.0,.5)*l) );
-      L13 = .5*(fmin(d1J,pow(3.0,.5)*l) + fmin(dJ3,pow(3.0,.5)*l) );
-      Lmud =  pow(3.0,.5)* (pow(2.0/3.0,.5)*fmax(L12,L13));
-      xiL = 1.0;
-      dexts[js1] = pow(cos(th)*sin(ph),.5)*Lmud*xiL;
-      dnx[0] = sdiag[sInd[jInd][jy[0]]][0] - Lmud*sdiag0[sInd[jInd][jy[0]]][0];
-      dnx[1] = sdiag[sInd[jInd][jy[0]]][1] - Lmud*sdiag0[sInd[jInd][jy[0]]][1];
-      dnx[2] = sdiag[sInd[jInd][jy[0]]][2] - Lmud*sdiag0[sInd[jInd][jy[0]]][2];
-      locX[0] = rRot[0][0]*dnx[0]+rRot[0][1]*dnx[1]+rRot[0][2]*dnx[2];
-      locX[1] = rRot[1][0]*dnx[0]+rRot[1][1]*dnx[1]+rRot[1][2]*dnx[2];
-      locX[2] = rRot[2][0]*dnx[0]+rRot[2][1]*dnx[1]+rRot[2][2]*dnx[2];
-      dctroid[3*js1] = dctroid[3*js] + locX[0];
-      dctroid[3*js1+1] = dctroid[3*js+1] + locX[1];
-      dctroid[3*js1+2] = dctroid[3*js+2] + locX[2];
-      dtinc[0]+=dtmin;
+      jI +=stride;
+    }
   }
 }
 
@@ -854,7 +1168,6 @@ void VoxelsCA::AddLayer1Macro(VoxelsCA *d_vx,Grid &g,Grid *d_g,double **d_cthptr
   nbuf2 = 4*(nGrain+ npg + int(ceil(g.nX[0]*g.nX[1]*(g.layerT/g.dX[2])*3*g.rNmax*pow(g.dX[0]*1e6,3.)*100)));
   nbuf1=4*(nGrain);
   resizeGlobalArray(d_cthptr,nbuf1,nbuf2);
-  cudaDeviceSynchronize();
   nThreads=512;
   nBlocks = npg/nThreads;
   getSites<<<nBlocks,nThreads>>>(d_g,d_vx,d_Sites,npg);
@@ -902,7 +1215,7 @@ void VoxelsCA::ConvertSolid1Macro(Grid *dg,int *vstate,double *dextents,const in
     if (iswitch==0){
     // converts 2 to 3 if all neighbors >=2 (ie mushy to solid)
     // can only use 1 block
-    convertSolid1Part1<<<1,nThreads,nThreads*sizeof(int)>>>(dg,vstate,dextents,ntot);
+    convertSolid1Part1<<<1,nThreads,nThreads*sizeof(bool)>>>(dg,vstate,dextents,ntot);
   } else {
     // converts 3 to 2 if any neighbor is 1 (ie solid to mushy)
     // can only use 1 block
@@ -919,71 +1232,106 @@ void VoxelsCA::UpdateVoxelsMacro(Grid *dg, Grid &gg,VoxelsCA *dvox,int *dgid, in
   nThreads=1024;
   nBlocks=ntot/nThreads+1;
   SetLiquid3Macro(dg,dgid,dvstate,dtempval,dexts,nThreads,nBlocks);
-  int isw=1, *dvs2c, *djindG,*dj1indG,n1;
+  int isw=1,*dj1indG,n0,n1,*dv2cc,*idaG,*ineiG,nA,*jsj1;
   ConvertSolid1Macro(dg,dvstate,dexts,isw,nThreads,ntot);
+  HandleError( cudaPeekAtLastError() );  
   // calculate # of mushy voxels (vstate=2)
-  bool isf=1,*d_isf;
+  bool isf=true,*d_isf,*iaG;
   double *dtinc;
   float *ddtminG;
   nBlocks= ntot/nThreads+1;
   n1=nBlocks;
   HandleError(cudaMalloc((void**)&dtinc,sizeof(double)));
-  HandleError(cudaMalloc((void**)&djindG,n1*sizeof(int)));
-  HandleError(cudaMalloc((void**)&dvs2c,2*sizeof(int)));
+  HandleError(cudaMalloc((void**)&dv2cc,n1*sizeof(int)));
+  HandleError(cudaMalloc((void**)&jsj1,nA*1*sizeof(int)));
   HandleError(cudaMalloc((void**)&d_isf,sizeof(bool)));
-  updateVoxelsPart1<<<nBlocks,nThreads,nThreads*sizeof(int)>>>(dvstate,djindG,ntot);
-  HandleError( cudaPeekAtLastError() );
+  // count # of voxels in active region
+  updateVoxelsPart1<<<nBlocks,nThreads,nThreads*sizeof(int)>>>(dg,dvstate,dtempval,dv2cc,ntot);
+  HandleError( cudaPeekAtLastError() );  
   while (nBlocks>3){
     n1=nBlocks;
     nBlocks/=2;
-    reduceGlobalArray<<<nBlocks,nThreads,nThreads*sizeof(int)>>>(djindG,n1,0);
+    reduceGlobalArray<<<nBlocks,nThreads,nThreads*sizeof(int)>>>(dv2cc,n1,0);
   }
   n1=nBlocks;
-  reduceGlobalArray<<<1,nThreads,nThreads*sizeof(int)>>>(djindG,n1,0);
+  reduceGlobalArray<<<1,nThreads,nThreads*sizeof(int)>>>(dv2cc,n1,0);
+  HandleError( cudaPeekAtLastError() );    
+  HandleError(cudaMemcpy(&nA,&dv2cc[0],sizeof(int),cudaMemcpyDeviceToHost));
+  HandleError(cudaMalloc((void**)&idaG,nA*sizeof(int)));
+  HandleError(cudaMalloc((void**)&ineiG,nA*32*sizeof(int)));
+  HandleError(cudaMalloc((void**)&iaG,nA*32*sizeof(bool)));
+  nBlocks= ntot/nThreads+1;
+  n1=nThreads*nBlocks;
+  n0=0;
+  // establish iaG (indices of active region)
+  while (n0<ntot){
+    updateVoxelsPart1a<<<nBlocks,nThreads,nThreads*sizeof(int)>>>(dg,dvstate,dtempval,dv2cc,
+								  n0,n1);
+    updateVoxelsPart1b<<<nBlocks,nThreads,nThreads*sizeof(int)>>>(dg,dvstate,dtempval,
+								  dv2cc,idaG,n0,ntot);  
+    n0+=n1;
+  }
+  // establish ineiG (global indices of each active region voxel's neighbor)
+  updateVoxelsPart1c<<<nBlocks,nThreads>>>(dg,idaG,ineiG,nA);
+  // establish boolean array indicating if voxel is actively growing and 
   // initialize while loop
-  updateVoxelsPart2<<<1,1>>>(djindG,dvs2c,d_isf,dtinc);
-  HandleError( cudaPeekAtLastError() );
-  HandleError(cudaFree(djindG));
   nThreads=512;
   nBlocks=ntot/nThreads+1;
+  updateVoxelsPart1d<<<nBlocks,nThreads>>>(dg,dvstate,idaG,ineiG,iaG,dtempval,
+					   d_isf,dtinc,nA);
+  HandleError( cudaPeekAtLastError() );
+  HandleError(cudaFree(dv2cc));
+  nThreads=256;
+  nBlocks=nA/nThreads+1;
   HandleError(cudaMalloc((void**)&ddtminG,nBlocks*sizeof(float)));
-  HandleError(cudaMalloc((void**)&djindG,nBlocks*sizeof(int)));
   HandleError(cudaMalloc((void**)&dj1indG,nBlocks*sizeof(int)));
   double rX=gg.rNmax*pow(gg.dX[0]*1e6,3.);
   std::default_random_engine g1(30*gg.tInd+seed1);
   std::uniform_real_distribution<double> xrand1(0.0,1.0);
+  int cc1=0;
   while (isf){
-    nBlocks=ntot/nThreads+1;  
-    updateVoxelsPart3<<<nBlocks,nThreads,2*nThreads*sizeof(int)+nThreads*sizeof(float)>>>
-      (dg,dgid,dvstate,dctheta,dtempval,troids,dexts,dtinc,dvs2c,d_isf,ddtminG,djindG,dj1indG,ntot);
+    cc1+=1;
+    nBlocks=nA/nThreads+1;  
+    updateVoxelsPart3<<<nBlocks,nThreads,nThreads*sizeof(int)+nThreads*sizeof(float)>>>
+      (dg,dgid,dvstate,idaG,ineiG,iaG,dctheta,dtempval,troids,dexts,dtinc,d_isf,ddtminG,dj1indG,nA);
+    updateVoxelsPart3a<<<1,1>>>(dg,d_isf,ddtminG,dtinc);
     HandleError(cudaMemcpy(&isf,d_isf,sizeof(bool),cudaMemcpyDeviceToHost));
-    HandleError( cudaPeekAtLastError() );
     while (nBlocks>3){
       n1=nBlocks;
       nBlocks/=2;
-      reduceVoxelCapture<<<nBlocks,nThreads,2*nThreads*sizeof(int)+nThreads*sizeof(float)>>>
-	(ddtminG,djindG,dj1indG,n1);
+      reduceVoxelCapture<<<nBlocks,nThreads,nThreads*sizeof(int)+nThreads*sizeof(float)>>>
+	(ddtminG,dj1indG,n1);
     }
     n1=nBlocks;
-    reduceVoxelCapture<<<1,nThreads,2*nThreads*sizeof(int)+nThreads*sizeof(float)>>>
-      (ddtminG,djindG,dj1indG,n1);
-    // index 0 is winning voxel. 
+    reduceVoxelCapture<<<1,nThreads,nThreads*sizeof(int)+nThreads*sizeof(float)>>>
+      (ddtminG,dj1indG,n1);
     if (xrand1(g1)<rX){
       // nucleation occurs in voxel
-      updateVoxelsPart4<<<1,1>>>(dg,dvox,dgid,dvstate,dctheta,troids,dexts,dvs2c,
-				 ddtminG,dj1indG);
-      HandleError( cudaPeekAtLastError() );
+      updateVoxelsPart4<<<1,1>>>(dg,dvox,dgid,dvstate,ineiG,dctheta,troids,dexts,
+				 d_isf,ddtminG,dj1indG);
+      // update boolean array identifying active voxels
+      nBlocks=(nA+32)/nThreads+1;
+      updateVoxelsPart7a(idaG,ineiG,jsj1,dj1ind,nA);	
+      updateVoxelsPart7b(dg,idaG,ineiG,iaG,dj1ind,jsj1,dvstate,dtempval,nA);
     } else {
-      nBlocks=ntot/nThreads+1;
-      updateVoxelsPart5<<<nBlocks,nThreads>>>(dg,dvstate,dtempval,dexts,ddtminG,ntot);
-      updateVoxelsPart6<<<1,1>>>(dg,dvox,dgid,dvstate,dctheta,troids,dexts,dvs2c,dtinc,
-				 ddtminG,djindG,dj1indG);
-      HandleError( cudaPeekAtLastError() );
-      }
+      nBlocks=nA/nThreads+1;
+      updateVoxelsPart5<<<nBlocks,nThreads>>>(dg,dvstate,idaG,ineiG,iaG,
+					      dtempval,d_isf,dexts,ddtminG,nA);
+      updateVoxelsPart6<<<1,1>>>(dg,dvox,dgid,dvstate,idaG,ineiG,dctheta,troids,dexts,
+				 d_isf,ddtminG,dj1indG);
+      // update boolean array identifying active voxels
+      nBlocks=(nA+32)/nThreads+1;
+      updateVoxelsPart7a(idaG,ineiG,jsj1,dj1ind,nA);	
+      updateVoxelsPart7b(dg,idaG,ineiG,iaG,dj1ind,jsj1,dvstate,dtempval,nA);      
+    }
   } // while (isf)
+  isw=0;
+  nThreads=1024;
+  ConvertSolid1Macro(dg,dvstate,dexts,isw,nThreads,ntot);
   HandleError(cudaFree(ddtminG));
-  HandleError(cudaFree(djindG));
   HandleError(cudaFree(dj1indG));
+  HandleError(cudaFree(dtinc));
+  HandleError(cudaFree(d_isf));
 }
 void VoxelsCA::WriteToHDF1(const std::string &filename, const Grid &g, const double *tempcurr)
 {
