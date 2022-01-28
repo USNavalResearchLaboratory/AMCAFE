@@ -2,7 +2,7 @@
 
 #ifndef TEMPFIELD_CUH
 #define TEMPFIELD_CUH
-
+#include "SetPrecision.cuh"
 #include "Grid.cuh"
 #include <string>
 #include <vector>

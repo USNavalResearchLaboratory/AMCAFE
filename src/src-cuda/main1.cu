@@ -1,5 +1,5 @@
 
-
+#include "SetPrecision.cuh"
 #include "Grid.cuh"
 #include "VoxelsCA.cuh"
 #include "BasePlate.cuh"
@@ -11,7 +11,6 @@
 #include <thread>
 #include <algorithm>
 #include "fstream"
-
 
 
 static void HandleError( cudaError_t err,
@@ -73,7 +72,7 @@ int main(int argc, char *argv[])
   VoxelsCA *d_vox;
   HandleError(cudaMallocManaged((void**)&d_vox,sizeof(VoxelsCA)));
   HandleError(cudaMemcpy(d_vox, &vox, sizeof(VoxelsCA), cudaMemcpyHostToDevice));
-  nThreads=1024;
+  nThreads=512;
   HandleError(cudaMallocManaged((void**)&d_gID,Ntot*sizeof(int)));
   HandleError(cudaMallocManaged((void**)&d_vState,Ntot*sizeof(int)));
   HandleError(cudaMallocManaged((void**)&d_extents,Ntot*sizeof(double)));
@@ -86,10 +85,12 @@ int main(int argc, char *argv[])
   nBlocks=Ntot/nThreads;  
   createBasePlateGrains<<<nBlocks,nThreads>>>(d_vox,d_gID,d_vState,d_g,d_Sites,d_extents, 
 					    d_centroidOct,Ntot);
+
+  HandleError( cudaPeekAtLastError() );
   nThreads=128;
   nBlocks=vox.nGrain/nThreads;
   createBasePlateOrientations<<<nBlocks,nThreads>>>(d_vox,d_cTheta,d_g);
-  //HandleError( cudaPeekAtLastError() );
+  HandleError( cudaPeekAtLastError() );
   HandleError(cudaFree(d_Sites));
   Sites.clear();
   Sites.shrink_to_fit();
@@ -123,6 +124,7 @@ int main(int argc, char *argv[])
     HandleError(cudaMemcpy(&g.inewlayerflg,&(d_g->inewlayerflg),sizeof(int),cudaMemcpyDeviceToHost));
     if (g.inewlayerflg==1){ 
       HandleError(cudaMemcpy(&(vox.nGrain), &(d_vox->nGrain), sizeof(int), cudaMemcpyDeviceToHost));
+      cudaDeviceSynchronize();
       vox.CleanLayerMacro(d_vox,d_gID,&d_cTheta,Ntot);
     }    
     indOut = TempF.tInd % g.outint;
@@ -147,7 +149,7 @@ int main(int argc, char *argv[])
     auto texec2 = std::chrono::high_resolution_clock::now();
     auto delTexec = std::chrono::duration_cast<std::chrono::seconds>( texec2 - texec1 ).count();
     fplog << TempF.tInd<<","<<delTexec<<std::endl;
-    std::cout<<TempF.tInd<<","<<delTexec<<std::endl;
+    std::cout<<"time step and total time (s)"<<TempF.tInd<<","<<delTexec<<std::endl;
     cc+=1;
   } // while (!g.bcheck...
   cudaDeviceSynchronize();

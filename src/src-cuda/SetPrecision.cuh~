@@ -1,0 +1,5 @@
+#ifdef USE_DOUBLES
+  typedef double real;
+#else
+  typedef float real;
+#endif

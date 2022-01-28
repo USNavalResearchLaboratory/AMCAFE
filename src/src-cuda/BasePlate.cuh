@@ -1,6 +1,6 @@
 #ifndef BASEPLATE_CUH
 #define BASEPLATE_CUH
-
+#include "SetPrecision.cuh"
 #include "vector"
 #include "VoxelsCA.cuh"
 #include "Grid.cuh"

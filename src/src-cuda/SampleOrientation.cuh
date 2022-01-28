@@ -1,7 +1,7 @@
 
 #ifndef SAMPLEORIENTATION_CUH
 #define SAMPLEORIENTATION_CUH
-
+#include "SetPrecision.cuh"
 #include<curand_kernel.h>
 
 

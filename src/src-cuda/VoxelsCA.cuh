@@ -1,6 +1,6 @@
 #ifndef VOXELSCA_CUH
 #define VOXELSCA_CUH
-
+#include "SetPrecision.cuh"
 #include "Grid.cuh"
 #include "TempField.cuh"
 #include "BasePlate.cuh"
@@ -39,13 +39,13 @@ class VoxelsCA
 }; // end class VoxelCA
 
 __global__ void addLayer1Part1(Grid *g,VoxelsCA *vx,double *xs, double *troids,
-                          int *gD, int *vs, int *itmp, int numPG);
+                          int *gD, int *vs, int *itmp, int numPG,int ntot);
 __global__ void addLayer1Part2(Grid *g,VoxelsCA *vx, double *cTheta,
-                          int *gD, int *itmp, int numPG);
+                          int *gD, int *itmp, int numPG,int ntot);
 __global__ void addLayer1Part3(const Grid *g,int *gD, int *vs);
 __global__ void copyGlobal(double *x1,double *x0, int n);
 __global__ void getSites(Grid *g,VoxelsCA *vx,double *xs, int numPG);
-__global__ void cleanLayerPart1(VoxelsCA *dvx,int *dgid,int *gvolflg, int *itmp,int Ntot);
+__global__ void cleanLayerPart1(VoxelsCA *dvx,int *dgid,int *gvolflg,int Ntot);
 __global__ void cleanLayerPart2(VoxelsCA *dvx,int *gvolflg, int *itmp);
 __global__ void cleanLayerPart3(VoxelsCA *dvx,int *dgid,int *gvolflg, int *itmp,
                                 double *ctmp, double *ctheta,int Ntot);
@@ -53,24 +53,10 @@ __global__ void cleanLayerPart4(VoxelsCA *dvx, int *gvolflg);
 __global__ void convertSolid1Part1(Grid *dg,int *vst,double *dexts, int ntot);
 __global__ void convertSolid1Part2(Grid *dg,int *vst,int ntot);
 __global__ void setLiquid3(Grid *dg,int *dgid,int *dvstate,double *dtempval, double *dexts);
-__global__ void updateVoxelsPart1(int *vstate,int *vs2cc,int ntot);
-__global__ void updateVoxelsPart2(int *vs2cc, int *vs2, bool *disf,double *dtinc);
-__global__ void updateVoxelsPart3(Grid *dg,int *dgid,int *dvstate, double *dctheta,double *dtempval,
-                                  double *dctroid,double *dexts,double *dtinc, int *vs2, bool *disf,
-                                  float *dtminG,int *jindG,int *j1indG,int ntot);
-__global__ void reduceVoxelCapture(float *dtminG,int *jindG, int *j1indG, int n);
-__global__ void updateVoxelsPart4(Grid *dg,VoxelsCA *dvox,int *dgid,int *dvstate, double *dctheta,
-                                  double *dctroid,double *dexts,int *vs2,
-                                  float *dtminG,int *j1indG);
-__global__ void updateVoxelsPart5(Grid *dg,int *dvstate, double *dtempval,
-                                  double *dexts,float *dtminG,int ntot);
-__global__ void updateVoxelsPart6(Grid *dg,VoxelsCA *dvox,int *dgid,int *dvstate, double *dctheta,
-                                  double *dctroid,double *dexts,int *vs2,double *dtinc,
-                                  float *dtminG,int *jindG,int *j1indG);
 __global__ void reduceGlobalArray(int *ig, int n,int isw);
-__device__ void loadRotMat(double omega, double *ax, double  rRot[][3]);
 __device__ void projectPointLine(double *A, double *x0, double *x1, double *xproj);
 __device__  void loadS(double S[][3],int sInd[][3]);
+__device__ void loadRotMat(float omega, float *ax, float rRot[][3]);
 void resizeGlobalArray(double **y, int &n0, int &n1);
 void resizeArray(double **y, int &n);
 #endif

@@ -1,5 +1,5 @@
 // member functions for TempField
-
+#include "SetPrecision.cuh"
 #include "Grid.cuh"
 #include "TempField.cuh"
 #include "fstream"

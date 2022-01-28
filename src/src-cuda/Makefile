@@ -7,14 +7,21 @@ CPP2=g++
 VIRT_ARCH=compute_60
 REAL_ARCH=sm_60
 
-CUDAFLAGS=--gpu-architecture=$(VIRT_ARCH) --gpu-code=$(REAL_ARCH) 
 
-CUDACOMPILEFLGS=-dc
+# if want double precision, comment first one and uncomment second 
+# (and vice versa if want single precision
+DOUBLEPRECISION=-DUSE_DOUBLES
+#DOUBLEPRECISION=
+
+CUDAFLAGS=  --gpu-architecture=$(VIRT_ARCH) --gpu-code=$(REAL_ARCH) 
+
+#CUDACOMPILEFLGS=-dc -G 
+CUDACOMPILEFLGS=-dc -opt-info inline -Xptxas -O100 
 
 #CPPFLAGS = -std=c++11 -DADIOS2_USE_MPI -isystem /home/kteferra/Documents/research/software/ADIOS2/include
 CPPFLAGS = -std=c++11 -DADIOS2_USE_MPI -isystem /usr/local/ADIOS2/include
 
-CPPOPTFLAGS = -g -O0
+CPPOPTFLAGS = -g -O5 
 #CPPOPTFLAGS = -Wall
 #CPPOPTFLAGS = -O3
 
@@ -37,7 +44,7 @@ OBJECTS = $(SOURCES:.cu=.o)
 cafe: $(OBJECTS)
 	@rm -f $@
 	$(CPP) $(CUDAFLAGS) -dlink $(OBJECTS) -o gpucode.o
-	$(CPP2) $(CPPFLAGS) $(CPPOPTFLAGS) -o $@  gpucode.o $^ $(METISLIB) $(adioslib) /usr/local/cuda/lib64/*so
+	$(CPP2) $(CPPFLAGS) $(CPPOPTFLAGS) -o $@  gpucode.o $^ $(METISLIB) $(adioslib) /usr/local/cuda/lib64/*so  /usr/local/cuda/lib64/*.a
 #	$(CPP2) $(CPPFLAGS) $(CPPOPTFLAGS) -o $@  gpucode.o $^ $(METISLIB) $(adioslib) -L/usr/local/cuda/lib64 -lcudart
 
 clean:
@@ -48,7 +55,7 @@ clean:
 .SUFFIXES: .cu  # define the suffixes
 
 %.o : %.cu
-	$(CPP) -c $(CPPFLAGS) $(CUDAFLAGS) $(CPPOPTFLAGS) $(CUDACOMPILEFLGS) $(CPPINCLUDE) $< -o $@
+	$(CPP) -c $(CPPFLAGS) $(DOUBLEPRECISION) $(CUDAFLAGS) $(CPPOPTFLAGS) $(CUDACOMPILEFLGS) $(CPPINCLUDE) $< -o $@
 
 # pattern rules for creating objects
 #--------------------------------------------------------

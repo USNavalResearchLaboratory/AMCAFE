@@ -1,5 +1,5 @@
 // member function definitions for Grid.C
-
+#include "SetPrecision.cuh"
 #include "SampleOrientation.cuh"
 #include "random"
 #include <numeric>

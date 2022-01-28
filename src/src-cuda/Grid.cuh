@@ -2,6 +2,7 @@
 
 #ifndef GRID_CUH
 #define GRID_CUH
+#include "SetPrecision.cuh"
 #include "iostream"
 #include <math.h>
 #include <vector>
