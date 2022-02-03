@@ -11,12 +11,12 @@
 #include <curand_kernel.h>
 
 __global__ void createBasePlateGrains(VoxelsCA *vx, int *gD, int *vs,
-                              Grid *gg,double *xSite,double *exts, double *troids,
+                              Grid *gg,real *xSite,real *exts, real *troids,
                               const int Ntot)
 {
   int tid = threadIdx.x + blockIdx.x*blockDim.x,ng=vx->nGrain;
   int j1,j2,j3,igid=0,js,stride=blockDim.x*gridDim.x;
-  double xloc,yloc,zloc,dsq=1e6,dsqtmp;
+  real xloc,yloc,zloc,dsq=1e6,dsqtmp;
   js=tid;
   while (js <Ntot){
 
@@ -48,13 +48,13 @@ __global__ void createBasePlateGrains(VoxelsCA *vx, int *gD, int *vs,
   } // whil (js < Ntot
 }
 
-__global__ void createBasePlateOrientations(VoxelsCA *vx, double *cTheta,Grid *gg)
+__global__ void createBasePlateOrientations(VoxelsCA *vx, real *cTheta,Grid *gg)
 {
   int tid = threadIdx.x + blockIdx.x*blockDim.x,ng=vx->nGrain, 
     nsamp=1,subsq=0,jc,stride=blockDim.x*gridDim.x;
 
   unsigned int seedL = vx->seed0 + tid*1000;
-  double axAng[4];
+  real axAng[4];
   jc=tid;
   while (jc<ng){
     GenerateSamples(nsamp,seedL,subsq,gg->s1, axAng);
@@ -66,11 +66,11 @@ __global__ void createBasePlateOrientations(VoxelsCA *vx, double *cTheta,Grid *g
   }
 }
 
-void GenerateGrainSites(const Grid &g, std::vector<double> & Xsite)
+void GenerateGrainSites(const Grid &g, std::vector<real> & Xsite)
 {
 
-  double Lx = g.lX[0], Ly = g.lX[1],height = g.Nzhg*g.dX[2];
-  double rate = g.mu*(Lx*1e6)*(Ly*1e6)*(height*1e6);
+  real Lx = g.lX[0], Ly = g.lX[1],height = g.Nzhg*g.dX[2];
+  real rate = g.mu*(Lx*1e6)*(Ly*1e6)*(height*1e6);
   std::default_random_engine generator;
   std::poisson_distribution<int> ng(rate);
   int num_grain =0;
@@ -78,7 +78,7 @@ void GenerateGrainSites(const Grid &g, std::vector<double> & Xsite)
     num_grain = ng(generator);
   } // end while 
   Xsite.assign(3*num_grain,0.);
-  std::uniform_real_distribution<double> xrand(0.0,1.0);
+  std::uniform_real_distribution<real> xrand(0.0,1.0);
   for (int j=0; j<num_grain;++j){
     Xsite[3*j] = xrand(generator)*Lx;
     Xsite[3*j+1] = xrand(generator)*Ly;

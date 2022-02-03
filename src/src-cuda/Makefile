@@ -10,8 +10,8 @@ REAL_ARCH=sm_60
 
 # if want double precision, comment first one and uncomment second 
 # (and vice versa if want single precision
-DOUBLEPRECISION=-DUSE_DOUBLES
-#DOUBLEPRECISION=
+#DOUBLEPRECISION=-DUSE_DOUBLES
+DOUBLEPRECISION=
 
 CUDAFLAGS=  --gpu-architecture=$(VIRT_ARCH) --gpu-code=$(REAL_ARCH) 
 

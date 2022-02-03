@@ -14,12 +14,12 @@ class Grid
   Grid(std::string & filIn);  
   // any functions added here
   void readInputFile(std::string &filInput);
-  void UpdateTime(const double &velo);
-  void UpdateTime2(const double &dtIn);
-  void UpdateTimeTest1(const double &velo);
-  __device__ void UpdateLaser(double *lasercoor,double *lasercoor2);
+  void UpdateTime(const real &velo);
+  void UpdateTime2(const real &dtIn);
+  void UpdateTimeTest1(const real &velo);
+  __device__ void UpdateLaser(real *lasercoor,real *lasercoor2);
   __device__ void GetNeighbors(int &jvox, int *ineigh);
-  void SkipTime(const double &DelT);
+  void SkipTime(const real &DelT);
   void ComputeNeighborhood(int &j, std::string & nO,std::vector<int> & nn);
   void ComputeNeighborhoodFirst(int &j, int & ntype, std::vector<int> &nn);
   void inline ComputeNeighborhoodMooreFirst(int &j, std::vector<int> &nn)
@@ -42,22 +42,22 @@ class Grid
       } // for (int i2...
     } // for (int i3...
   } // end inline Compute...
-  double time,dX[3],meltparam[4],beamSTD[3],lX[3],offset[3],gsize[2],gth,gth0,*lcoor,*lcoor2,gbox[4],
+  real time,dX[3],meltparam[4],beamSTD[3],lX[3],offset[3],gsize[2],gth,gth0,*lcoor,*lcoor2,gbox[4],
     Avel,nvel,bmDelT;
   int nDim,tInd,nnodePerCell,ictrl,nZlayer,patternID,outint,outNL,nTsd,Nsd,Ntd,NpT,
     inewscanflg,inewlayerflg,isp,indlayer,ilaserLoc,Nzhg,nX[3],ntype,nlayerTot;
-  double bmV,bmP,bhatch; // beam velocity,power, hatch spacing, nucleation rate
-  double tL,tS,T0; // liquidus, solidus, room temp (K)
-  double rNmax; // nucleation density (m^{-3})
-  double layerT; // thickness of each layer
-  double mu; // rate for Voronoi tessellation for baseplate
-  double bpH; // base plate height
-  double lrate; // layer rate for Voronoi powder microstructure 
+  real bmV,bmP,bhatch; // beam velocity,power, hatch spacing, nucleation rate
+  real tL,tS,T0; // liquidus, solidus, room temp (K)
+  real rNmax; // nucleation density (m^{-3})
+  real layerT; // thickness of each layer
+  real mu; // rate for Voronoi tessellation for baseplate
+  real bpH; // base plate height
+  real lrate; // layer rate for Voronoi powder microstructure 
   bool bcheck=0;
   curandState_t s1;
 }; // end class Grid
 
-__global__ void UpdateLaserGlobal(Grid *gg,double *lasercoor,double *lasercoor2);
-__global__ void UpdateTime2Global(Grid *dg, const double dt);
+__global__ void UpdateLaserGlobal(Grid *gg,real *lasercoor,real *lasercoor2);
+__global__ void UpdateTime2Global(Grid *dg, const real dt);
 
 #endif

@@ -9,9 +9,9 @@
 #include <math_constants.h>
 
 
-__device__ void GetPermutation(const double *xyz, int *P)
+__device__ void GetPermutation(const real *xyz, int *P)
 {
-  double x,y,z;
+  real x,y,z;
   x= xyz[0];
   y = xyz[1];
   z = xyz[2];
@@ -37,7 +37,7 @@ __device__ void GetPermutation(const double *xyz, int *P)
   }
 } // end GetPermutation
 
-__device__ void ComputeMap1(const double &a, const double& aprime, const double *xyz, double *map1)
+__device__ void ComputeMap1(const real &a, const real& aprime, const real *xyz, real *map1)
 {
  
   map1[0] = a/aprime*xyz[0];
@@ -45,9 +45,9 @@ __device__ void ComputeMap1(const double &a, const double& aprime, const double 
   map1[2] = a/aprime*xyz[2];
 } // end ComputeMap1
 
-__device__ void ComputeMap2(const double &beta,const double *xyz, double *map2)
+__device__ void ComputeMap2(const real &beta,const real *xyz, real *map2)
 {
-  double x,y,z,Tcurv1,Tcurv2;
+  real x,y,z,Tcurv1,Tcurv2;
   x=xyz[0];
   y=xyz[1];
   z=xyz[2];
@@ -76,9 +76,9 @@ __device__ void ComputeMap2(const double &beta,const double *xyz, double *map2)
   map2[0] = Tcurv1; map2[1] = Tcurv2; map2[2] = z;
 } // end ComputeMap2
 
-__device__ void ComputeMap3(const double *xyz, double *map3)
+__device__ void ComputeMap3(const real *xyz, real *map3)
 {
-  double x,y,z,m1,m2,m3;
+  real x,y,z,m1,m2,m3;
   x=xyz[0];
   y=xyz[1];
   z=xyz[2];
@@ -92,7 +92,7 @@ __device__ void ComputeMap3(const double *xyz, double *map3)
   }
 } // end ComputeMap3
 
-__device__  void ComputeMeasure(const double &t,double & f)
+__device__  void ComputeMeasure(const real &t,real & f)
 {
   float r=1.;
   if ( fabs((fabs(t)-1.0)) <1e-10){
@@ -108,12 +108,12 @@ __device__  void ComputeMeasure(const double &t,double & f)
   }
 } // end ComputeMeasure
 
-__device__ void GenerateSamples(const int Nsample,unsigned int seedL, int subsq, curandState_t &s1, double *axisAngle)
+__device__ void GenerateSamples(const int Nsample,unsigned int seedL, int subsq, curandState_t &s1, real *axisAngle)
 {
-  double a,rhoP,t,omega,tnorm,pmax,coeffA[7],beta,aprime,
+  real a,rhoP,t,omega,tnorm,pmax,coeffA[7],beta,aprime,
     xyz0[3],xyz[3],xyz2[3],xyzb[3],map1[3],map2[3],map3[3];
   float r=1.;
-  double R1 = pow(3.0*CUDART_PI/4.0,1.0/3.0)*r;
+  real R1 = pow(3.0*CUDART_PI/4.0,1.0/3.0)*r;
   int Perm[]={1,2,3};
   a  = pow(2.0*CUDART_PI/3.0,1.0/2.0)*R1;
   aprime = pow(4.0*CUDART_PI/3.0,1.0/3.0)*R1;

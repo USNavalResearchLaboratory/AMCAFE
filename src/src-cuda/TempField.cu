@@ -15,13 +15,13 @@ __global__ void calcTemptInd(const Grid *g,TempField *temp)
 }
 
 __global__ void analyticTempCalcPart1(Grid *dg,TempField *dtempF, int *ispv, 
-				 double *dlcoor, double *dtempOut, 
+				 real *dlcoor, real *dtempOut, 
 				 int Ntot)
 {
 
   //computes temp field based on Schwalbach et al
   int j1,j2,j3,tid=threadIdx.x+blockDim.x*blockIdx.x,js,stride,nX[2],i1;
-  double x0,y0,x,y,z,dsq,xi,xp,yp,dirp,zp,rij1[3],a1m[6],dx,LX[2];
+  real x0,y0,x,y,z,dsq,xi,xp,yp,dirp,zp,rij1[3],a1m[6],dx,LX[2];
   dx=dg->dX[0];
   nX[0]=dg->nX[0];nX[1]=dg->nX[1];
   LX[0]=nX[0]*dx;;LX[1]=nX[1]*dx;
@@ -45,9 +45,9 @@ __global__ void analyticTempCalcPart1(Grid *dg,TempField *dtempF, int *ispv,
     j3 = js/(nX[0]*nX[1]);
     j2 = (js -nX[0]*nX[1]*j3)/nX[0];
     j1 = js - nX[0]*nX[1]*j3 - nX[0]*j2;
-    x0 = (double(j1)+.5)*(dx);
-    y0 = (double(j2)+.5)*(dx);
-    zp = (double(j3)+.5)*(dx);
+    x0 = (real(j1)+.5)*(dx);
+    y0 = (real(j2)+.5)*(dx);
+    zp = (real(j3)+.5)*(dx);
     if (zp<=z){
       xp=cos(dg->gth)*(x0-LX[0]/2.)+
 	sin(dg->gth)*(y0-LX[1]/2.)+LX[0]/2.;
@@ -84,12 +84,12 @@ __global__ void analyticTempCalcPart1(Grid *dg,TempField *dtempF, int *ispv,
 
 }
 
-__global__ void analyticTempCalcPart2(Grid *dg, TempField *dtempF,int *ispv,double *dlcoor2,
-				      double *dtempOut, int Ntot)
+__global__ void analyticTempCalcPart2(Grid *dg, TempField *dtempF,int *ispv,real *dlcoor2,
+				      real *dtempOut, int Ntot)
 {
   // check if last simulation of scan
   int tid=threadIdx.x+blockDim.x*blockIdx.x, js, stride=blockDim.x*gridDim.x;
-  double tmelt=dg->tL,x,y;
+  real tmelt=dg->tL,x,y;
   extern __shared__ volatile bool icheck[];
   x=dlcoor2[2*ispv[dg->isp]]-dtempF->offset[0];
   y=dlcoor2[2*ispv[dg->isp]+1]-dtempF->offset[1];
@@ -137,13 +137,13 @@ TempField::TempField(const Grid &g)
     } // for (int j=0...
   } // if (patternID==2...
   int Ntot = g.nX[0]*g.nX[1]*g.nX[2];
-  TempCurr = (double*)malloc(Ntot*sizeof(double));
+  TempCurr = (real*)malloc(Ntot*sizeof(real));
 } // end TempField
 
 void TempField::InitializeAnalytic(const Grid &g)
 {
   /*
-    This this 2 double ellipsoids (one encompassing another) to represent the temperature
+    This this 2 real ellipsoids (one encompassing another) to represent the temperature
     field. This approach is used in Rogers_Madison_Tikare, Comp Mat Sci, 2017.
     SCAN INFORMATION
     patternID=0: scan in +X direction only
@@ -164,8 +164,8 @@ void TempField::InitializeAnalytic(const Grid &g)
   a1[5] = a1[2];
 } // end InitializeAnalytic 
 
-void TempField::AnalyticalTempCalcMacro(Grid *dg,TempField *dtempF, double *dtempOut, 
-					double *dlcoor,double *dlcoor2,int *ispv,
+void TempField::AnalyticalTempCalcMacro(Grid *dg,TempField *dtempF, real *dtempOut, 
+					real *dlcoor,real *dlcoor2,int *ispv,
 					int &nThreads, int &nBlocks, int &Ntot)
 {
 

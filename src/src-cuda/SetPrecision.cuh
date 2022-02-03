@@ -1,8 +1,8 @@
 #ifndef SETPRECISION_CUH
 #define SETPRECISION_CUH
 #ifdef USE_DOUBLES
-  typedef double real;
+typedef double real;
 #else
-  typedef float real;
+typedef float real;
 #endif
 #endif

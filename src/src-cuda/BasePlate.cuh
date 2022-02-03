@@ -10,10 +10,10 @@
 
 class VoxelsCA;
 
-__global__ void createBasePlateGrains(VoxelsCA* vx, int *gid, int *vs,Grid *g,double *site,double *ext, double *centroids,const int ntot);
-__global__ void createBasePlateOrientations(VoxelsCA *vx, double *ctheta, Grid *gg);
+__global__ void createBasePlateGrains(VoxelsCA* vx, int *gid, int *vs,Grid *g,real *site,real *ext, real *centroids,const int ntot);
+__global__ void createBasePlateOrientations(VoxelsCA *vx, real *ctheta, Grid *gg);
 
-void GenerateGrainSites(const Grid &, std::vector<double> & );
+void GenerateGrainSites(const Grid &, std::vector<real> & );
 
 
 #endif

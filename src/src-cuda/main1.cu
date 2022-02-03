@@ -32,13 +32,13 @@ int main(int argc, char *argv[])
   // initialize and create base plate
   // set up all pointers for arrays in class
   auto texec1 = std::chrono::high_resolution_clock::now();
-  double *d_lcoor,*d_lcoor2;
+  real *d_lcoor,*d_lcoor2;
   // voxels
   int *d_gID,*d_vState,nBlocks,
     nThreads,*d_ispvec;
-  double *d_cTheta,*d_extents,*d_centroidOct;
+  real *d_cTheta,*d_extents,*d_centroidOct;
   // tempfield
-  double *d_Tempvals;
+  real *d_Tempvals;
   // initialize class variables
   std::string filbaseOut,filout,filLogOut,filParamIn;
   filParamIn = argv[1];
@@ -49,39 +49,39 @@ int main(int argc, char *argv[])
   int Ntot=g.nX[0]*g.nX[1]*g.nX[2];
   HandleError(cudaMallocManaged((void**)&d_g,sizeof(Grid)));
   HandleError(cudaMemcpy(d_g, &g, sizeof(Grid), cudaMemcpyHostToDevice));
-  HandleError(cudaMallocManaged((void**)&d_lcoor,2*g.NpT*sizeof(double)));
-  HandleError(cudaMallocManaged((void**)&d_lcoor2,2*g.NpT*sizeof(double)));
-  HandleError(cudaMemcpy(d_lcoor,(g.lcoor), 2*g.NpT*sizeof(double), cudaMemcpyHostToDevice));
-  HandleError(cudaMemcpy(d_lcoor2,(g.lcoor2), 2*g.NpT*sizeof(double), cudaMemcpyHostToDevice));
+  HandleError(cudaMallocManaged((void**)&d_lcoor,2*g.NpT*sizeof(real)));
+  HandleError(cudaMallocManaged((void**)&d_lcoor2,2*g.NpT*sizeof(real)));
+  HandleError(cudaMemcpy(d_lcoor,(g.lcoor), 2*g.NpT*sizeof(real), cudaMemcpyHostToDevice));
+  HandleError(cudaMemcpy(d_lcoor2,(g.lcoor2), 2*g.NpT*sizeof(real), cudaMemcpyHostToDevice));
   TempField TempF(g);
   TempF.InitializeAnalytic(g);
   TempField *d_TempF;
   HandleError(cudaMallocManaged((void**)&d_TempF,sizeof(Grid)));
-  HandleError(cudaMalloc((void**)&d_Tempvals,Ntot*sizeof(double)));
+  HandleError(cudaMalloc((void**)&d_Tempvals,Ntot*sizeof(real)));
   HandleError(cudaMemcpy(d_TempF, &TempF, sizeof(TempField), cudaMemcpyHostToDevice));
   HandleError(cudaMallocManaged((void**)&d_ispvec,g.NpT*sizeof(int)));
   HandleError(cudaMemcpy(d_ispvec,(TempF.ispvec), g.NpT*sizeof(int), cudaMemcpyHostToDevice));
-  std::vector<double> Sites;
+  std::vector<real> Sites;
   GenerateGrainSites(g,Sites);
   VoxelsCA vox(g);
   vox.nGrain = Sites.size()/3;
-  double *d_Sites;
-  HandleError(cudaMallocManaged((void**)&d_Sites,vox.nGrain*3*sizeof(double)));
-  HandleError(cudaMemcpy(d_Sites,Sites.data(), vox.nGrain*3*sizeof(double), cudaMemcpyHostToDevice));
-  vox.cTheta=(double*)malloc(vox.nGrain*4*sizeof(double));
+  real *d_Sites;
+  HandleError(cudaMallocManaged((void**)&d_Sites,vox.nGrain*3*sizeof(real)));
+  HandleError(cudaMemcpy(d_Sites,Sites.data(), vox.nGrain*3*sizeof(real), cudaMemcpyHostToDevice));
+  vox.cTheta=(real*)malloc(vox.nGrain*4*sizeof(real));
   VoxelsCA *d_vox;
   HandleError(cudaMallocManaged((void**)&d_vox,sizeof(VoxelsCA)));
   HandleError(cudaMemcpy(d_vox, &vox, sizeof(VoxelsCA), cudaMemcpyHostToDevice));
   nThreads=512;
   HandleError(cudaMallocManaged((void**)&d_gID,Ntot*sizeof(int)));
   HandleError(cudaMallocManaged((void**)&d_vState,Ntot*sizeof(int)));
-  HandleError(cudaMallocManaged((void**)&d_extents,Ntot*sizeof(double)));
-  HandleError(cudaMallocManaged((void**)&d_centroidOct,3*Ntot*sizeof(double)));
+  HandleError(cudaMallocManaged((void**)&d_extents,Ntot*sizeof(real)));
+  HandleError(cudaMallocManaged((void**)&d_centroidOct,3*Ntot*sizeof(real)));
   HandleError(cudaMemset(d_gID,0,Ntot*sizeof(int)));
   HandleError(cudaMemset(d_vState,0,Ntot*sizeof(int)));
-  HandleError(cudaMemset(d_extents,0,Ntot*sizeof(double)));
-  HandleError(cudaMemset(d_centroidOct,0,3*Ntot*sizeof(double)));
-  HandleError(cudaMallocManaged((void**)&d_cTheta,4*vox.nGrain*sizeof(double)));
+  HandleError(cudaMemset(d_extents,0,Ntot*sizeof(real)));
+  HandleError(cudaMemset(d_centroidOct,0,3*Ntot*sizeof(real)));
+  HandleError(cudaMallocManaged((void**)&d_cTheta,4*vox.nGrain*sizeof(real)));
   nBlocks=Ntot/nThreads;  
   createBasePlateGrains<<<nBlocks,nThreads>>>(d_vox,d_gID,d_vState,d_g,d_Sites,d_extents, 
 					    d_centroidOct,Ntot);
@@ -135,8 +135,8 @@ int main(int argc, char *argv[])
       resizeArray(&(vox.cTheta),nbuf);
       HandleError(cudaMemcpy(vox.gID, d_gID, Ntot*sizeof(int), cudaMemcpyDeviceToHost));
       HandleError(cudaMemcpy(vox.vState, d_vState, Ntot*sizeof(int), cudaMemcpyDeviceToHost));
-      HandleError(cudaMemcpy(TempF.TempCurr, d_Tempvals, Ntot*sizeof(double), cudaMemcpyDeviceToHost));
-      HandleError(cudaMemcpy(vox.cTheta, d_cTheta, 4*vox.nGrain*sizeof(double), cudaMemcpyDeviceToHost));
+      HandleError(cudaMemcpy(TempF.TempCurr, d_Tempvals, Ntot*sizeof(real), cudaMemcpyDeviceToHost));
+      HandleError(cudaMemcpy(vox.cTheta, d_cTheta, 4*vox.nGrain*sizeof(real), cudaMemcpyDeviceToHost));
       filout = filbaseOut+std::to_string(TempF.tInd);
       vox.WriteToHDF1(filout, g, TempF.TempCurr);
     } // if (indOut==0 ...

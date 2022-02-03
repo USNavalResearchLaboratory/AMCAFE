@@ -10,7 +10,7 @@
 #include "sstream"
 #include "numeric"
 
-__global__ void UpdateLaserGlobal(Grid *dg, double *laser_coor, double *laser_coor2){
+__global__ void UpdateLaserGlobal(Grid *dg, real *laser_coor, real *laser_coor2){
   //********************************************************
   // NOTE: ONLY RUN WITH 1 BLOCK AND 1 THREAD (THI IS SERIAL 
   // CODE THAT UPDATES GLOBAL VARIABLES)
@@ -19,7 +19,7 @@ __global__ void UpdateLaserGlobal(Grid *dg, double *laser_coor, double *laser_co
   if (tid==0){dg->UpdateLaser(laser_coor,laser_coor2);}
 } // end UpdateLaserGlobal
 
-__global__ void UpdateTime2Global(Grid *dg, const double dt)
+__global__ void UpdateTime2Global(Grid *dg, const real dt)
 {
   dg->time+=dt;
   dg->tInd+=1;
@@ -64,7 +64,7 @@ Grid::Grid(std::string &filInput)
   readInputFile(filInput);
   //if (gsize[0]==0){gsize={nX[0]*dX[0]*2,nX[1]*dX[1]*2};}
   lX[0] = nX[0]*dX[0];lX[1]=nX[1]*dX[1];lX[2]=nX[2]*dX[2];
-  bpH< std::numeric_limits<double>::epsilon() ? bpH=layerT : bpH=bpH;
+  bpH< std::numeric_limits<real>::epsilon() ? bpH=layerT : bpH=bpH;
   nZlayer = int(round(layerT/dX[2]));
   isp=0;
   inewscanflg=1;
@@ -75,11 +75,11 @@ Grid::Grid(std::string &filInput)
   Ntd=int(ceil(gsize[1]/bhatch))+1;
   Nsd=int(ceil(gsize[0]/(bmV*bmDelT)))+1;
   NpT=Nsd*Ntd;
-  lcoor = (double*)malloc(2*NpT*sizeof(double));
-  lcoor2 = (double*)malloc(2*NpT*sizeof(double));
-  double xlmin=(lX[0]-gsize[0])/2.,ylmin=(lX[1]-gsize[1])/2.;
+  lcoor = (real*)malloc(2*NpT*sizeof(real));
+  lcoor2 = (real*)malloc(2*NpT*sizeof(real));
+  real xlmin=(lX[0]-gsize[0])/2.,ylmin=(lX[1]-gsize[1])/2.;
   int k;
-  double gmid[2];
+  real gmid[2];
   gmid[0]=lX[0]/2.;
   gmid[1]=lX[1]/2.;
   gth+=gth0;
@@ -99,16 +99,16 @@ Grid::Grid(std::string &filInput)
   gbox[1]=lX[0]+bhatch/2.;
   gbox[2]=-bhatch/2.;
   gbox[3]=lX[1]+bhatch/2.;               
-  nlayerTot=int(ceil( (double)(nX[2]-Nzhg)/(double)nZlayer));
+  nlayerTot=int(ceil( (real)(nX[2]-Nzhg)/(real)nZlayer));
 } // end constructor
 
-__device__ void Grid::UpdateLaser(double *laser_coor, double *laser_coor2){
+__device__ void Grid::UpdateLaser(real *laser_coor, real *laser_coor2){
   //********************************************************
   // NOTE: ONLY RUN WITH 1 BLOCK AND 1 THREAD (THI IS SERIAL 
   // CODE THAT UPDATES GLOBAL VARIABLES)
   //********************************************************
   int itmp,iflg=0,irep=0,k;
-  double x,y,gmid[2];
+  real x,y,gmid[2];
 
 
   itmp = (isp+1) - ((isp+1)/Nsd)*Nsd;
@@ -330,7 +330,7 @@ void Grid::readInputFile(std::string &filInput)
     simInput >> keyword;
   } // while(simInput)
 } // readInputFile
-void Grid::UpdateTime2(const double &dtIn)
+void Grid::UpdateTime2(const real &dtIn)
 {
   time +=dtIn;
   tInd +=1;
