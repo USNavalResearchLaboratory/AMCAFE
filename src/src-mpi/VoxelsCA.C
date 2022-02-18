@@ -888,7 +888,6 @@ void VoxelsCA::AddLayer1(){
       i2+=1;
     }
   }
-  ig1=nGrain+ng2;
   if (i2 != ng2){
     for (int j=0;j<i3*_xyz->nZlayer;++j){
       i1=gtmp[j]-1;
@@ -910,11 +909,11 @@ void VoxelsCA::AddLayer1(){
       } // if (j<Ntot)
     } // if (j3>=iz1 && j3<_xyz->ilaserLoc ...
   } // for (int j...
-  nGrain += i2+1;  
+  nGrain += i2;  
   SampleOrientation sa1;
   // randomly generate crystallographic orientations
   std::vector<double> aa;
-  ng2=i2+1;
+  ng2=i2;
   sa1.GenerateSamples(ng2,sdloc,aa);
   cTheta.insert(cTheta.end(), aa.begin(),aa.end());
   // assign appropriate vState (including zeroing states above ilaserLoc

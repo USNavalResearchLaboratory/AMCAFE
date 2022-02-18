@@ -126,7 +126,7 @@ void TempField::AnalyticTempCurr(double tcurr,std::vector<double> & TempOut, std
       }
     } // if (dirp*rij1[0]>0...
   } // for (int j=0...
-  // check if last simulation of scan
+  // update to new scan if nothing melted (i.e. laser well outside domain)
   double tmelt=_xyz->tL;
   int n1=_part->ncellLoc,icheck,ichecktmp;
   x=_xyz->lcoor2[2*ispvec[_xyz->isp]]-offset[0];
@@ -135,15 +135,9 @@ void TempField::AnalyticTempCurr(double tcurr,std::vector<double> & TempOut, std
     ichecktmp=std::any_of(TempOut.begin(),TempOut.begin()+n1,[&tmelt]
 			  (double tchk){return tchk >= tmelt;});
     MPI_Allreduce(&ichecktmp,&icheck,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
-    if (icheck==0 || fmod(_xyz->isp+1,_xyz->Nsd)==0){ 
+    if (icheck==0){ 
       _xyz->inewscanflg=1;
     } // if (icheck==0...
-    if (_xyz->isp==(_xyz->NpT-1)){
-      _xyz->inewscanflg=1;
-      _xyz->inewlayerflg=1;
-      _xyz->isp=0;
-      _xyz->indlayer+=1;
-    }
   } // if (x<box[0...
 } // end AnalyticTempCurr()            
 void TempField::InitializeSchwalbach()

@@ -109,6 +109,17 @@ Grid::Grid(std::string &filIn, int & myidIn, int & nprocsIn)
 void Grid::UpdateLaser(){
   int itmp,iflg=0,irep=0;
   double x,y;
+
+  // update laser to new scan if at last point in scan
+  if (fmod(isp+1,Nsd)==0){inewscanflg=1;}
+  // if at last step of layer, new layer gets updated here
+  if (isp==(NpT-1)){
+      inewscanflg=1;
+      inewlayerflg=1;
+      isp=0;
+      indlayer+=1;
+  }
+  // otherwise, update laser location in general
   while(irep==0 || isp==0){
     irep+=1;
     itmp=isp;
