@@ -104,23 +104,23 @@ void Utilities::LayerUpdate(double t){
 
 double Utilities::Integral(std::vector<double> L, double T, std::vector<double> R){
   double Temp;
-  double t = 150.0e-5;
+  double t = 80.0e-5;
   double to = 0.0;
-  //  std::vector<double> M = Materials_316L(T);
-  std::vector<double> M = Materials_Ti64(T);
+  std::vector<double> M = Materials_316L(T);
+  //  std::vector<double> M = Materials_Ti64(T);
   struct my_f_params params = {t, bmV, R, T, Q, lat_shift, M, L};
   gsl_integration_fixed_workspace * w;
   const gsl_integration_fixed_type * Y = gsl_integration_fixed_legendre;
 
   gsl_function G;
-  
-  w = gsl_integration_fixed_alloc (Y, 15, to, t, 0.0, 0.0);
+
+  w = gsl_integration_fixed_alloc (Y, 25, to, t, 0.0, 0.0);
   G.function = &Utilities::Temp_Fun_G;
   G.params = &params;
 
   gsl_integration_fixed (&G, &Temp,  w);
   gsl_integration_fixed_free (w);
-  return 475 + Temp;  // Make this T0 + Temp
+  return 300 + Temp;  // Make this T0 + Temp
 }
 
 
@@ -146,26 +146,26 @@ void Utilities::InitializeUT()
   bmV = _xyz->bmV;
   Q = _xyz->bmP;
   zlaserOff = 1.0; // 1.0 (this specifies where laser z value is - see SchwalbachTempCurr)
-  bp_height = _bp->height; 
+  bp_height = _bp->height;
   DelT = _xyz->bmDelT;
   dX = _xyz->dX;
-  bmDX = {DelT*bmV, _xyz->bhatch,_xyz->layerT}; // (SD, TD, BD) per layer                                                                                                                                                                  
+  bmDX = {DelT*bmV, _xyz->bhatch,_xyz->layerT}; // (SD, TD, BD) per layer
   offset = _xyz->offset;
 
   // For Angled Structures:    ---------------------------------------------------------
   //  shiftL = {_xyz->meltparam[1], 0.0, 0.0}; // (SD, TD, BD) per layer
   //  lat_shift =_xyz->layerT*tan(_xyz->angle);
   bmLx = {_xyz->LX[0] + 2*offset[0], _xyz->LX[1], _xyz->LX[2]};
-  //  if (_xyz->patternID == 9){bmLx[1]=_xyz->struct_width/sin(_xyz->angle);}  
+  //  if (_xyz->patternID == 9){bmLx[1]=_xyz->struct_width/sin(_xyz->angle);}
   //  else if (_xyz->patternID == 24){bmLx[1] = _xyz->struct_width/sin(_xyz->angle);}
   //  ------------------------------------------------------------------------------------
-  
+
   nTTemp = {_xyz->nTsd==2 ? _xyz->nTsd : int(ceil(bmLx[0]/bmDX[0] ))+1,
             bmDX[1]>_xyz->LX[1] ? 1 : int(ceil(bmLx[1]/bmDX[1]))+1,
             bmDX[2]<std::numeric_limits<double>::epsilon() ? 1: int(ceil(bmLx[2]/bmDX[2]))};
   bmLx={(nTTemp[0]-1)*bmDX[0],(nTTemp[1]-1)*bmDX[1],(nTTemp[2]-1)*bmDX[2]};
   //  printf("nTTemp[0] TESTING : \n   _xyz->nTsd = Hold   \n bmLx[0] = %f  \n bmDX[0] = %f \n  END nTTemp[0] TEST", bmLx[0], bmDX[0]);
-} // end InitializeEASM   
+} // end InitializeEASM
 
 
 
@@ -226,7 +226,7 @@ std::vector<double> Utilities::Materials_Ti64(double T){
 
 
 double Utilities::Temp_Fun_G(double x, void *p){
-  double sigma = 100.0e-6;
+  double sigma = 50.0e-6;
   double eta = 0.56;
   struct my_f_params *params = (struct my_f_params *)p;
   //From params struct
@@ -247,4 +247,3 @@ double Utilities::Temp_Fun_G(double x, void *p){
   return C*pow(t-x,-0.5)/(2*M[3]*(t-x) + pow(sigma,2))*exp(-1*(pow(R[0]-Lx,2)+pow(R[1]-Ly,2)) /
                                                              (4*M[3]*(t-x)+2*pow(sigma,2)) - pow(abs(R[2]-Lz),2)/(4*M[3]*(t-x)));
 }
-

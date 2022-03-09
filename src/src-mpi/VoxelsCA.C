@@ -20,19 +20,19 @@
                           double &A, double &n, double &T)
   {
     double v=(5.51*pow(M_PI,2.0)*pow((-mL)*(1-kP),1.5)*
-       (Gamma))*( pow((tL - T),2.5)/pow(c0,1.5)); // LGK model                                                                                             
+       (Gamma))*( pow((tL - T),2.5)/pow(c0,1.5)); // LGK model
     return v;
-  } // end inline void dendriteVel1                                                                                                                        
+  } // end inline void dendriteVel1
   inline double dendriteVel2(double &tL,double &mL,double &kP,double &Gamma,double &c0,
                           double &A, double &n, double &T)
   {
     double v=A*pow(tL-T,n);
     return v;
-  } // end inline void dendriteVel     
+  } // end inline void dendriteVel
 
 // constructor
 VoxelsCA::VoxelsCA(Grid &g,TempField &tf, Partition &part)
-{ 
+{
   _xyz = &g;
   _temp = &tf;
   _part = &part;
@@ -51,7 +51,7 @@ VoxelsCA::VoxelsCA(Grid &g,TempField &tf, Partition &part)
   if (_xyz->Avel>0){
     dendritevelptr=dendriteVel2;} else {
     dendritevelptr=dendriteVel1;}
-  // establishes ineighID and ineighptr for convertSolid1 
+  // establishes ineighID and ineighptr for convertSolid1
   int cc=0;
   std::vector<int> neigh;
   ineighptr.assign(Ntot1+1,0);
@@ -76,12 +76,12 @@ VoxelsCA::VoxelsCA(Grid &g,TempField &tf, Partition &part)
 void VoxelsCA::SetBuild(std::vector<int> jlist, int Ntot){
 
   std::vector<int> BuildgID(Ntot);
-  for (int j=0; j < Ntot; j++){ //Here we store the gID of any voxel that melted                                                                                                           
+  for (int j=0; j < Ntot; j++){ //Here we store the gID of any voxel that melted
     if (jlist[j] == 1){
       if (gID[j] > 0)
         BuildgID[j] = gID[j];
-    } // if jlist[j]                                                                                                                                                                       
-  } // for int j=0                                                                                                                                                                          
+    } // if jlist[j]
+  } // for int j=0
   std::vector<int>::iterator ip;
   ip = std::unique(BuildgID.begin(), BuildgID.begin() + Ntot);
   BuildgID.resize(std::distance(BuildgID.begin(), ip));
@@ -111,10 +111,15 @@ void VoxelsCA::SetBuild(std::vector<int> jlist, int Ntot){
       if (gID[j] > 0)
 	Build[j] = 1;
     }
-  }//for int j=0                                                                                                                                                                           
+  }//for int j=0
 }// SetBuild
 
-
+void VoxelsCA::gIDReset(int Ntot){
+  for (int j=0; j<Ntot; j++){
+    if (Build[j] == 0)
+      gID[j] = 0;
+  }//for int j=0
+}
 
 
 void VoxelsCA::InitializeVoxels(BasePlate &bp){
@@ -188,7 +193,7 @@ void VoxelsCA::InitializeTest2()
     cTheta[4*j1+1] =aa[4*j1+1];
     cTheta[4*j1+2] = aa[4*j1+2];
     cTheta[4*j1+3] = aa[4*j1+3];
-  } // end for j1        
+  } // end for j1
   //std::cout << cTheta[0]<<","<<cTheta[1]<<","<<cTheta[2]<<","<<cTheta[3]<<","<<std::endl;
   for (int j =0; j <Ntot; ++j){ vState[j] = 1;}
   for (int j=0;j<nGrain;++j){
@@ -231,14 +236,14 @@ void VoxelsCA::UpdateVoxels()
     must make sure that modifications to the code are implemented in
     both files
    */
-  // set liquid if temperature > TL 
+  // set liquid if temperature > TL
   // and zero voxels above laser (no material there)
   //*******************  AFTER TEST, ELIMINATE THIS IF/ELSE AND TEST CASES
   // TEST CASE IS ICTRL=4
   if (_xyz->ictrl==4){
-    SetLiquid4(); 
+    SetLiquid4();
   } else{
-    SetLiquid3();  
+    SetLiquid3();
     //ZeroVoxels1(); // voxels are zero'ed in update layer
   }
   //*******************  AFTER TEST, ELIMINATE THIS IF/ELSE AND TEST CASES
@@ -258,7 +263,7 @@ void VoxelsCA::UpdateVoxels()
     if (vState[j]==2 || (vState[j]==1 && _temp->TempCurr[j]<_xyz->tL) ){
       indA[NlocA]=j;
       NlocA+=1;
-      for (int j1=ineighptr[j];j1<ineighptr[j+1];++j1){	
+      for (int j1=ineighptr[j];j1<ineighptr[j+1];++j1){
 	if (_temp->TempCurr[ineighID[j1]]>=_xyz->tL && ineighID[j1]<Ntot){
 	  indA[NlocA]=ineighID[j1];
 	  NlocA+=1;
@@ -274,7 +279,7 @@ void VoxelsCA::UpdateVoxels()
   std::vector<int> vS(Na,0),G(Na,0),vI(Na,0),iv(_part->nprocs+1,0);
   j0[0]=0;
   for (int j=1;j<_part->nprocs;++j){j0[j]= j0[j-1]+NvecA[j-1];}
-  cc=0; 
+  cc=0;
   for (int j=0;j<NlocA;++j){
     i1 = indA[j];
     vS[j0[_part->myid]+cc] = vState[i1];
@@ -350,7 +355,7 @@ void VoxelsCA::UpdateVoxels()
   i1==0 ? i2=0: i2 = floor( (double)vSind2 / (double)i1);
   for (int j=0;j<(_part->nprocs+1);++j){
     if (j < (i2+1)){iv[j] = i1*j;}
-    if (j>i2 && j<_part->nprocs){iv[j] = i2*i1 + 
+    if (j>i2 && j<_part->nprocs){iv[j] = i2*i1 +
 	floor( (double)(vSind2-i2*i1)/(double)(_part->nprocs-i2));}
     if (j==_part->nprocs){iv[j]=vSind2;}
   } // for (int j...
@@ -387,14 +392,14 @@ void VoxelsCA::UpdateVoxels()
           i4 = ineighIDA[i5+j1];
           vSneigh[j1]=vS[i4];
           Tneigh[j1] = T[i4];
-        } // for (int j1... 
+        } // for (int j1...
 	if (std::any_of(vSneigh.begin(),vSneigh.begin()+i6,[](int n){return n==1;}) &&
 	    std::all_of(Tneigh.begin(),Tneigh.begin()+i6,[&tmelt](double tchk){return tchk < tmelt;})){
 	  omega = cTheta[4*(G[i1]-1)];
 	  ax[0]=cTheta[4*(G[i1]-1)+1];
 	  ax[1]=cTheta[4*(G[i1]-1)+2];
 	  ax[2]=cTheta[4*(G[i1]-1)+3];
-	  loadRotMat(omega,ax,rRot);	    
+	  loadRotMat(omega,ax,rRot);
 	  //T[i1]>=_xyz->tL ? vhatvec[j]=0.0: vhatvec[j]=dendritevelptr(_xyz->tL,_xyz->mL,_xyz->kP,_xyz->Gamma,
 	//						_xyz->c0,_xyz->Avel,_xyz->nvel,T[i1]);
 	  T[i1]>=_xyz->tL ? vhatvec[j]=0.0: vhatvec[j]=_xyz->Avel*pow(_xyz->tL-T[i1],_xyz->nvel);
@@ -411,8 +416,8 @@ void VoxelsCA::UpdateVoxels()
             th > M_PI/4.0 ? th= M_PI/2.0 - th: th ;
             ph = atan2(pow(pow(dnx[0],2.0)+pow(dnx[1],2.0),.5),std::fabs(dnx[2]));
             ph < M_PI/4.0 ? ph = M_PI/2.0 - ph: ph ;
-	    // matrix is local->global; need to multiply by transpose for global->local            
-	    // put into 1st quadrant b/c of symmetry     
+	    // matrix is local->global; need to multiply by transpose for global->local
+	    // put into 1st quadrant b/c of symmetry
 	    dlocX[0] = std::fabs(rRot[0][0]*dnx[0]+rRot[1][0]*dnx[1]+rRot[2][0]*dnx[2]);
 	    dlocX[1] = std::fabs(rRot[0][1]*dnx[0]+rRot[1][1]*dnx[1]+rRot[2][1]*dnx[2]);
 	    dlocX[2] = std::fabs(rRot[0][2]*dnx[0]+rRot[1][2]*dnx[1]+rRot[2][2]*dnx[2]);
@@ -422,21 +427,21 @@ void VoxelsCA::UpdateVoxels()
             if (timeUntil <= xin.DtMin){
               if (timeUntil<xin.DtMin){
                 xin.DtMin = timeUntil;
-                js = i1;  // js is capturing voxel index                               
+                js = i1;  // js is capturing voxel index
                 j1s = j1;  // V[js][j1s] is index of captured voxel
                 ruqflag=ruqs;
-              } else { // this is if timeUntil==xin.DtMin                                                                       
+              } else { // this is if timeUntil==xin.DtMin
                 if (ruqs<ruqflag){
                   xin.DtMin = timeUntil;
-                  js = i1;  // js is capturing voxel index                                                                                   
+                  js = i1;  // js is capturing voxel index
                   j1s = j1;  // V[js][j1s] is index of captured voxel
                   ruqflag=ruqs;
                 }
               }
-            } // if (timeUntil ... 
+            } // if (timeUntil ...
 	  } // for (int j1...
-	} // if (std::any_of ...  
-      } // if (vS[j]==2...      
+	} // if (std::any_of ...
+      } // if (vS[j]==2...
     } // for (int j...
     std::vector<double> dtminvec(_part->nprocs,0);
     std::vector<int> jsvec(_part->nprocs,0),j1svec(_part->nprocs,0);
@@ -462,9 +467,9 @@ void VoxelsCA::UpdateVoxels()
 	    xout.rank=j;
 	    js=jsvec[j];
 	    j1s=j1svec[j];
-	    ruqflag = ruqs;	    
+	    ruqflag = ruqs;
 	  }
-	}       
+	}
       }
     }
     /*
@@ -475,7 +480,7 @@ void VoxelsCA::UpdateVoxels()
     if (xout.DtMin>=1e6){break;}
     // test: make captured grain new grain based on rate
     //rX = _xyz->rNmax*exp( - 25*pow( (T[js]-_xyz->tS)/(_xyz->tL-_xyz->tS) ,2.0));
-    if (xrand1(g1)< rX){      
+    if (xrand1(g1)< rX){
       i1 = ineighIDA[ineighAptr[js]+j1s];
       sa.GenerateSamples(1,sdloc,quatnuc);
       vS[i1] = 2;
@@ -494,7 +499,7 @@ void VoxelsCA::UpdateVoxels()
       jx[0] = vI[i1] -i3*jx[2] - i2*jx[1];
       CentroidA[3*i1] = (double(jx[0])+.5)*_xyz->dX[0];
       CentroidA[3*i1+1] = (double(jx[1])+.5)*_xyz->dX[1];
-      CentroidA[3*i1+2] = (double(jx[2])+.5)*_xyz->dX[2];	
+      CentroidA[3*i1+2] = (double(jx[2])+.5)*_xyz->dX[2];
       sdloc +=10;
       xout.DtMin=0.0;
       ExtA[i1] = extentsInitialValue;
@@ -508,7 +513,7 @@ void VoxelsCA::UpdateVoxels()
 	if (vS[i1]!=2){continue;}
 	ExtA[i1]+=vhatvec[j]*xout.DtMin;
 	ExtA[i1] = std::max(ExtA[i1],0.0);
-      } // for (int j... 
+      } // for (int j...
       MPI_Bcast(&ExtA[js],1,MPI_DOUBLE,xout.rank,MPI_COMM_WORLD);
       i1 = ineighIDA[ineighAptr[js]+j1s];
       vS[i1] = 2;
@@ -535,8 +540,8 @@ void VoxelsCA::UpdateVoxels()
       ax[0]=cTheta[4*(G[js]-1)+1];
       ax[1]=cTheta[4*(G[js]-1)+2];
       ax[2]=cTheta[4*(G[js]-1)+3];
-      loadRotMat(omega,ax,rRot);	    
-      // matrix is local->global; need to multiply by transpose for global->local            
+      loadRotMat(omega,ax,rRot);
+      // matrix is local->global; need to multiply by transpose for global->local
       locX[0] = rRot[0][0]*dnx[0]+rRot[1][0]*dnx[1]+rRot[2][0]*dnx[2];
       locX[1] = rRot[0][1]*dnx[0]+rRot[1][1]*dnx[1]+rRot[2][1]*dnx[2];
       locX[2] = rRot[0][2]*dnx[0]+rRot[1][2]*dnx[1]+rRot[2][2]*dnx[2];
@@ -548,7 +553,7 @@ void VoxelsCA::UpdateVoxels()
       dr = std::fabs(locX[0])+ std::fabs(locX[1])+ std::fabs(locX[2]);
       for (int j1=0;j1<6;++j1){sdiag[j1]={sdiag0[j1][0]*dr,sdiag0[j1][1]*dr,sdiag0[j1][2]*dr};}
       jInd = 4*std::signbit(locX[2])+ 2*std::signbit(locX[1])+ std::signbit(locX[0]);
-      for (int j1=0;j1<3;++j1){ 
+      for (int j1=0;j1<3;++j1){
 	dnorm[j1] = pow(locX[0]-sdiag[sInd[jInd][j1]][0],2.0)+
 	  pow(locX[1]-sdiag[sInd[jInd][j1]][1],2.0)+pow(locX[2]-sdiag[sInd[jInd][j1]][2],2.0);
       } // for (int j1...
@@ -563,20 +568,20 @@ void VoxelsCA::UpdateVoxels()
       }
       projectPointLine(locX,&sdiag[sInd[jInd][jy[0]]][0],&sdiag[sInd[jInd][jy[1]]][0],xI);
       projectPointLine(locX,&sdiag[sInd[jInd][jy[0]]][0],&sdiag[sInd[jInd][jy[2]]][0],xJ);
-      d1I = pow(pow(sdiag[sInd[jInd][jy[0]]][0]-xI[0],2.0) + 
-		pow(sdiag[sInd[jInd][jy[0]]][1]-xI[1],2.0) + 
+      d1I = pow(pow(sdiag[sInd[jInd][jy[0]]][0]-xI[0],2.0) +
+		pow(sdiag[sInd[jInd][jy[0]]][1]-xI[1],2.0) +
 		pow(sdiag[sInd[jInd][jy[0]]][2]-xI[2],2.0),.5);
-      dI2 = pow(pow(sdiag[sInd[jInd][jy[1]]][0]-xI[0],2.0) + 
-		pow(sdiag[sInd[jInd][jy[1]]][1]-xI[1],2.0) + 
+      dI2 = pow(pow(sdiag[sInd[jInd][jy[1]]][0]-xI[0],2.0) +
+		pow(sdiag[sInd[jInd][jy[1]]][1]-xI[1],2.0) +
 		pow(sdiag[sInd[jInd][jy[1]]][2]-xI[2],2.0),.5);
-      d1J = pow(pow(sdiag[sInd[jInd][jy[0]]][0]-xJ[0],2.0) + 
-		pow(sdiag[sInd[jInd][jy[0]]][1]-xJ[1],2.0) + 
+      d1J = pow(pow(sdiag[sInd[jInd][jy[0]]][0]-xJ[0],2.0) +
+		pow(sdiag[sInd[jInd][jy[0]]][1]-xJ[1],2.0) +
 		pow(sdiag[sInd[jInd][jy[0]]][2]-xJ[2],2.0),.5);
-      dJ3 = pow(pow(sdiag[sInd[jInd][jy[2]]][0]-xJ[0],2.0) + 
-		pow(sdiag[sInd[jInd][jy[2]]][1]-xJ[1],2.0) + 
+      dJ3 = pow(pow(sdiag[sInd[jInd][jy[2]]][0]-xJ[0],2.0) +
+		pow(sdiag[sInd[jInd][jy[2]]][1]-xJ[1],2.0) +
 		pow(sdiag[sInd[jInd][jy[2]]][2]-xJ[2],2.0),.5);
-      L12 = .5*(std::min(d1I,pow(3.0,.5)*l) + std::min(dI2,pow(3.0,.5)*l) );  
-      L13 = .5*(std::min(d1J,pow(3.0,.5)*l) + std::min(dJ3,pow(3.0,.5)*l) );  
+      L12 = .5*(std::min(d1I,pow(3.0,.5)*l) + std::min(dI2,pow(3.0,.5)*l) );
+      L13 = .5*(std::min(d1J,pow(3.0,.5)*l) + std::min(dJ3,pow(3.0,.5)*l) );
       Lmud =  pow(3.0,.5)* (pow(2.0/3.0,.5)*std::max(L12,L13));
       //xiL = -.4*(l/_xyz->dX[0] - 1.0)/(pow(3.0,.5)-1.0) + .9;
       //xiL = -.2*(l/_xyz->dX[0] - 1.0)/(pow(3.0,.5)-1.0) + .6;
@@ -597,10 +602,10 @@ void VoxelsCA::UpdateVoxels()
       locX[2] = rRot[2][0]*dnx[0]+rRot[2][1]*dnx[1]+rRot[2][2]*dnx[2];
       CentroidA[3*i1] = CentroidA[3*js] + locX[0];
       CentroidA[3*i1+1] = CentroidA[3*js+1] + locX[1];
-      CentroidA[3*i1+2] = CentroidA[3*js+2] + locX[2];      
-      // end compute new decentered octohedron return centroid and extents      
+      CentroidA[3*i1+2] = CentroidA[3*js+2] + locX[2];
+      // end compute new decentered octohedron return centroid and extents
     } // if (tnucA[i4]<(tinc+xout.DtMin)) ...
-    cc+=1;    
+    cc+=1;
     tinc += xout.DtMin;
   } // while (std::count...
   std::vector<int> ivlcvec(_part->nprocs);
@@ -622,7 +627,7 @@ void VoxelsCA::UpdateVoxels()
 	ExtA[vs2ind[ia[j1]]] = aE[j1];
       }
     }
-  }		
+  }
   // end capture all undercooled liquid voxels by growing grains
   // bring global variables back to local variables
   cc1=0;
@@ -636,7 +641,7 @@ void VoxelsCA::UpdateVoxels()
     centroidOct[3*i1+2] = CentroidA[3*j0[_part->myid]+3*cc1+2];
     cc1+=1;
   } // for (int j...
-  // pass information 
+  // pass information
   for (int j=Ntot;j<(_part->nGhost+Ntot);++j){
     cc1=std::distance(vI.begin(),std::find(vI.begin(),vI.end(),_part->icellidLoc[j]));
     if (cc1<Na){
@@ -644,7 +649,7 @@ void VoxelsCA::UpdateVoxels()
       gID[j] = G[cc1];
     } // if (cc1<
   } // for (int j...
-  // mushy (vState=2) to solid (vState=3) if all neighbors 2 
+  // mushy (vState=2) to solid (vState=3) if all neighbors 2
   ConvertSolid1(0);
   _part->PassInformation(vState);
 }; // end UpdateVoxels
@@ -733,7 +738,7 @@ void VoxelsCA::ConvertSolid1(const int &iswitch)
     */
     cc=0;
     for (int j=0; j < Ntot;++j){
-      if (vState[j]==2){      
+      if (vState[j]==2){
 	vneigh.assign(ineighptr[j+1]-ineighptr[j],0);
 	cc1=0;
 	for (int j1=ineighptr[j];j1<ineighptr[j+1];++j1){
@@ -830,7 +835,7 @@ void VoxelsCA::CleanLayer(){
     i1t = itmp1[gID[j]-1];
     gID[j] =  i1t;
   }
- 
+
 }; // CleanLayer
 void VoxelsCA::AddLayer(){
   /*
@@ -868,15 +873,15 @@ void VoxelsCA::AddLayer(){
       } // if (j<Ntot)
     } // if (j3>=iz1 && j3<_xyz->ilaserLoc ...
   } // for (int j...
-  nGrain += _xyz->nX[0]*_xyz->nX[1]*_xyz->nZlayer;  
+  nGrain += _xyz->nX[0]*_xyz->nX[1]*_xyz->nZlayer;
   // assign appropriate vState (including zeroing states above ilaserLoc
   iz1 = _xyz->nX[0]*_xyz->nX[1]*_xyz->ilaserLoc;
   for (int j=0;j<Ntot2;++j){
     if (_part->icellidLoc[j] >=iz1){
       vState[j] = 0;
       gID[j] = 0;
-    }    
-  } // for j  
+    }
+  } // for j
 }; // AddLayer
 
 void VoxelsCA::AddLayer1(){
@@ -959,7 +964,7 @@ void VoxelsCA::AddLayer1(){
       } // if (j<Ntot)
     } // if (j3>=iz1 && j3<_xyz->ilaserLoc ...
   } // for (int j...
-  nGrain += i2+1;  
+  nGrain += i2+1;
   SampleOrientation sa1;
   // randomly generate crystallographic orientations
   std::vector<double> aa;
@@ -972,14 +977,14 @@ void VoxelsCA::AddLayer1(){
     if (_part->icellidLoc[j] >=iz1){
       vState[j] = 0;
       gID[j] = 0;
-    }    
-  } // for j  
+    }
+  } // for j
 }; // AddLayer1
 void VoxelsCA::UpdateLayer(std::string &filCSV){
   /*
     Function adds powder to layer by making every voxel in layer a unique grain.
     It is called at the start of a new layer
-    
+
   */
 
   // purge indices of cTheta associated with grains having no volume
@@ -1045,35 +1050,35 @@ void VoxelsCA::UpdateLayer(std::string &filCSV){
     } // if (j3>=iz1 && j3<_xyz->ilaserLoc ...
   } // for (int j...
   nGrain += _xyz->nX[0]*_xyz->nX[1]*_xyz->nZlayer;
-  
+
   // assign appropriate vState (including zeroing states above ilaserLoc
   iz1 = _xyz->nX[0]*_xyz->nX[1]*_xyz->ilaserLoc;
   for (int j=0;j<Ntot2;++j){
     if (_part->icellidLoc[j] >=iz1){
       vState[j] = 0;
       gID[j] = 0;
-    }    
-  } // for j  
+    }
+  } // for j
 }; // UpdateLayer
 
 void VoxelsCA::SetLiquid(){
   // makes cell liquid if temperature exceeds liquidus
-  int Ntot = _part->ncellLoc + _part->nGhost; 
+  int Ntot = _part->ncellLoc + _part->nGhost;
   int n1 = NzhBP*_xyz->nX[0]*_xyz->nX[1];
   int j;
   for (int j=0;j<Ntot;++j){
     if (_part->icellidLoc[j] <n1){continue;}
-    if (_temp->TempCurr[j] >= _xyz->tL ) { 
+    if (_temp->TempCurr[j] >= _xyz->tL ) {
       vState[j] = 1;
       gID[j] = 0; // flag that it loses its grain
       extents[j] = extentsInitialValue;
-    } 
+    }
   } // end for j
 };
 
 void VoxelsCA::SetLiquid2(){
   // makes cell liquid if temperature exceeds liquidus
-  int Ntot = _part->ncellLoc + _part->nGhost; 
+  int Ntot = _part->ncellLoc + _part->nGhost;
   int n1 = NzhBP*_xyz->nX[0]*_xyz->nX[1];
   int j,j3;
   for (int j=0;j<Ntot;++j){
@@ -1086,19 +1091,19 @@ void VoxelsCA::SetLiquid2(){
 	gID[j] = 0; // flag that it loses its grain
 	if (j<_part->ncellLoc){extents[j] = extentsInitialValue;}
       }
-    } 
+    }
   } // end for j
 };
 
 void VoxelsCA::SetLiquid3(){
   // makes cell liquid if temperature exceeds liquidus
-  int Ntot = _part->ncellLoc + _part->nGhost,n1,j,nZlayer,iz1; 
+  int Ntot = _part->ncellLoc + _part->nGhost,n1,j,nZlayer,iz1;
   int Ntot1 = _part->ncellLoc;
   n1 = _xyz->nX[0]*_xyz->nX[1];
   nZlayer = round(_xyz->layerT/_xyz->dX[2]);
   iz1 = _xyz->ilaserLoc*_xyz->nX[0]*_xyz->nX[1];
   for (int j=0;j<Ntot;++j){
-    if (_temp->TempCurr[j] >= _xyz->tL ) { 
+    if (_temp->TempCurr[j] >= _xyz->tL ) {
       if (_part->icellidLoc[j]<n1){
 	vState[j]=2;
       } else if ( _part->icellidLoc[j]<iz1){
@@ -1112,13 +1117,13 @@ void VoxelsCA::SetLiquid3(){
 void VoxelsCA::SetLiquid4(){
   // makes cell liquid if temperature exceeds liquidus
   // this is for test case
-  int Ntot = _part->ncellLoc + _part->nGhost,n1; 
+  int Ntot = _part->ncellLoc + _part->nGhost,n1;
   int Ntot1=_part->ncellLoc;
   int j;
   for (int j=0;j<Ntot;++j){
     n1 = std::distance(gNucleus.begin(),std::find(
        gNucleus.begin(),gNucleus.end(),_part->icellidLoc[j]));
-    if (_temp->TempCurr[j] >= _xyz->tL && n1==nGrain) { 
+    if (_temp->TempCurr[j] >= _xyz->tL && n1==nGrain) {
 	vState[j] = 1;
 	gID[j] = 0; // flag that it loses its grain
 	// if (j<Ntot1){extents[j] = extentsInitialValue;}
@@ -1195,7 +1200,7 @@ void VoxelsCA::ExtentsInitialize(){
 void VoxelsCA::ZeroVoxels(){
   // sets voxels to zero where laser hasn't reached yet
   int j,j1,j2,j3;
-  int Ntot = _part->ncellLoc + _part->nGhost,n1; 
+  int Ntot = _part->ncellLoc + _part->nGhost,n1;
   double x,y;
   if (_temp->patternID==0){
     x = fmod(_temp->tInd,(_temp->nTTemp[0]))*_temp->bmDX[0] - _temp->offset[0];
@@ -1214,19 +1219,19 @@ void VoxelsCA::ZeroVoxels(){
 void VoxelsCA::ZeroVoxels1(){
   // sets voxels to zero where laser hasn't reached yet
   int j,j1b,j2b,j3b,j2,j3;
-  int Ntot = _part->ncellLoc + _part->nGhost,n1; 
+  int Ntot = _part->ncellLoc + _part->nGhost,n1;
   double x,y;
   n1 = _xyz->nX[0]*_xyz->nX[1]*_xyz->ilaserLoc;
   for (int j=0;j<Ntot;++j){
     if (_part->icellidLoc[j] >=n1){
       vState[j] = 0;
       gID[j] = 0;
-    } 
+    }
   } // for j
 }; // ZeroVoxels1
 
 void VoxelsCA::CheckTimeSkip(){
-  // checks if any voxel with vState=1 has temperature < melting; if none, then 
+  // checks if any voxel with vState=1 has temperature < melting; if none, then
   // skip ahead to next time increment for temperature
   int Ntot = _part->ncellLoc + _part->nGhost,icheck=0,icheckT;
   for (int j=0;j<Ntot;++j){
@@ -1266,10 +1271,10 @@ void VoxelsCA::ComputeExtents(){
 	  (5.51*pow(M_PI,2.0)*pow((- _xyz->mL)*(1-_xyz->kP),1.5)*
 	   (_xyz->Gamma))*( pow((_xyz->tL - _temp->TempCurr[j]),2.5)/
 			  pow(_xyz->c0,1.5));
-       }	
+       }
       vmax = std::max(vmax,velocity[j]);
     } // if (vState[j]==2)
-  } // for j  
+  } // for j
   double vmax2 = vmax;
   MPI_Allreduce(&vmax2,&vmax,1,MPI_DOUBLE,MPI_MAX,MPI_COMM_WORLD);
   _xyz->UpdateTimeTest1(vmax);
@@ -1281,11 +1286,11 @@ void VoxelsCA::ComputeExtents(){
   }
   _xyz->UpdateTime2(_temp->DelT/20.0);
   */
-  
+
   for (int j=0;j<Ntot;++j){
     if (vState[j] == 2){
       extents[j] +=velocity[j]*(_xyz->dt);
-      
+
     }
   }
 };
@@ -1327,7 +1332,7 @@ void VoxelsCA::ComputeNucleation1(){
     cthtmp.push_back(aa[4*j1+1]);
     cthtmp.push_back(aa[4*j1+2]);
     cthtmp.push_back(aa[4*j1+3]);
-  } // end for j1   
+  } // end for j1
 
   MPI_Allgather(&ngtmp,1,MPI_INT,&ngvec[0],1,MPI_INT,MPI_COMM_WORLD);
   ngnew = std::accumulate(ngvec.begin(),ngvec.end(),0);
@@ -1363,7 +1368,7 @@ void VoxelsCA::ComputeNucleation1(){
     for (int j=0; j<4*ngnew;++j){cTheta.push_back(tmpall1[j]);}
     for (int j=0; j<ngnew;++j){gNucleus.push_back(tmpall2[j]);}
     cc = 1;
-    for (int j=0;j<_part->nprocs;++j){    
+    for (int j=0;j<_part->nprocs;++j){
       if (_part->myid ==j){
 	for (int j1=0;j1<ind.size();++j1){
 	  gID[ind[j1]] = nGrain + cc + j1;
@@ -1376,7 +1381,7 @@ void VoxelsCA::ComputeNucleation1(){
     _part->PassInformation(gID);
     _part->PassInformation(extents);
 
-  } // if (ngnew > 0)  
+  } // if (ngnew > 0)
 };
 
 void VoxelsCA::WriteToVTU1(const std::string &filename)
@@ -1407,7 +1412,7 @@ void VoxelsCA::WriteToVTU1(const std::string &filename)
       ax[0]= cTheta[4*(gID[j]-1)+1];
       ax[1]= cTheta[4*(gID[j]-1)+2];
       ax[2]= cTheta[4*(gID[j]-1)+3];
-      // matrix is local->global; need to multiply by transpose for global->local            
+      // matrix is local->global; need to multiply by transpose for global->local
       rRot[0][0] = cos(omega) + pow(ax[0],2.0)*(1-cos(omega));
       rRot[0][1] = ax[0]*ax[1]*(1-cos(omega)) - ax[2]*sin(omega);
       rRot[0][2] = ax[0]*ax[2]*(1-cos(omega)) + ax[1]*sin(omega);
@@ -1450,7 +1455,7 @@ void VoxelsCA::WriteToVTU1(const std::string &filename)
       IPFmapx[3*j] = red/mscale;
       IPFmapx[3*j+1] = green/mscale;
       IPFmapx[3*j+2] = blue/mscale;
-      // y dir 
+      // y dir
       vCD[0] = std::fabs(rRot[0][0]*vY[0]+rRot[1][0]*vY[1]+rRot[2][0]*vY[2]);
       vCD[1] = std::fabs(rRot[0][1]*vY[0]+rRot[1][1]*vY[1]+rRot[2][1]*vY[2]);
       vCD[2] = std::fabs(rRot[0][2]*vY[0]+rRot[1][2]*vY[1]+rRot[2][2]*vY[2]);
@@ -1533,7 +1538,7 @@ void VoxelsCA::WriteToVTU1(const std::string &filename)
     MPI_Barrier(MPI_COMM_WORLD);
     if (_part->myid != rank) continue;
     fp.open(vtkFilename.c_str(), std::fstream::app);
-    int Scalar = nP * sizeof (float), Vector = 3 * Scalar, Cells = nC * sizeof(int), 
+    int Scalar = nP * sizeof (float), Vector = 3 * Scalar, Cells = nC * sizeof(int),
       CellsTH=3*nC*sizeof(float), CellsTemp=nC*sizeof(float);
     int CellChars = nC * sizeof(unsigned char), Conn = _part->iconnectivityLoc.size() * sizeof(int);
     fp.write(reinterpret_cast<const char *>(&Vector), 4);
@@ -1559,7 +1564,7 @@ void VoxelsCA::WriteToVTU1(const std::string &filename)
       cell_offsets += _xyz->nnodePerCell;
       fp.write(reinterpret_cast<const char *>(&cell_offsets), sizeof(int));
     }
-    fp.write(reinterpret_cast<const char *>(&CellChars), 4);    
+    fp.write(reinterpret_cast<const char *>(&CellChars), 4);
     for (int i=0;i<nC;i++) fp.write(reinterpret_cast<const char *>(&cell_type), sizeof (unsigned char));
     fp.write(reinterpret_cast<const char *>(&Cells), 4);
     for (int i=0;i<nC;i++) fp.write(reinterpret_cast<const char *>(&vState[i]), sizeof (int));
@@ -1582,7 +1587,7 @@ void VoxelsCA::WriteToVTU1(const std::string &filename)
     fp << "</VTKFile>" << std::endl;
     fp.close();
   }
-  MPI_Barrier(MPI_COMM_WORLD);  
+  MPI_Barrier(MPI_COMM_WORLD);
 } // end WriteToVTU1
 void VoxelsCA::WriteToHDF1(const std::string &filename)
 {
@@ -1623,7 +1628,7 @@ void VoxelsCA::WriteToHDF1(const std::string &filename)
       ax[0]= cTheta[4*(gID[j]-1)+1];
       ax[1]= cTheta[4*(gID[j]-1)+2];
       ax[2]= cTheta[4*(gID[j]-1)+3];
-      // matrix is local->global; need to multiply by transpose for global->local            
+      // matrix is local->global; need to multiply by transpose for global->local
       rRot[0][0] = cos(omega) + pow(ax[0],2.0)*(1-cos(omega));
       rRot[0][1] = ax[0]*ax[1]*(1-cos(omega)) - ax[2]*sin(omega);
       rRot[0][2] = ax[0]*ax[2]*(1-cos(omega)) + ax[1]*sin(omega);
@@ -1746,7 +1751,7 @@ void VoxelsCA::WriteToHDF1(const std::string &filename)
 	  IPFmapx[3*j+2]=q;
 	}
       }
-      // y dir 
+      // y dir
       vCD[0] = std::fabs(rRot[0][0]*vY[0]+rRot[1][0]*vY[1]+rRot[2][0]*vY[2]);
       vCD[1] = std::fabs(rRot[0][1]*vY[0]+rRot[1][1]*vY[1]+rRot[2][1]*vY[2]);
       vCD[2] = std::fabs(rRot[0][2]*vY[0]+rRot[1][2]*vY[1]+rRot[2][2]*vY[2]);
@@ -1847,7 +1852,7 @@ void VoxelsCA::WriteToHDF1(const std::string &filename)
   hdf5Writer.Put<float>(IPFmapya, IPFmapy.data());
   hdf5Writer.Put<float>(angAx, cth.data());
   hdf5Writer.Close();
-  MPI_Barrier(MPI_COMM_WORLD);  
+  MPI_Barrier(MPI_COMM_WORLD);
 } // end WriteToHDF1
 
 void VoxelsCA::WriteToVTU2(const std::string &filename)
@@ -1871,7 +1876,7 @@ void VoxelsCA::WriteToVTU2(const std::string &filename)
       ax[0]= cTheta[4*(gID[j]-1)+1];
       ax[1]= cTheta[4*(gID[j]-1)+2];
       ax[2]= cTheta[4*(gID[j]-1)+3];
-      // matrix is local->global; need to multiply by transpose for global->local            
+      // matrix is local->global; need to multiply by transpose for global->local
       rRot[0][0] = cos(omega) + pow(ax[0],2.0)*(1-cos(omega));
       rRot[0][1] = ax[0]*ax[1]*(1-cos(omega)) - ax[2]*sin(omega);
       rRot[0][2] = ax[0]*ax[2]*(1-cos(omega)) + ax[1]*sin(omega);
@@ -1959,7 +1964,7 @@ void VoxelsCA::WriteToVTU2(const std::string &filename)
     MPI_Barrier(MPI_COMM_WORLD);
     if (_part->myid != rank) continue;
     fp.open(vtkFilename.c_str(), std::fstream::app);
-    int Scalar = nP * sizeof (float), Vector = 3 * Scalar, Cells = nC * sizeof(int), 
+    int Scalar = nP * sizeof (float), Vector = 3 * Scalar, Cells = nC * sizeof(int),
       CellsTH=4*nC*sizeof(float), CellsTemp=nC*sizeof(float);
     int CellChars = nC * sizeof(unsigned char), Conn = _part->iconnectivityLoc.size() * sizeof(int);
     fp.write(reinterpret_cast<const char *>(&Vector), 4);
@@ -1985,7 +1990,7 @@ void VoxelsCA::WriteToVTU2(const std::string &filename)
       cell_offsets += _xyz->nnodePerCell;
       fp.write(reinterpret_cast<const char *>(&cell_offsets), sizeof(int));
     }
-    fp.write(reinterpret_cast<const char *>(&CellChars), 4);    
+    fp.write(reinterpret_cast<const char *>(&CellChars), 4);
     for (int i=0;i<nC;i++) fp.write(reinterpret_cast<const char *>(&cell_type), sizeof (unsigned char));
     fp.write(reinterpret_cast<const char *>(&Cells), 4);
     for (int i=0;i<nC;i++) fp.write(reinterpret_cast<const char *>(&vState[i]), sizeof (int));
@@ -2004,12 +2009,12 @@ void VoxelsCA::WriteToVTU2(const std::string &filename)
     fp << "</VTKFile>" << std::endl;
     fp.close();
   }
-  MPI_Barrier(MPI_COMM_WORLD);  
+  MPI_Barrier(MPI_COMM_WORLD);
 } // end WriteToVTU2
 
 void VoxelsCA::WriteToPVTU1(const std::string &filename, int &nFile)
 {
-  /* 
+  /*
      writes gID, vState, IPFx,IPFy,IPFz per voxel
      - if vtu file > 2G then need to break up into smaller files
        for paraview to read. This function is for that case. it
@@ -2038,7 +2043,7 @@ void VoxelsCA::WriteToPVTU1(const std::string &filename, int &nFile)
       ax[0]= cTheta[4*(gID[j]-1)+1];
       ax[1]= cTheta[4*(gID[j]-1)+2];
       ax[2]= cTheta[4*(gID[j]-1)+3];
-      // matrix is local->global; need to multiply by transpose for global->local            
+      // matrix is local->global; need to multiply by transpose for global->local
       rRot[0][0] = cos(omega) + pow(ax[0],2.0)*(1-cos(omega));
       rRot[0][1] = ax[0]*ax[1]*(1-cos(omega)) - ax[2]*sin(omega);
       rRot[0][2] = ax[0]*ax[2]*(1-cos(omega)) + ax[1]*sin(omega);
@@ -2081,7 +2086,7 @@ void VoxelsCA::WriteToPVTU1(const std::string &filename, int &nFile)
       IPFmapx[3*j] = red/mscale;
       IPFmapx[3*j+1] = green/mscale;
       IPFmapx[3*j+2] = blue/mscale;
-      // y dir 
+      // y dir
       vCD[0] = std::fabs(rRot[0][0]*vY[0]+rRot[1][0]*vY[1]+rRot[2][0]*vY[2]);
       vCD[1] = std::fabs(rRot[0][1]*vY[0]+rRot[1][1]*vY[1]+rRot[2][1]*vY[2]);
       vCD[2] = std::fabs(rRot[0][2]*vY[0]+rRot[1][2]*vY[1]+rRot[2][2]*vY[2]);
@@ -2110,9 +2115,9 @@ void VoxelsCA::WriteToPVTU1(const std::string &filename, int &nFile)
     ftmp << filename << "_f" << f << ".vtu";
     ftmp >> vtuf;
     vtuFilenames[f] = vtuf;
-  }  
-  
-  
+  }
+
+
   if (_part->myid == 0 ) {
     f0.open(pvtuFilename.c_str());
     f0 << "<?xml version='1.0'?>" << std::endl;
@@ -2225,7 +2230,7 @@ void VoxelsCA::WriteToPVTU1(const std::string &filename, int &nFile)
       MPI_Barrier(MPI_COMM_WORLD);
       if (_part->myid != rank) continue;
       fp[f].open(vtuf.c_str(), std::fstream::app);
-      int Scalar = nP * sizeof (float), Vector = 3 * Scalar, Cells = nC * sizeof(int), 
+      int Scalar = nP * sizeof (float), Vector = 3 * Scalar, Cells = nC * sizeof(int),
 	CellsTH=3*nC*sizeof(float), CellsTemp=nC*sizeof(float);
       int CellChars = nC * sizeof(unsigned char), Conn = _part->iconnectivityLoc.size() * sizeof(int);
       fp[f].write(reinterpret_cast<const char *>(&Vector), 4);
@@ -2251,7 +2256,7 @@ void VoxelsCA::WriteToPVTU1(const std::string &filename, int &nFile)
 	cell_offsets += _xyz->nnodePerCell;
 	fp[f].write(reinterpret_cast<const char *>(&cell_offsets), sizeof(int));
       }
-      fp[f].write(reinterpret_cast<const char *>(&CellChars), 4);    
+      fp[f].write(reinterpret_cast<const char *>(&CellChars), 4);
       for (int i=0;i<nC;i++) fp[f].write(reinterpret_cast<const char *>(&cell_type), sizeof (unsigned char));
       fp[f].write(reinterpret_cast<const char *>(&Cells), 4);
       for (int i=0;i<nC;i++) fp[f].write(reinterpret_cast<const char *>(&vState[i]), sizeof (int));
@@ -2278,7 +2283,7 @@ void VoxelsCA::WriteToPVTU1(const std::string &filename, int &nFile)
       fp[f].close();
     }
   }
-  MPI_Barrier(MPI_COMM_WORLD);  
+  MPI_Barrier(MPI_COMM_WORLD);
 } // end WriteToPVTU1
 
 
@@ -2364,7 +2369,7 @@ void VoxelsCA::WriteToVTU0(const std::string &filename)
     MPI_Barrier(MPI_COMM_WORLD);
     if (_part->myid != rank) continue;
     fp.open(vtkFilename.c_str(), std::fstream::app);
-    int Scalar = nP * sizeof (float), Vector = 3 * Scalar, Cells = nC * sizeof(int), 
+    int Scalar = nP * sizeof (float), Vector = 3 * Scalar, Cells = nC * sizeof(int),
       CellsTH=4*nC*sizeof(float), CellsTemp=nC*sizeof(float);
     int CellChars = nC * sizeof(unsigned char), Conn = _part->iconnectivityLoc.size() * sizeof(int);
     fp.write(reinterpret_cast<const char *>(&Vector), 4);
@@ -2390,7 +2395,7 @@ void VoxelsCA::WriteToVTU0(const std::string &filename)
       cell_offsets += _xyz->nnodePerCell;
       fp.write(reinterpret_cast<const char *>(&cell_offsets), sizeof(int));
     }
-    fp.write(reinterpret_cast<const char *>(&CellChars), 4);    
+    fp.write(reinterpret_cast<const char *>(&CellChars), 4);
     for (int i=0;i<nC;i++) fp.write(reinterpret_cast<const char *>(&cell_type), sizeof (unsigned char));
     fp.write(reinterpret_cast<const char *>(&Cells), 4);
     for (int i=0;i<nC;i++) fp.write(reinterpret_cast<const char *>(&vState[i]), sizeof (int));
@@ -2409,7 +2414,7 @@ void VoxelsCA::WriteToVTU0(const std::string &filename)
     fp << "</VTKFile>" << std::endl;
     fp.close();
   }
-  MPI_Barrier(MPI_COMM_WORLD);  
+  MPI_Barrier(MPI_COMM_WORLD);
 } // end WriteToVTU0
 
 void VoxelsCA::WriteCSVData(const std::string &filename)
@@ -2460,7 +2465,7 @@ void VoxelsCA::WriteCSVData1(const std::string &filename)
     fp.open(filename.c_str());
     fp << "grain nucleation (x,y,z), axis-angle (omega,n), grain Volume" << std::endl;
     for (int j=0;j<nGrain;++j){
-      fp << cTheta[4*j] << "," << cTheta[4*j+1] << "," << cTheta[4*j+2] << "," << 
+      fp << cTheta[4*j] << "," << cTheta[4*j+1] << "," << cTheta[4*j+2] << "," <<
 	cTheta[4*j+3]<<","<<gVolT[j] << std::endl;
     } // end for (int j...
     fp.close();
@@ -2605,7 +2610,7 @@ void VoxelsCA::NucleateGrains(std::vector<int> &nucA, std::vector<double> &tnucA
     if (Nnucvec[j]==0){continue;}
     MPI_Bcast(&itmp[jnuc0[j]],Nnucvec[j],MPI_INT,j,MPI_COMM_WORLD);
     MPI_Bcast(&tmp[jnuc0[j]],Nnucvec[j],MPI_DOUBLE,j,MPI_COMM_WORLD);
-  } // for (int j ..    
+  } // for (int j ..
   std::sort(ivec.begin(),ivec.end(),[&tmp](int j1,int j2){return tmp[j1]<tmp[j2];});
   for (int j=0;j<NnucA;++j){
     cc=ivec[j];
