@@ -103,7 +103,7 @@ void TempField::EASM(std::vector<double> &TempOut, std::vector<int> &icellid, in
     std::vector<double> L = {x, y, z};
 //    if (x0 > x+0.00020){continue;}
 //    TempOut[j] = _ut->EASM_Temp_LG(L, R, TempOut[j]);
-    if ((x0 > (x+0.00000)) && (zp > (z-_xyz->layerT)) )
+    if ((x0 > (x-0.000040)) && (zp > (z-_xyz->layerT)) )
       TempOut[j] = 290.0;
     else
       TempOut[j] = _ut->EASM_Temp_LG(L, R, TempOut[j]);
@@ -121,7 +121,7 @@ void TempField::EASM(std::vector<double> &TempOut, std::vector<int> &icellid, in
   int n1=_part->ncellLoc,icheck,ichecktmp;
   x=_xyz->lcoor2[2*ispvec[_xyz->isp]]-offset[0];
   y=_xyz->lcoor2[2*ispvec[_xyz->isp]+1]-offset[1];
-  if (x<_xyz->gbox[0] || x>_xyz->gbox[1] || y<_xyz->gbox[2] || y>_xyz->gbox[3]){
+  if (x<_xyz->gbox[0]-1E-4 || x>_xyz->gbox[1]+1E-4 || y<_xyz->gbox[2]+3E-5 || y>_xyz->gbox[3]-3E-5){
     ichecktmp=std::any_of(TempOut.begin(),TempOut.begin()+n1,[&tmelt]
                           (double tchk){return tchk >= tmelt;});
     MPI_Allreduce(&ichecktmp,&icheck,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
