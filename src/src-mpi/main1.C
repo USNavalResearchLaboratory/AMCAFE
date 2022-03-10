@@ -87,6 +87,10 @@ int main(int argc, char *argv[])
     if (part.myid==0){std::cout << TempF.tInd<<","<<delTexec<< std::endl;}
     if (part.myid==0){fplog << TempF.tInd<<","<<delTexec<<std::endl;}
     } // while
+  vox.CleanLayer();
+  vox.gIDReset(Ntot);
+  filout = filbaseOut+std::to_string(TempF.tInd);
+  vox.WriteToHDF1(filout);
   MPI_Barrier(MPI_COMM_WORLD);
   MPI_Finalize();
   return 0;
