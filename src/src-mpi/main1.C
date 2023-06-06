@@ -5,6 +5,7 @@
 #include "TempField.h"
 #include "Partition.h"
 #include "SampleOrientation.h"
+#include "Utilities.h"
 #include "iostream"
 #include "vector"
 #include <math.h>
@@ -32,9 +33,11 @@ int main(int argc, char *argv[])
   //part.PartitionGraph();
   part.PartitionGraph2();
   BasePlate bp(g, part);
-  TempField TempF(g,part,bp);
+  Utilities ut(g, part, bp);
+  TempField TempF(g,part,bp,ut);
   int Ntot=part.ncellLoc+ part.nGhost;
   TempF.InitializeAnalytic();
+  ut.InitializeUT();
   VoxelsCA vox(g,TempF, part);
   vox.InitializeVoxels(bp);
   /*-----------------------------------------------
@@ -59,7 +62,8 @@ int main(int argc, char *argv[])
   while (!bcheck){
     // update temperature field
     TempF.tInd = int(round(g.time/TempF.DelT));
-    TempF.AnalyticTempCurr(g.time,TempF.TempCurr,part.icellidLoc,Ntot);
+    //    TempF.AnalyticTempCurr(g.time,TempF.TempCurr,part.icellidLoc,Ntot);
+    TempF.EASM(TempF.TempCurr, part.icellidLoc, Ntot);
     // update next step for voxels 
     vox.UpdateVoxels();
     //write out
@@ -72,6 +76,7 @@ int main(int argc, char *argv[])
       filtime.push_back(g.time);
       filout = filbaseOut+std::to_string(TempF.tInd);
       filout = filbaseOut+std::to_string(TempF.tInd);
+      vox.SetBuild(TempF.BuildjID, Ntot);
       vox.WriteToHDF1(filout);
       MPI_Barrier(MPI_COMM_WORLD);
     } // (indOut==0 ...
@@ -82,6 +87,10 @@ int main(int argc, char *argv[])
     if (part.myid==0){std::cout << TempF.tInd<<","<<delTexec<< std::endl;}
     if (part.myid==0){fplog << TempF.tInd<<","<<delTexec<<std::endl;}
     } // while
+  vox.CleanLayer();
+  vox.gIDReset(Ntot);
+  filout = filbaseOut+std::to_string(TempF.tInd);
+  vox.WriteToHDF1(filout);
   MPI_Barrier(MPI_COMM_WORLD);
   MPI_Finalize();
   return 0;

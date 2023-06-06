@@ -14,6 +14,8 @@ class VoxelsCA
 {
  public:
   VoxelsCA(Grid &, TempField &, Partition &);
+  void SetBuild(std::vector<int> jlist, int Ntot);
+  void gIDReset(int Ntot);
   void ConvertSolid(const int &iswitch);
   void ConvertSolid1(const int &iswitch);
   void InitializeVoxels(BasePlate &bp);
@@ -53,9 +55,9 @@ class VoxelsCA
   void WriteToPVD(const std::string &filname, const std::vector<int> &, const std::vector<double> &);
   inline void loadS(std::vector<std::vector<double>>&S,std::vector<std::vector<int>> &sInd)
   {
-    // this is for decentered octahedron method: 
-    //      S is 6 corners of octahedron in local coor and sInd gives the 3 corner 
-    //      indices for a given octant 
+    // this is for decentered octahedron method:
+    //      S is 6 corners of octahedron in local coor and sInd gives the 3 corner
+    //      indices for a given octant
     S.assign(6,std::vector<double>(3));
     S[0] = {1,0,0};
     S[1] = {0,1,0};
@@ -119,7 +121,7 @@ class VoxelsCA
   } // end inline void dendriteVel
 */
   std::vector<int> gID,gNucleus,ineighID,ineighptr;
-  std::vector<int> vState; // 0=uninitialized; 1=liquid; 2=mushy; 3=solid
+  std::vector<int> vState, Build; // 0=uninitialized; 1=liquid; 2=mushy; 3=solid
   std::vector<double> cTheta,extents,centroidOct;
   double vmax;
   double (*dendritevelptr)(double &,double &,double &,double &,double &,double &,double &,double & );
