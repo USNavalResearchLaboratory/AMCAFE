@@ -51,6 +51,7 @@ Grid::Grid(std::string &filIn, int & myidIn, int & nprocsIn)
   T0 = 300;
   ictrl = 3;
   gsize={0,0};
+  EASM_Flag = 0; // 0 for Analytical, 1 for EASM
   meltparam = {75e-6,162.75e-6,75e-6,75e-6};
   bhatch = 1.53*meltparam[2];
   bmDelT = 4.0/3.0*meltparam[0]/bmV;
@@ -70,8 +71,8 @@ Grid::Grid(std::string &filIn, int & myidIn, int & nprocsIn)
   nZlayer = round(layerT/dX[2]);
   deltaXmin = *std::min_element(dX.begin(),dX.end());
   deltaTcheck = pow(deltaXmin,2.0)/dL;
-  ethresh = .01; 
-  deltaThresh=.95;  
+  ethresh = .01;
+  deltaThresh=.95;
   isp=0;
   inewscanflg=1;
   inewlayerflg=1;
@@ -99,12 +100,12 @@ Grid::Grid(std::string &filIn, int & myidIn, int & nprocsIn)
       lcoor2[2*k+1] = sin(gth)*(lcoor[2*k]-gmid[0])+
 	cos(gth)*(lcoor[2*k+1]-gmid[1])+gmid[1];
     } // j1
-  } // j2   
+  } // j2
   //grid box
   gbox[0]=-bhatch/2.;
   gbox[1]=LX[0]+bhatch/2.;
   gbox[2]=-bhatch/2.;
-  gbox[3]=LX[1]+bhatch/2.;               
+  gbox[3]=LX[1]+bhatch/2.;
 } // end constructor
 void Grid::UpdateLaser(){
   int itmp,iflg=0,irep=0;
@@ -141,7 +142,7 @@ void Grid::UpdateLaser(){
 	indlayer+=1;
 	ilaserLoc= Nzhg + indlayer*nZlayer;
 	isp=0;
-	// update grid 
+	// update grid
 	double gmid[2];
 	gmid[0]=LX[0]/2.;
 	gmid[1]=LX[1]/2.;
@@ -159,8 +160,8 @@ void Grid::UpdateLaser(){
       } // if/else (itmp<NpT-1...
     } // if (inewscanflg==0...
   } // while(irep==0...
-  if (irep==1){inewlayerflg=0;} 
-} // end UpdateLaser 
+  if (irep==1){inewlayerflg=0;}
+} // end UpdateLaser
 void Grid::readInputFile()
 {
   std::ifstream filIn;
@@ -272,6 +273,10 @@ void Grid::readInputFile()
       simInput >> keyword;
       offset[2]=std::stod(keyword);
     }
+    if (keyword=="EASM") {
+      simInput >> keyword;
+      EASM_Flag = std::stod(keyword);
+    }
     if (keyword=="meltparam") {
       meltparam.resize(4);
       simInput >> keyword;
@@ -337,7 +342,7 @@ void Grid::SkipTime(const double &DelT)
 {
   // DelT is the time increment of the temperature field
   //dt does not change
-  time = ceil(time/DelT)*DelT ; 
+  time = ceil(time/DelT)*DelT ;
   //tInd +=1;
 } // end UpdateTime2
 
@@ -449,4 +454,3 @@ void Grid::ComputeNeighborhoodFirst(int &j,std::string &ntype, std::vector<int> 
   } // if (ntype.compare...
 
 }; // end ComputeNeighborhoodFirst
-

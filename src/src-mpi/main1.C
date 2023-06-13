@@ -62,9 +62,13 @@ int main(int argc, char *argv[])
   while (!bcheck){
     // update temperature field
     TempF.tInd = int(round(g.time/TempF.DelT));
-    //    TempF.AnalyticTempCurr(g.time,TempF.TempCurr,part.icellidLoc,Ntot);
-    TempF.EASM(TempF.TempCurr, part.icellidLoc, Ntot);
-    // update next step for voxels 
+    if (EASM_Flag == 1) {
+      TempF.EASM(TempF.TempCurr, part.icellidLoc, Ntot);
+    }
+    else{
+      TempF.AnalyticTempCurr(g.time,TempF.TempCurr,part.icellidLoc,Ntot);
+    }
+    // update next step for voxels
     vox.UpdateVoxels();
     //write out
     g.UpdateLaser();
@@ -80,7 +84,7 @@ int main(int argc, char *argv[])
       vox.WriteToHDF1(filout);
       MPI_Barrier(MPI_COMM_WORLD);
     } // (indOut==0 ...
-    g.UpdateTime2(TempF.DelT);    
+    g.UpdateTime2(TempF.DelT);
     if (g.inewlayerflg==1){vox.AddLayer1();}
     auto texec2 = std::chrono::high_resolution_clock::now();
     auto delTexec = std::chrono::duration_cast<std::chrono::seconds>( texec2 - texec1 ).count();

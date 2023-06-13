@@ -9,7 +9,7 @@ class Grid
 {
  public:
   // default constructor
-  Grid(std::string & filIn, int & myid, int & nprocs);  
+  Grid(std::string & filIn, int & myid, int & nprocs);
   // any functions added here
   void readInputFile();
   void UpdateTime(const double &velo);
@@ -44,13 +44,13 @@ class Grid
   std::vector<double> dX,meltparam,beamSTD,LX,offset,lcoor,lcoor2,gsize;
   std::vector<int> nX;
   int nDim,tInd,nnodePerCell,ictrl,nZlayer,patternID,outint,myid,nprocs,outNL,nTsd,Nsd,Ntd,NpT,
-    inewscanflg,inewlayerflg,isp,indlayer,ilaserLoc,Nzhg;
+    inewscanflg,inewlayerflg,isp,indlayer,ilaserLoc,Nzhg,EASM_Flag;
   double bmV,bmP,bhatch; // beam velocity,power, hatch spacing, nucleation rate
   double tL,tS,T0; // liquidus, solidus, room temp (K)
   double mL; // liquidus slope of (K/wt%)
   double c0; // initial concentration (wt %)
   double Gamma; // Gibbs-Thompson coefficient (K m)
-  double kP; // partition coefficient 
+  double kP; // partition coefficient
   double dL; // diffusion coefficient (m^2/s)
   double muN; // nucleation rate coefficient
   double rho; // material density (kg/m^3)
@@ -64,7 +64,7 @@ class Grid
   double deltaThresh; // threshold value of pmf for allowing if voxel can be captured
   double mu; // rate for Voronoi tessellation for baseplate
   double bpH; // base plate height
-  double lrate; // layer rate for Voronoi powder microstructure 
+  double lrate; // layer rate for Voronoi powder microstructure
   double beamEta,T0targ,bmDelT,gbox[4],Avel,nvel;
   std::string ntype; // type of neighborhood: Moore or VonNeumann
   std::string neighOrder; // order of neighborhood
